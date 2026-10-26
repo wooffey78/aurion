@@ -1,0 +1,28 @@
+# Render Blueprint for Aurion's web process only. It deliberately does NOT create a database.
+# Supply DATABASE_URL for a dedicated Aurion PostgreSQL database before deploying.
+services:
+  - type: web
+    name: aurion-web
+    runtime: node
+    plan: free
+    buildCommand: npm ci --prefix backend --include=dev --no-audit --no-fund && npm run build
+    startCommand: npm --prefix backend start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: AURION_ENCRYPTION_KEY
+        sync: false

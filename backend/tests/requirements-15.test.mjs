@@ -16,5 +16,6 @@ test('landing download cards are rendered before the hero section', () => {
 test('landing download cards stay compact and images have no internal padding', () => {
   assert.match(css, /\.install-grid\{[^}]*max-width:820px[^}]*padding:0 12px/);
   assert.match(css, /\.install-card\{padding:0/);
-  assert.match(css, /\.install-card img\{display:block;width:100%/);
+  assert.match(css, /\.install-card img\{display:block;width:46px;height:46px/);
+  assert.match(css, /\.install-card\{min-height:68px;padding:0/);
 });

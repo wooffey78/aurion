@@ -18,7 +18,9 @@ export async function healthRoutes(app:FastifyInstance){
       await query("select 1");
       return {ok:true,service:"aurion-api",version,database:"reachable"};
     }catch(e:any){
-      return reply.code(503).send({ok:false,database:"unreachable",message:String(e?.message||e)});
+      // Never disclose driver errors, hostnames, role names, or connection details on a public health endpoint.
+      app.log.warn({err:e}, 'Database health check failed');
+      return reply.code(503).send({ok:false,database:"unreachable",error:"DATABASE_UNAVAILABLE"});
     }
   });
 }

@@ -1,15 +1,18 @@
 {
   "name": "aurion",
-  "version": "15.2.30",
+  "version": "15.2.31",
   "private": true,
   "scripts": {
     "dev": "npm --prefix backend run dev",
     "build": "npm --prefix backend run build",
-    "test": "npm --prefix backend test",
+    "test": "npm run build && npm --prefix backend test",
     "migrate": "npm --prefix backend run migrate:prod",
     "db:reset:test": "npm --prefix backend run db:reset:test",
     "start": "npm --prefix backend start",
     "sync-pricing": "node tools/sync-pricing.mjs",
-    "build-setup": "pwsh tools/Build-Setup.ps1"
+    "build-setup": "pwsh tools/Build-Setup.ps1",
+    "typecheck": "npm --prefix backend run typecheck",
+    "check": "npm run build && npm run typecheck && npm run test:smoke",
+    "test:smoke": "node --test backend/tests/production-readiness.test.mjs backend/tests/routes.contract.test.mjs backend/tests/routes.duplicates.test.mjs backend/tests/requirements-14.test.mjs backend/tests/requirements-15.test.mjs backend/tests/requirements-16.test.mjs backend/tests/strict-requirements-1-15.test.mjs"
   }
 }

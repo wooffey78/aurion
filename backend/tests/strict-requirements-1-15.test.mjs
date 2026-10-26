@@ -134,7 +134,7 @@ test('requirements 8/9 keep editable per-quote coefficients and catalog prices',
   assert.match(quote,/default_price/);assert.match(quote,/default_price/);
   assert.match(business,/part_coefficient_percent/);assert.match(business,/labor_coefficient_percent/);
   assert.match(business,/selling_price/);
-  assert.match(business,/unitPrice=Math\.max\(0,Number\(item\.unitCost/);
+  assert.match(business,/item\.unitPrice!==null&&item\.unitPrice!==undefined\?Math\.max\(0,Number\(item\.unitPrice\)\):Math\.max\(0,Number\(item\.unitCost\|\|0\)\*\(1\+coefficient\/100\)\+euroCoefficient/);
   assert.match(quote,/const total=service;/);
 });
 

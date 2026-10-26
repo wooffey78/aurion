@@ -5,7 +5,8 @@ dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 import { z } from 'zod';
 const schema=z.object({
  NODE_ENV:z.enum(['development','test','production']).default('development'),
- HOST:z.string().default('127.0.0.1'), PORT:z.coerce.number().int().min(1).max(65535).default(4000),
+ // Render and other PaaS reverse-proxies must bind to all interfaces; local development stays loopback-only.
+ HOST:z.string().default(process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1'), PORT:z.coerce.number().int().min(1).max(65535).default(4000),
  DATABASE_URL:z.string().min(1), CORS_ORIGIN:z.string().default('http://127.0.0.1:4000,http://localhost:4000,http://127.0.0.1:5500,http://localhost:5500'),
  JWT_ISSUER:z.string().default('aurion'), JWT_AUDIENCE:z.string().default('aurion-web'), JWT_SECRET:z.string().min(32),
  COOKIE_SECURE:z.enum(['true','false']).default('false').transform(v=>v==='true'),
