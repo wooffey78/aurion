@@ -1,0 +1,20 @@
+import dotenv from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.env') });
+import { z } from 'zod';
+const schema=z.object({
+ NODE_ENV:z.enum(['development','test','production']).default('development'),
+ HOST:z.string().default('127.0.0.1'), PORT:z.coerce.number().int().min(1).max(65535).default(4000),
+ DATABASE_URL:z.string().min(1), CORS_ORIGIN:z.string().default('http://127.0.0.1:4000,http://localhost:4000,http://127.0.0.1:5500,http://localhost:5500'),
+ JWT_ISSUER:z.string().default('aurion'), JWT_AUDIENCE:z.string().default('aurion-web'), JWT_SECRET:z.string().min(32),
+ COOKIE_SECURE:z.enum(['true','false']).default('false').transform(v=>v==='true'),
+ GOOGLE_CLIENT_ID:z.string().default(''), GOOGLE_CLIENT_SECRET:z.string().default(''), GOOGLE_REDIRECT_URI:z.string().default('http://127.0.0.1:4000/integrations/google/callback'),
+ GOOGLE_TOKEN_ENCRYPTION_KEY:z.string().default(''), GOOGLE_CALENDAR_ID:z.string().default('primary'),
+ MAIL_FROM_NAME:z.string().default('Aurion'), AURION_ENCRYPTION_KEY:z.string().default(''), APP_BASE_URL:z.string().default(''), PLATFORM_SMTP_HOST:z.string().default(''), PLATFORM_SMTP_PORT:z.coerce.number().int().default(465), PLATFORM_SMTP_SECURITY:z.enum(['ssl','starttls','none']).default('ssl'), PLATFORM_SMTP_USER:z.string().default(''), PLATFORM_SMTP_PASS:z.string().default(''), PLATFORM_SMTP_FROM:z.string().default(''), RATE_LIMIT_MAX:z.coerce.number().int().min(60).default(1500), STRIPE_SECRET_KEY:z.string().default(''), STRIPE_WEBHOOK_SECRET:z.string().default(''), BANK_TRANSFER_IBAN:z.string().default(''), BANK_TRANSFER_BIC:z.string().default(''), BANK_TRANSFER_HOLDER:z.string().default('Aurion'),
+ REMINDER_WORKER_INTERVAL_MS:z.coerce.number().int().min(10000).default(60000), AURION_SUPPORT_EMAIL:z.string().email().default('easyfixit.reparation@gmail.com')
+});
+const parsed=schema.parse(process.env);
+if(parsed.NODE_ENV==='production'&&!parsed.COOKIE_SECURE)throw new Error('COOKIE_SECURE=true est obligatoire en production.');
+if(parsed.GOOGLE_CLIENT_ID && !parsed.GOOGLE_CLIENT_SECRET)throw new Error('GOOGLE_CLIENT_SECRET manquant.');
+export const config=parsed;

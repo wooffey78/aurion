@@ -1,0 +1,2 @@
+export function passwordScore(v=''){let s=0;if(v.length>=12)s++;if(v.length>=16)s++;if(/[A-Z]/.test(v))s++;if(/[a-z]/.test(v))s++;if(/\d/.test(v))s++;if(/[^A-Za-z0-9]/.test(v))s++;return Math.min(5,s)}
+export function suggestPassword(){const a='ABCDEFGHJKLMNPQRSTUVWXYZ',b='abcdefghijkmnopqrstuvwxyz',n='23456789',s='!@#$%^&*_-+=';let out='';const pool=a+b+n+s;for(let i=0;i<20;i++)out+=pool[Math.floor(Math.random()*pool.length)];return out}

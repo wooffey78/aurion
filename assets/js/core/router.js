@@ -1,0 +1,1 @@
+export function route(){const p=(location.hash.replace(/^#/,'')||'/').split('?')[0];return p.startsWith('/')?p:'/'+p}export function routeQuery(){const h=location.hash.replace(/^#/,'');const i=h.indexOf('?');return new URLSearchParams(i>=0?h.slice(i+1):'')}export function go(path){location.hash=path}export function listen(fn){addEventListener('hashchange',fn)}

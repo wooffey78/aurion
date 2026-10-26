@@ -1,0 +1,216 @@
+import type { FastifyInstance } from "fastify";
+import crypto from "node:crypto";
+import { query, db } from "../db.js";
+import { hashPassword, verifyPassword } from "../services/passwords.js";
+import { registerSchema, loginSchema } from "../services/validation.js";
+import { signAccessToken } from "../plugins/auth.js";
+import { recordAcceptances } from "../services/account.js";
+import { createRefreshSession, rotateRefreshSession, revokeRefreshSession, revokeAllRefreshSessions, REFRESH_SECONDS } from '../services/native-sessions.js';
+import { registrationOptions, verifyRegistration, authenticationOptions, verifyAuthentication, issueWebAuthnSession } from '../services/webauthn.js';
+
+function configOrigin(request:any){ const proto=String(request.headers['x-forwarded-proto']||'http').split(',')[0]; const host=String(request.headers.host||'localhost'); return `${proto}://${host}`; }
+
+export async function authRoutes(app: FastifyInstance) {
+  app.get('/auth/vip-invite/validate', { config: { rateLimit: { max: 30, timeWindow: '15 minutes' } } }, async (request, reply) => {
+    const token=String((request.query as any)?.token||'');
+    if(token.length<20)return reply.code(400).send({error:'INVITE_INVALID',message:'Invitation invalide.'});
+    const row=(await query('select email,expires_at,accepted_at from admin_guest_invites where token_hash=$1',[crypto.createHash('sha256').update(token).digest('hex')])).rows[0];
+    if(!row||row.accepted_at||new Date(row.expires_at).getTime()<=Date.now())return reply.code(400).send({error:'INVITE_INVALID',message:'Cette invitation est invalide ou expirée.'});
+    return {valid:true,email:row.email,expiresAt:row.expires_at};
+  });
+  app.post('/auth/vip-invite/accept', { config: { rateLimit: { max: 8, timeWindow: '15 minutes' } } }, async (request, reply) => {
+    const body=request.body as any;const token=String(body?.token||'');const password=String(body?.password||'');const fullName=String(body?.fullName||'').trim();
+    if(token.length<20||password.length<12||!body?.acceptLegal)return reply.code(400).send({error:'INVALID_INPUT',message:'Le lien, le mot de passe et l’acceptation des documents légaux sont obligatoires.'});
+    const tokenHash=crypto.createHash('sha256').update(token).digest('hex');
+    const row=(await query('select * from admin_guest_invites where token_hash=$1 and accepted_at is null and expires_at>now()',[tokenHash])).rows[0];
+    if(!row)return reply.code(400).send({error:'INVITE_INVALID',message:'Cette invitation est invalide ou expirée.'});
+    if((await query('select 1 from users where lower(email)=lower($1) limit 1',[row.email])).rowCount)return reply.code(409).send({error:'ACCOUNT_EXISTS',message:'Un compte existe déjà avec cette adresse e-mail.'});
+    const { hashPassword }=await import('../services/passwords.js');
+    const id=crypto.randomUUID(),orgId=crypto.randomUUID(),passwordHash=await hashPassword(password),client=await db.connect();
+    try{
+      await client.query('begin');
+      await client.query("insert into organizations(id,name,activity) values($1,$2,$3)",[orgId,'Espace VIP Aurion','À configurer']);
+      await client.query('insert into users(id,email,password_hash,full_name) values($1,$2,$3,nullif($4,\'\'))',[id,row.email,passwordHash,fullName]);
+      await client.query("insert into organization_members(organization_id,user_id,role) values($1,$2,'owner')",[orgId,id]);
+      await client.query("insert into activities(organization_id,code,name,description,urssaf_rate,vat_rate) values($1,'principale','Activité principale','À configurer',null,20) on conflict do nothing",[orgId]);
+      await client.query('insert into vip_guest_accounts(user_id,invited_by,invite_id) values($1,$2,$3)',[id,row.invited_by,row.id]);
+      await client.query('update admin_guest_invites set accepted_at=now(),accepted_user_id=$1 where id=$2',[id,row.id]);
+      await recordAcceptances(client,id,request.ip);
+      await client.query('commit');
+    }catch(e){await client.query('rollback');throw e}finally{client.release()}
+    const identity={userId:id,organizationId:orgId,role:'owner',email:row.email};
+    const tokenOut=await signAccessToken(identity);app.setSession(reply,tokenOut);
+    return {ok:true,accessToken:tokenOut,user:{id,email:row.email,fullName},organizationId:orgId,vip:true};
+  });
+  app.get("/auth/me", { preHandler: app.requireAuth }, async (request) => ({
+    userId: request.auth!.userId,
+    organizationId: request.auth!.organizationId,
+    role: request.auth!.role,
+  }));
+
+  app.post(
+    "/auth/register",
+    {
+      config: { rateLimit: { max: 5, timeWindow: "15 minutes" } },
+      schema: {
+        body: {
+          type: "object",
+          required: ["email", "password"],
+          additionalProperties: false,
+          properties: {
+            email: { type: "string", maxLength: 254 },
+            password: { type: "string", minLength: 12, maxLength: 256 },
+            acceptLegal: { type: "boolean" },
+            fullName: { type: "string", maxLength: 160 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      if ((request.body as any)?.acceptLegal !== true) {
+        return reply.code(400).send({ error: "LEGAL_NOT_ACCEPTED", message: "Vous devez accepter les CGV et la politique de confidentialité pour créer un compte." });
+      }
+      const parsed = registerSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "INVALID_INPUT" });
+      }
+
+      const email = parsed.data.email.toLowerCase();
+      const id = crypto.randomUUID();
+      const orgId = crypto.randomUUID();
+      const passwordHash = await hashPassword(parsed.data.password);
+      const client = await db.connect();
+
+      try {
+        await client.query("begin");
+        await client.query(
+          "insert into organizations(id,name,activity) values($1,$2,$3)",
+          [orgId, "Nouvelle entreprise", "À configurer"],
+        );
+        await client.query(
+          "insert into users(id,email,password_hash) values($1,$2,$3)",
+          [id, email, passwordHash],
+        );
+        await client.query(
+          "insert into organization_members(organization_id,user_id,role) values($1,$2,'owner')",
+          [orgId, id],
+        );
+        await client.query(
+          "insert into activities(organization_id,code,name,description,urssaf_rate,vat_rate) values($1,'principale','Activité principale','À configurer',null,20) on conflict do nothing",
+          [orgId],
+        );
+        await client.query(
+          "insert into subscriptions(organization_id,status,trial_started_at,trial_ends_at) values($1,'trialing',now(),now()+interval '60 days')",
+          [orgId],
+        );
+        if ((request.body as any)?.fullName) await client.query("update users set full_name=$1 where id=$2", [String((request.body as any).fullName).trim(), id]);
+        await recordAcceptances(client, id, request.ip);
+        await client.query("commit");
+      } catch (error: any) {
+        await client.query("rollback");
+        if (error?.code === "23505") {
+          return reply.code(409).send({ error: "ACCOUNT_EXISTS" });
+        }
+        throw error;
+      } finally {
+        client.release();
+      }
+
+      const token = await signAccessToken({
+        userId: id,
+        organizationId: orgId,
+        role: "owner",
+      });
+      app.setSession(reply, token);
+      const refresh=await createRefreshSession({userId:id,organizationId:orgId,role:'owner',sessionVersion:0},request);
+      app.setRefreshSession(reply,refresh.token);
+
+      return reply.code(201).send({
+        user: { id, email },
+        organization: { id: orgId },
+        accessToken: token,
+        expiresIn: 30*60,
+      });
+    },
+  );
+
+  app.post(
+    "/auth/login",
+    {
+      config: { rateLimit: { max: 8, timeWindow: "15 minutes" } },
+      schema: {
+        body: {
+          type: "object",
+          required: ["email", "password"],
+          additionalProperties: false,
+          properties: {
+            email: { type: "string", maxLength: 254 },
+            password: { type: "string", minLength: 1, maxLength: 256 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const parsed = loginSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "INVALID_INPUT" });
+      }
+
+      const r = await query<{
+        id: string;
+        email: string;
+        password_hash: string;
+        organization_id: string;
+        role: string;
+        session_version: number;
+      }>(
+        `select u.id,u.email,u.password_hash,u.session_version,om.organization_id,om.role
+         from users u
+         join organization_members om on om.user_id=u.id
+         where lower(u.email)=lower($1)
+         limit 1`,
+        [parsed.data.email],
+      );
+
+      const row = r.rows[0];
+      if (!row || !(await verifyPassword(row.password_hash, parsed.data.password))) {
+        return reply.code(401).send({ error: "INVALID_CREDENTIALS" });
+      }
+
+      const token = await signAccessToken({
+        userId: row.id,
+        organizationId: row.organization_id,
+        role: row.role,
+        sv: Number(row.session_version || 0),
+      });
+      app.setSession(reply, token);
+      const refresh=await createRefreshSession({userId:row.id,organizationId:row.organization_id,role:row.role,sessionVersion:Number(row.session_version||0)},request);
+      app.setRefreshSession(reply,refresh.token);
+
+      return { user:{id:row.id,email:row.email}, organizationId:row.organization_id, accessToken:token, expiresIn:30*60 }; 
+    },
+  );
+
+  app.get('/auth/webauthn/register/options', { preHandler: app.requireAuth }, async (request) => registrationOptions(request.auth!.userId, String(request.headers.origin || configOrigin(request))))
+  app.post('/auth/webauthn/register/verify', { preHandler: app.requireAuth }, async (request, reply) => {
+    try { return await verifyRegistration(request.auth!.userId, request.body, String(request.headers.origin || configOrigin(request))); }
+    catch(e:any){ return reply.code(400).send({error:'WEBAUTHN_REGISTRATION_FAILED',message:String(e?.message||e)}); }
+  });
+  app.get('/auth/webauthn/authenticate/options', { config: { rateLimit: { max: 8, timeWindow: '15 minutes' } } }, async (request) => authenticationOptions(String(request.headers.origin || configOrigin(request))));
+  app.post('/auth/webauthn/authenticate/verify', async (request, reply) => {
+    try { const identity=await verifyAuthentication(request.body, String(request.headers.origin || configOrigin(request))); return await issueWebAuthnSession(app,reply,request,identity); }
+    catch(e:any){ return reply.code(401).send({error:'WEBAUTHN_AUTHENTICATION_FAILED',message:'La connexion biométrique n’a pas pu être validée.'}); }
+  });
+
+  app.post('/auth/refresh', async (request, reply) => {
+    const raw=request.cookies?.aurion_refresh;
+    if(!raw) return reply.code(401).send({error:'UNAUTHENTICATED'});
+    const rotated=await rotateRefreshSession(raw,request);
+    if(!rotated) return reply.code(401).send({error:'UNAUTHENTICATED'});
+    const token=await signAccessToken(rotated.identity);
+    app.setSession(reply,token); app.setRefreshSession(reply,rotated.token);
+    return {accessToken:token,expiresIn:30*60,organizationId:rotated.identity.organizationId};
+  });
+
+  app.post('/auth/logout', async (request, reply) => { await revokeRefreshSession(request.cookies?.aurion_refresh||''); app.clearSession(reply); app.clearRefreshSession(reply); return {ok:true}; });
+}

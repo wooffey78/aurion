@@ -1,0 +1,128 @@
+// Devis & factures : consulter, modifier, télécharger (PDF / Word / ODT), envoyer, facturer, supprimer.
+import{api}from'../../core/api.js';
+import{S,e,money,toast,modalForm,confirmDelete,openDoc,emailToast,itemsText,prof,hooks,askConfirm}from'./core.js';
+
+const kindOf=q=>q.document_type==='invoice'?'invoices':'quotes';
+const fmt=d=>new Date(d).toLocaleDateString('fr-FR');
+const invoicePenalty=q=>Number(q.total_penalty_amount||0)||0;
+const invoiceDue=q=>Number(q.total_ttc||0)+invoicePenalty(q);
+const invoiceStatus=q=>!q.sent_at?'Facture non envoyée':Number(q.reminder_count||0)>=4?`${Number(q.reminder_count)}e relance envoyée avec majoration`:Number(q.reminder_count||0)===3?'3e relance envoyée':Number(q.reminder_count||0)===2?'2e relance envoyée':Number(q.reminder_count||0)===1?'Première relance envoyée':'Facture envoyée';
+
+const savPartOptions=(selected='')=>`<option value="">Votre choix</option>${(S.parts||[]).map(p=>`<option value="${e(p.id)}" ${selected===p.id?'selected':''}>${e(p.name)}${Number(p.selling_price)>0?` · ${money(p.selling_price)} HT`:''}</option>`).join('')}`;
+const savRow=(item={},prefix='sav')=>`<div class="sav-line stack" data-sav-row>
+  <div class="grid-2"><label class="field"><span>Pièce / prestation</span><select class="sav-part">${savPartOptions(item.partId||'')}</select></label><label class="field"><span>Désignation</span><input class="sav-label" value="${e(item.label||'')}" placeholder="Pièce ou main-d’œuvre"></label></div>
+  <div class="grid-2"><label class="field"><span>Quantité</span><input class="sav-qty" type="number" min="0.01" step="any" value="${item.quantity!=null&&Number(item.quantity)>0?e(item.quantity):''}" placeholder="1"></label><label class="field"><span>Tarif SAV unitaire HT</span><input class="sav-price" type="number" min="0" step="0.01" value="${item.unitPrice!=null&&Number(item.unitPrice)>0?e(item.unitPrice):''}" placeholder="Tarif SAV"></label></div>
+  <div class="button-row"><button type="button" class="btn danger small sav-remove">Retirer cette ligne</button></div>
+</div>`;
+const savUnitPrice=(item,invoiceShipping=0)=>{const part=(S.parts||[]).find(p=>p.id===item.partId);const supplierPrices=(part?.suppliers||[]).map(s=>Number(s.purchasePrice)).filter(n=>n>0);const purchase=supplierPrices.length?Math.min(...supplierPrices):Number(item.unitCost||0);return Math.max(0,purchase+Number(invoiceShipping||0));};
+const savRows=(items=[],invoiceShipping=0)=>Array.isArray(items)&&items.length?items.map(i=>savRow({...i,unitPrice:savUnitPrice(i,invoiceShipping)})).join(''):savRow();
+const readSavItems=m=>[...m.querySelectorAll('[data-sav-row]')].map(row=>({
+  label:String(row.querySelector('.sav-label')?.value||'').trim(),
+  quantity:Number(String(row.querySelector('.sav-qty')?.value||'').replace(',','.'))||0,
+  unitPrice:Number(String(row.querySelector('.sav-price')?.value||'').replace(',','.'))||0,
+  partId:row.querySelector('.sav-part')?.value||null
+})).filter(x=>x.label&&x.quantity>0);
+const savTotal=m=>readSavItems(m).reduce((t,x)=>t+x.quantity*x.unitPrice,0);
+const refreshSavTotal=m=>{const total=savTotal(m);const node=m.querySelector('.sav-total');if(node)node.textContent=total>0?`-${money(total)}`:money(0);};
+const bindSavForm=(m,{items=[],invoiceShipping=0}={})=>{
+  const syncPartLabel=row=>{const select=row.querySelector('.sav-part'),label=row.querySelector('.sav-label'),price=row.querySelector('.sav-price');const part=(S.parts||[]).find(x=>x.id===select?.value);if(part&&label&&!label.value)label.value=part.name;if(part&&price)price.value=savUnitPrice({partId:part.id,unitCost:0},invoiceShipping).toFixed(2);};
+  m.querySelector('#sav-add-line')?.addEventListener('click',()=>{m.querySelector('#sav-lines')?.insertAdjacentHTML('beforeend',savRow());const row=m.querySelector('#sav-lines')?.lastElementChild;row?.querySelector('.sav-label')?.focus();refreshSavTotal(m)});
+  m.querySelector('#sav-lines')?.addEventListener('click',ev=>{const b=ev.target.closest('.sav-remove');if(!b)return;const rows=[...m.querySelectorAll('[data-sav-row]')];if(rows.length>1)b.closest('[data-sav-row]').remove();else{b.closest('[data-sav-row]').querySelectorAll('input').forEach(i=>{i.value=''});b.closest('[data-sav-row]').querySelector('.sav-part').value='';}refreshSavTotal(m)});
+  m.querySelector('#sav-lines')?.addEventListener('input',()=>refreshSavTotal(m));
+  m.querySelector('#sav-lines')?.addEventListener('change',ev=>{if(ev.target.classList.contains('sav-part'))syncPartLabel(ev.target.closest('[data-sav-row]'));refreshSavTotal(m)});
+  refreshSavTotal(m);
+};
+const openSavForInvoice=async q=>{
+  const warranties=q.warranties||[];
+  if(!warranties.length){modalForm(`SAV · ${e(q.number)}`,`<div class="notice">Aucune garantie active n’est associée à cette facture. Le bouton SAV reste disponible, mais un dossier SAV ne peut être créé qu’avec une garantie encore valide.</div>`,async()=>{},{label:'Fermer'});return;}
+  const remaining=Math.min(...warranties.map(w=>Number(w.remainingDays||0)));
+  const scope=[...new Set(warranties.map(w=>w.scopeType).filter(Boolean))].map(v=>v==='parts'?'pièces':v==='labor'?'main-d’œuvre':'pièces + main-d’œuvre').join(', ');
+  const fields=`<p class="muted">Garantie restante : <b>${remaining} jour${remaining>1?'s':''}</b>${scope?` · Couverture : <b>${e(scope)}</b>`:''}. Le SAV est sans coefficient et son montant total sera toujours nul ou négatif.</p>
+    <label class="field"><span>Client</span><select id="savClient" disabled><option value="${e(q.client_id||'')}" selected>${e(q.client_name||'Client')}</option></select></label>
+    <div id="sav-lines" class="stack">${savRows(q.items||[],Number(q.shipping_cost||0)).replaceAll('class="sav-line stack"','class="sav-line stack"')}</div>
+    <div class="button-row"><button type="button" class="btn secondary" id="sav-add-line">+ Ajouter une pièce / main-d’œuvre</button></div>
+    <div class="calc-total"><span>Total SAV</span><strong class="sav-total">0,00 €</strong></div>
+    <label class="field"><span>Note <em class="tag">facultatif</em></span><textarea id="savNote" placeholder="Motif ou détail du SAV"></textarea></label>`;
+  const m=modalForm(`SAV · ${e(q.number)}`,fields,async sm=>{
+    const arr=readSavItems(sm);
+    await api.createSav({clientId:q.client_id,invoiceId:q.id,items:arr,note:sm.querySelector('#savNote').value.trim()||null});
+    await hooks.refresh('invoices');
+  },{label:'Enregistrer le SAV'});
+  bindSavForm(m,{items:q.items||[]});
+};
+
+export const view=()=>{
+  const f=S.docFilter,list=S.quotes.filter(q=>f==='all'||(f==='invoice')===(q.document_type==='invoice'));
+  const savList=S.sav||[];
+  return`<div class="page-head"><div><span class="eyebrow">DOCUMENTS COMMERCIAUX</span><h1>Devis & factures</h1><p>Consultez, modifiez, téléchargez, envoyez ou supprimez vos documents.</p></div><div class="button-row"><button class="btn primary" data-new-type="quote">+ Nouveau devis</button><button class="btn secondary" data-new-type="invoice">+ Nouvelle facture</button></div></div>
+  <div class="doc-search"><input id="doc-search" type="search" placeholder="Rechercher par identité, montant ou date…" aria-label="Rechercher par identité, montant ou date"></div><div class="seg">${[['all','Tous'],['quote','Devis'],['invoice','Factures']].map(([k,l])=>`<button class="seg-btn ${f===k?'active':''}" data-filter="${k}">${l}</button>`).join('')}</div>
+  ${list.some(q=>q.document_type==='invoice'&&Number(q.reminder_count||0)===3&&q.payment_status!=='paid')?'<div class="notice warn-notice">⚠ Une ou plusieurs factures nécessitent une 4e relance. Ouvrez la section Devis & factures pour définir ou vérifier la majoration puis envoyer la relance.</div>':''}<section class="panel">${list.map(q=>`<article class="doc-row" data-client-name="${e(String(q.client_name||'').toLowerCase())}" data-doc-search="${e([q.client_name,q.total_ttc,q.created_at,q.number].join(' ').toLowerCase())}"><div class="doc-main"><div class="doc-title"><b>${e(q.number)}</b><span class="pill">${q.document_type==='invoice'?'Facture':'Devis'}</span>${q.document_type!=='invoice'&&q.sent_at?'<span class="pill ok">Envoyé</span>':''}${q.document_type==='invoice'?`<span class="pill">${e(invoiceStatus(q))}</span><span class="pill ${q.payment_status==='paid'?'ok':''}">${q.payment_status==='paid'?'Réglé':'Paiement en attente'}</span>`:''}${q.warranties?.length?`<span class="pill ok warranty-live">Garantie restante · ${Math.min(...q.warranties.map(w=>Number(w.remainingDays||0)))} jour${Math.min(...q.warranties.map(w=>Number(w.remainingDays||0)))>1?'s':''}</span>`:''}</div><small>${e(q.client_name||'Client')} · ${fmt(q.created_at)}</small><small>${e(q.intervention||'')}${itemsText(q)?` — ${e(itemsText(q))}`:''}${Number(q.mileage_total||0)>0?` · ${Number(q.mileage_km||0).toLocaleString('fr-FR')} km × ${Number(q.mileage_rate||0).toLocaleString('fr-FR',{maximumFractionDigits:4})} €/km`:''}</small></div><div class="doc-total">${money(q.document_type==='invoice'?invoiceDue(q):q.total_ttc)}<small>TTC</small></div>
+   <div class="doc-actions"><button class="btn secondary small view-doc" data-id="${q.id}">Voir</button><button class="btn secondary small edit-doc" data-id="${q.id}">Modifier</button><button class="btn secondary small pdf-view" data-id="${q.id}">Aperçu PDF</button><button class="link-btn dl" data-id="${q.id}" data-ext="pdf">PDF</button><button class="link-btn dl" data-id="${q.id}" data-ext="docx">Word</button><button class="link-btn dl" data-id="${q.id}" data-ext="odt">ODT</button><button class="btn secondary small mail-doc" data-id="${q.id}">E-mail</button>${q.document_type!=='invoice'?`<button class="btn primary small convert" data-id="${q.id}">Facturer</button>`:`${q.sent_at?`<button class="btn secondary small sav-from-invoice" data-id="${q.id}">SAV</button>`:''}${q.document_type==='invoice'?`<button class="btn secondary small schedule-doc" data-id="${q.id}">Échéancier</button>`:''}<button class="btn ${q.payment_status==='paid'?'secondary':'primary'} small settle-doc" data-id="${q.id}" ${q.payment_status==='paid'?'disabled':''}>${q.payment_status==='paid'?'Réglé':'Réglé'}</button>${q.document_type==='invoice'&&Number(q.reminder_count||0)===3?`<button class="btn secondary small penalty-config" data-id="${q.id}">Configurer la majoration</button>`:''}${Number(q.reminder_count||0)<1000?`<button class="btn secondary small remind-doc" data-id="${q.id}">Relance</button>`:''}`}${q.document_type==='invoice'&&q.payment_status==='paid'?'':`<button class="btn danger small delete-doc" data-id="${q.id}">Supprimer</button>`}</div>${q.document_type==='invoice'?`<details class="invoice-history"><summary>Facture et relances envoyées</summary><div class="stack"><div class="list-row"><div><b>Facture ${e(q.number)}</b><small>Montant facture : ${money(q.total_ttc||0)} TTC</small></div><strong>${money(invoiceDue(q))}</strong></div>${(q.reminders||[]).map(r=>`<div class="list-row"><div><b>${Number(r.reminderNumber)===1?'1ère':`${Number(r.reminderNumber)}e`} relance</b><small>Envoyée le ${fmt(r.createdAt)}${Number(r.penaltyAmount||0)>0?` · Majoration : ${money(r.penaltyAmount)}`:''}</small></div><strong>${money(Number(q.total_ttc||0)+Number((q.reminders||[]).filter(x=>Number(x.reminderNumber)<=Number(r.reminderNumber)).reduce((n,x)=>n+Number(x.penaltyAmount||0),0)))} TTC</strong></div>`).join('')||'<p class="muted">Aucune relance envoyée.</p>'}</div></details>`:''}</article>`).join('')||'<div class="empty">Aucun document.</div>'}</section><section class="panel"><div class="section-title"><div><h2>SAV</h2><small>Consultation, modification et suppression des dossiers SAV.</small></div></div>${savList.map(x=>`<article class="doc-row sav-row"><div class="doc-main"><div class="doc-title"><b>SAV</b><span class="pill">${e(x.invoice_number||'Facture')}</span></div><small>${e(x.client_name||'Client')} · ${fmt(x.created_at)}</small><small>${(x.items||[]).map(i=>`${Number(i.quantity)} × ${e(i.label)}`).join(', ')}</small>${x.note?`<small>Note SAV : ${e(x.note)}</small>`:''}</div><div class="doc-total">${money(x.amount_ttc||0)}<small>TTC</small></div><div class="doc-actions"><button class="btn secondary small edit-sav" data-id="${x.id}">Modifier</button><button class="btn danger small delete-sav" data-id="${x.id}">Supprimer</button></div></article>`).join('')||'<div class="empty">Aucun SAV enregistré.</div>'}</section>`;
+};
+
+export function bind(){
+  const all=s=>document.querySelectorAll(s),get=id=>S.quotes.find(x=>x.id===id); const search=document.querySelector('#doc-search'); search?.addEventListener('input',ev=>{const q=String(ev.target.value||'').trim().toLowerCase();all('.doc-row').forEach(r=>r.hidden=!!q&&!r.dataset.docSearch.includes(q))});
+  all('[data-new-type]').forEach(b=>b.onclick=()=>{S.editing=null;S.quoteDraft=null;S.documentType=b.dataset.newType;hooks.refresh('quote').catch(x=>toast(x.message,'error'))});
+  all('[data-filter]').forEach(b=>b.onclick=()=>{S.docFilter=b.dataset.filter;hooks.show('invoices')});
+  all('.pdf-view').forEach(b=>b.onclick=()=>{const q=get(b.dataset.id);openDoc(kindOf(q),q.id,'pdf','view')});
+  all('.dl').forEach(b=>b.onclick=()=>{const q=get(b.dataset.id);openDoc(kindOf(q),q.id,b.dataset.ext,'download')});
+  all('.edit-doc').forEach(b=>b.onclick=()=>{S.editing=get(b.dataset.id);if(!S.editing)return;S.documentType=S.editing.document_type==='invoice'?'invoice':'quote';hooks.refresh('quote').catch(x=>toast(x.message,'error'))});
+  all('.delete-doc').forEach(b=>b.onclick=()=>{const q=get(b.dataset.id);confirmDelete(`Supprimer définitivement ${q.document_type==='invoice'?'la facture':'le devis'} ${q.number} ?\nSes fichiers PDF, Word et ODT seront aussi supprimés. Cette action est irréversible.`,()=>api.deleteQuote(q.id),'Document supprimé',{title:`Supprimer ${q.number} ?`})});
+  all('.delete-sav').forEach(b=>b.onclick=()=>{const x=S.sav.find(v=>v.id===b.dataset.id);if(!x)return;confirmDelete(`Supprimer définitivement le SAV de ${x.client_name||'ce client'} ?`,()=>api.deleteSav(x.id),'SAV supprimé',{title:'Supprimer le SAV ?'});});
+  all('.edit-sav').forEach(b=>b.onclick=()=>{const x=S.sav.find(v=>v.id===b.dataset.id);if(!x)return;const items=Array.isArray(x.items)?x.items:[];const invoice=S.quotes.find(q=>q.id===x.quote_id);const m=modalForm('Modifier le SAV',`<p class="muted">Le SAV reste associé à la facture et à son client. Aucun coefficient n'est appliqué.</p><div id="sav-lines" class="stack">${savRows(items,Number(invoice?.shipping_cost||0))}</div><div class="button-row"><button type="button" class="btn secondary" id="sav-add-line">+ Ajouter une pièce / main-d’œuvre</button></div><div class="calc-total"><span>Total SAV</span><strong class="sav-total">0,00 €</strong></div><label class="field"><span>Note <em class="tag">facultatif</em></span><textarea id="savNote" placeholder="Motif ou détail du SAV">${e(x.note||'')}</textarea></label>`,async m=>{await api.updateSav(x.id,{items:readSavItems(m),note:m.querySelector('#savNote').value.trim()||null});},{label:'Enregistrer'});bindSavForm(m,{items,invoiceShipping:Number(invoice?.shipping_cost||0)});});
+  all('.convert').forEach(b=>b.onclick=async()=>{
+    const q=get(b.dataset.id);if(!q)return;
+    const m=modalForm(`Transformer ${e(q.number)} en facture`,`<p class="muted">La facture sera le document envoyé au client. Elle ne sera intégrée aux calculs Aurion qu’après déclaration d’un paiement.</p><div class="grid-2"><label class="field"><span>Échéance de paiement</span><input id="convertDueAt" type="date" required></label><label class="field"><span>Délai entre les relances (jours)</span><input id="convertReminderInterval" type="number" min="0" max="365" step="1" placeholder="0"></label></div><label class="field"><span>Adresse de facturation</span><select id="convertAddressSource"><option value="">Votre choix</option><option value="client">Adresse du client</option><option value="intervention">Adresse d’intervention</option></select></label>`,async m=>{
+      const dueAt=m.querySelector('#convertDueAt').value||null;if(!dueAt)throw new Error('Indiquez une échéance de paiement.');
+      const rawInterval=m.querySelector('#convertReminderInterval').value.trim();const interval=rawInterval===''?0:Math.min(365,Math.max(0,Number(rawInterval)));
+      const invoiceAddressSource=m.querySelector('#convertAddressSource').value;
+      const r=await api.convertQuote(q.id,true,{dueAt,reminderIntervalDays:interval,invoiceAddressSource});
+      toast(`Facture ${r.number} créée et envoyée. Les calculs comptables restent en attente du règlement.`,'success');
+      await hooks.refresh('invoices');
+    },{label:'Créer et envoyer'});
+    m.querySelector('#convertDueAt').value=new Date(Date.now()+7*86400000).toISOString().slice(0,10);
+  });
+  all('.schedule-doc').forEach(b=>b.onclick=async()=>{const q=get(b.dataset.id);if(!q)return;const m=modalForm(`Échéancier · ${e(q.number)}`,`<p class="muted">Le dernier centime est automatiquement affecté à la dernière échéance.</p><label class="field"><span>Nombre d’échéances</span><input id="instCount" type="number" min="1" max="120" step="1" value="2"></label><label class="field"><span>Première échéance</span><input id="instStart" type="date" required></label><label class="field"><span>Intervalle entre échéances (jours)</span><input id="instInterval" type="number" min="0" max="3650" step="1" value="30"></label><div id="instPreview" class="stack"></div>`,async m=>{const count=Math.max(1,Math.min(120,Number(m.querySelector('#instCount').value||0))),start=m.querySelector('#instStart').value;if(!start)throw new Error('Indiquez la première échéance.');await api.saveInvoiceInstallments(q.id,{count,startDate:start,intervalDays:Number(m.querySelector('#instInterval').value||0)});toast('Échéancier enregistré.','success');await hooks.refresh('invoices')},{label:'Enregistrer l’échéancier'});m.querySelector('#instStart').value=new Date(Date.now()+7*86400000).toISOString().slice(0,10);});
+  all('.settle-doc').forEach(b=>b.onclick=async()=>{
+    const q=get(b.dataset.id);if(!q||q.payment_status==='paid')return;
+    let live;try{live=await api.invoicePayments(q.id)}catch(x){return toast(x.message,'error')}
+    const penalties=Number(live.invoice?.total_penalty_amount||invoicePenalty(q)||0);
+    const dueTotal=Number((live.invoice?.total_ttc??q.total_ttc)||0)+penalties;
+    const remaining=Math.max(0,dueTotal-Number((live.invoice?.amount_paid??q.amount_paid)||0));
+    if(remaining<=0){toast('Cette facture est déjà entièrement payée.','info');await hooks.refresh('invoices');return}
+    const methods=[['cash','Espèces'],['cheque','Chèque'],['card','Carte'],['transfer','Virement'],['crypto','Crypto']];
+    modalForm(`Enregistrer un paiement · ${e(q.number)}`,
+      `<p class="muted">Reste à payer : ${money(remaining)}.</p>
+       <label class="field"><span>Montant</span><input id="payAmount" type="number" min="0.01" step="0.01" max="${remaining}" value="${remaining}" required></label>
+       <label class="field"><span>Date du paiement</span><input id="payDate" type="date" value="${new Date().toISOString().slice(0,10)}"></label>
+       <label class="field"><span>Mode de paiement</span><select id="payMethod"><option value="">Votre choix</option>${methods.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label>
+       <label class="field"><span>Référence <em class="tag">facultatif</em></span><input id="payReference" placeholder="Ex. VIR-20261025-001"></label>
+       <label class="field"><span>Note <em class="tag">facultatif</em></span><input id="payNote"></label>`,
+      async m=>{
+        const amount=Number(String(m.querySelector('#payAmount').value||'').replace(',','.'));
+        if(!Number.isFinite(amount)||amount<=0)throw new Error('Indiquez un montant valide.');
+        await api.addInvoicePayment(q.id,{amount,paymentMethod:m.querySelector('#payMethod').value,paidAt:m.querySelector('#payDate').value||null,reference:m.querySelector('#payReference').value.trim()||null,note:m.querySelector('#payNote').value.trim()||null});
+      },
+      {label:'Enregistrer le paiement'}
+    );
+  });
+  all('.penalty-config').forEach(b=>b.onclick=()=>{const q=get(b.dataset.id);modalForm(`Majoration · ${e(q.number)}`,`<p class="muted">Configurez ici la majoration qui sera appliquée à la 4e relance. En pourcentage, elle est calculée sur le total TTC de la 3e relance, majorations déjà cumulées comprises. En euros, le montant est ajouté à ce total.</p><label class="field"><span>Type</span><select id="penaltyMode"><option value="">Votre choix</option><option value="none" ${q.late_penalty_mode==='none'?'selected':''}>Aucune</option><option value="fixed" ${q.late_penalty_mode==='fixed'?'selected':''}>Montant en €</option><option value="percent" ${q.late_penalty_mode==='percent'?'selected':''}>Pourcentage %</option></select></label><label class="field"><span>Montant / pourcentage</span><input id="penaltyValue" type="number" min="0" step="0.01" value="${Number(q.late_penalty_value||0)?Number(q.late_penalty_value):''}" placeholder="0"></label>`,async m=>{await api.updateInvoicePenalty(q.id,{mode:m.querySelector('#penaltyMode').value,value:Number(String(m.querySelector('#penaltyValue').value||'').replace(',','.'))||0});},{label:'Enregistrer la majoration'});});
+  all('.remind-doc').forEach(b=>b.onclick=async()=>{const q=get(b.dataset.id),next=Number(q.reminder_count||0)+1;let extra={};if(next>4){const m=modalForm(`Nouvelle majoration · ${e(q.number)}`,`<p class="muted">Cette majoration s’ajoutera aux majorations déjà appliquées.</p><label class="field"><span>Type</span><select id="additionalPenaltyMode"><option value="">Votre choix</option><option value="fixed">Montant en €</option><option value="percent">Pourcentage %</option></select></label><label class="field"><span>Valeur</span><input id="additionalPenaltyValue" type="number" min="0" step="0.01" required></label>`,async m=>{extra={additionalPenaltyMode:m.querySelector('#additionalPenaltyMode').value,additionalPenaltyValue:Number(String(m.querySelector('#additionalPenaltyValue').value||'').replace(',','.'))||0};try{const r=await api.sendInvoiceReminder(q.id,extra);toast(`${r.reminderNumber}e relance envoyée.`,'success');await hooks.refresh('invoices')}catch(x){toast(x.message,'error')}},{label:'Envoyer la relance'});return}if(!await askConfirm({title:'Envoyer une relance ?',message:`Aurion enverra la ${next}e relance avec la facture en PDF${next===4?' et appliquera la majoration configurée.':'.'}`,confirmLabel:'Envoyer la relance'}))return;try{const r=await api.sendInvoiceReminder(q.id,extra);toast(`${r.reminderNumber}e relance envoyée.`,'success');await hooks.refresh('invoices')}catch(x){toast(x.message,'error')}});
+  all('.sav-from-invoice').forEach(b=>{const q=get(b.dataset.id);b.onclick=()=>openSavForInvoice(q)});
+  all('.view-doc').forEach(b=>b.onclick=()=>{
+    const q=get(b.dataset.id),p=prof(),d=p.doc||{};
+    modalForm(`${q.document_type==='invoice'?'Facture':'Devis'} ${e(q.number)}`,`<div class="document-preview"><div class="preview-grid"><div><span>Client</span><b>${e(q.client_name||'')}</b></div><div><span>${e(d.interventionLabel||'Prestation')}</span><b>${e(q.intervention||'')}</b></div></div>
+      ${(q.items||[]).length?`<div class="preview-items"><span>${e(d.itemsLabel||'Pièces')}</span>${q.items.map(i=>`<div class="list-row"><b>${e(i.label)}</b><span>× ${Number(i.quantity)}</span></div>`).join('')}</div>`:''}
+      ${q.warranty_text?`<div class="preview-grid"><div><span>Garantie</span><b>${e(q.warranty_text)}</b></div></div>`:''}
+      <div class="calc-total"><span>Total TTC client</span><strong>${money(q.document_type==='invoice'?invoiceDue(q):q.total_ttc)}</strong></div>
+      <details class="advanced"><summary>Vue interne (jamais visible par le client)</summary><div class="calc-line"><span>Coûts d’achat HT</span><b>${money(Number(q.part_cost)+Number(q.shipping_cost))}</b></div><div class="calc-line"><span>Frais kilométriques</span><b>${money(q.mileage_total||0)}</b></div><div class="calc-line"><span>Marge brute HT</span><b>${money(q.margin)}</b></div><div class="calc-line"><span>Cotisations estimées</span><b>${money(Number(q.total_ht)*Number(q.urssaf_rate||0)/100)}</b></div><div class="calc-line"><span>Marge nette</span><b>${money(Number(q.margin)-Number(q.total_ht)*Number(q.urssaf_rate||0)/100)}</b></div></details></div>`,async()=>{},{label:'Fermer'});
+  });
+  all('.mail-doc').forEach(b=>b.onclick=()=>{
+    const q=get(b.dataset.id),noun=q.document_type==='invoice'?'facture':'devis';
+    modalForm(`Envoyer ${e(q.number)} par e-mail`,`<div class="mail-form-spaced">${q.client_email?`<p class="muted">Destinataire : <b>${e(q.client_email)}</b> — le PDF est joint automatiquement.</p>`:'<div class="notice">Ce client n’a pas d’adresse e-mail : ajoutez-la dans sa fiche.</div>'}<label class="field"><span>Message</span><textarea id="message" rows="7">Bonjour ${e(q.client_name||'')},\n\nVeuillez trouver votre ${noun} ${e(q.number)} en pièce jointe.\n\nCordialement.</textarea></label></div>`,
+      async m=>{
+        await api.sendDocumentEmail(q.document_type==='invoice'?'invoice':'quote',q.id,m.querySelector('#message').value);
+
+      },{label:'Envoyer'});
+  });
+}
