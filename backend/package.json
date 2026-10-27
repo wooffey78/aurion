@@ -18,7 +18,8 @@
     "db:reset:test": "node scripts/reset-test-data.mjs",
     "admin:create": "tsx src/create-admin.ts",
     "db:test:up": "docker compose -f ../docker-compose.test.yml up -d postgres",
-    "db:test:down": "docker compose -f ../docker-compose.test.yml down -v"
+    "db:test:down": "docker compose -f ../docker-compose.test.yml down -v",
+    "secrets:rotate": "npm run build && node scripts/rotate-secrets.mjs"
   },
   "dependencies": {
     "@fastify/cookie": "11.0.2",
