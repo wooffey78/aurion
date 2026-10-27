@@ -250,6 +250,17 @@ if (!enabled) {
     assert.equal(login.statusCode, 200, login.body);
     assert.equal(login.json().organizationId, owner.organizationId);
 
+    const malformedClient = await app.inject({
+      method: 'POST', url: '/clients', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: 123 },
+    });
+    assert.equal(malformedClient.statusCode, 400, malformedClient.body);
+    const malformedClientMinutes = await app.inject({
+      method: 'POST', url: '/clients', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: 'Client invalide', estimatedMinutes: 'pas-un-nombre' },
+    });
+    assert.equal(malformedClientMinutes.statusCode, 400, malformedClientMinutes.body);
+
     const clientResponse = await app.inject({
       method: 'POST', url: '/clients', headers: { authorization: `Bearer ${owner.token}` },
       payload: { name: 'Client d’intégration', email: 'client@example.test', address: '1 rue de test' },
@@ -275,6 +286,16 @@ if (!enabled) {
     });
     assert.equal(quoteResponse.statusCode, 201, quoteResponse.body);
     const quote = quoteResponse.json();
+    const invalidQuotePatch = await app.inject({
+      method: 'PATCH', url: `/quotes/${quote.id}`, headers: { authorization: `Bearer ${owner.token}` },
+      payload: { vatRate: 'pas-un-nombre' },
+    });
+    assert.equal(invalidQuotePatch.statusCode, 400, invalidQuotePatch.body);
+    const crossTenantQuotePatch = await app.inject({
+      method: 'PATCH', url: `/quotes/${quote.id}`, headers: { authorization: `Bearer ${other.token}` },
+      payload: { intervention: 'Modification étrangère' },
+    });
+    assert.equal(crossTenantQuotePatch.statusCode, 404, crossTenantQuotePatch.body);
     const otherQuotes = await app.inject({ method: 'GET', url: '/quotes', headers: { authorization: `Bearer ${other.token}` } });
     assert.equal(otherQuotes.statusCode, 200, otherQuotes.body);
     assert.equal(otherQuotes.json().some(document => document.id === quote.id), false);

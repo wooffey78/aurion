@@ -31,6 +31,27 @@ const quoteLineInputSchema = z.object({
   quantity: numericInput, unitCost: numericInput, unitPrice: numericInput,
   partId: optionalUuid, saleCoefficientPercent: numericInput,
 }).passthrough();
+const clientCreateInputSchema = z.object({
+  name: z.string().trim().min(1).max(240),
+  email: z.string().trim().email().max(254).or(z.literal('')).nullable().optional(),
+  phone: z.string().max(80).nullable().optional(),
+  address: z.string().max(1000).nullable().optional(),
+  interventionAddress: z.string().max(1000).nullable().optional(),
+  siret: z.string().max(40).nullable().optional(),
+  estimatedMinutes: numericInput,
+  activityId: optionalUuid,
+}).passthrough();
+const clientPatchInputSchema = z.object({
+  name: z.string().trim().min(1).max(240).optional(),
+  email: z.string().trim().email().max(254).or(z.literal('')).nullable().optional(),
+  phone: z.string().max(80).nullable().optional(),
+  address: z.string().max(1000).nullable().optional(),
+  interventionAddress: z.string().max(1000).nullable().optional(),
+  siret: z.string().max(40).nullable().optional(),
+  estimatedMinutes: numericInput,
+  activityId: optionalUuid,
+}).passthrough();
+
 const quoteCreateInputSchema = z.object({
   clientId: optionalUuid, activityId: optionalUuid, intervention: z.string().max(240).optional(),
   documentType: z.enum(['quote','invoice']).optional(), items: z.array(quoteLineInputSchema).max(500).nullable().optional(),
@@ -44,6 +65,7 @@ const quoteCreateInputSchema = z.object({
   invoiceAddressSource: z.enum(['client','intervention','free']).optional(), billingAddress: z.string().max(1000).optional(),
   contributions: z.array(z.object({ name: z.string().max(160).optional(), rate: numericInput, basis: z.string().max(120).optional(), mandatory: z.boolean().optional(), variable: z.boolean().optional() }).passthrough()).max(100).optional(),
 }).passthrough();
+const quotePatchInputSchema = quoteCreateInputSchema.partial();
 const invoiceConversionInputSchema = z.object({
   dueAt: z.string().max(40).optional(), reminderIntervalDays: numericInput,
   invoiceAddressSource: z.enum(['client','intervention','free']).optional(), billingAddress: z.string().max(1000).optional(),
@@ -306,9 +328,30 @@ export async function businessRoutes(app:FastifyInstance){
   app.patch('/activities/:id',async(r,reply)=>{const b:any=r.body,id=(r.params as any).id;const x=await query('update activities set name=coalesce($1,name),description=$2,legal_form=$3,cgv_text=$4,urssaf_rate=$5,vat_rate=coalesce($6,vat_rate),margin_min_percent=greatest(0,coalesce($7,margin_min_percent)),default_part_coefficient_percent=greatest(0,coalesce($8,default_part_coefficient_percent)),default_labor_coefficient_percent=greatest(0,coalesce($9,default_labor_coefficient_percent)),active=coalesce($10,active),configuration_defined=true,updated_at=now() where id=$11 and organization_id=$12 returning *',[b.name?.trim(),b.description??null,b.legalForm??null,b.cgvText??null,b.urssafRate===''?null:b.urssafRate===undefined?null:Number(b.urssafRate),b.vatRate===undefined?null:Number(b.vatRate),b.marginMinPercent===undefined?null:Number(b.marginMinPercent),b.defaultPartCoefficientPercent===undefined?null:Number(b.defaultPartCoefficientPercent),b.defaultLaborCoefficientPercent===undefined?null:Number(b.defaultLaborCoefficientPercent),b.active,id,r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});if(b.profileCode!==undefined){if(b.profileCode&&PROFILE_CODES.includes(b.profileCode))await saveActivityProfileOverride(r.auth!.organizationId,id,b.profileCode);else await query('delete from activity_profile_overrides o where o.activity_id=$1 and exists(select 1 from activities own where own.id=o.activity_id and own.organization_id=$2)',[id,r.auth!.organizationId])}if(b.autoFiscalDetect===false)await query('update activities set social_auto_detected=false,vat_auto_detected=false where id=$1 and organization_id=$2',[id,r.auth!.organizationId]);if(b.legalForm&&b.autoFiscalDetect!==false){const a=x.rows[0],p=profileFor(a.name,a.description||'',b.profileCode);const detected=detectFiscalSettings(String(b.legalForm),p.code,a.name,a.description||'');const keepManualSocial=a.social_auto_detected===false&&b.urssafRate!==undefined;const keepManualVat=a.vat_auto_detected===false&&b.vatRate!==undefined;const socialRate=keepManualSocial?Number(b.urssafRate):detected.socialRate;const vatRate=keepManualVat?Number(b.vatRate):detected.vatRate;const socialDetected=!keepManualSocial;const vatDetected=!keepManualVat;const cgv=defaultCgvFor(p.code,p.title,String(b.legalForm||''));await query('update activities set urssaf_rate=$1,vat_rate=coalesce($2,vat_rate),social_regime=$3,vat_regime=$4,cgv_text=$5,social_auto_detected=$6,vat_auto_detected=$7,updated_at=now() where id=$8 and organization_id=$9',[socialRate,vatRate,detected.socialRegime,detected.vatRegime,cgv,socialDetected,vatDetected,id,r.auth!.organizationId]);if(socialDetected||vatDetected)await saveContributionPresets(r.auth!.organizationId,id,detected.contributions);x.rows[0].urssaf_rate=socialRate;x.rows[0].vat_rate=vatRate;x.rows[0].cgv_text=cgv;x.rows[0].contributions=(socialDetected||vatDetected)?detected.contributions:[];}await saveLegalFields(id,r.auth!.organizationId,b);return x.rows[0]});
 
   app.get('/clients',async r=>(await query('select id,name,email,phone,address,intervention_address,siret,estimated_minutes,activity_id,created_at from clients where organization_id=$1 and ($2::uuid is null or activity_id=$2) order by name',[r.auth!.organizationId,activityId(r)])).rows);
-  app.post('/clients',async(r,reply)=>{const b:any=r.body;if(!b?.name?.trim())return reply.code(400).send({error:'INVALID_INPUT'});const aid=await ensureActivity(r,activityId(r,b));if(!aid)return reply.code(400).send({error:'INVALID_INPUT'});const id=crypto.randomUUID();const manual=Math.max(0,Number(b.estimatedMinutes??0)||0);const org=r.auth!.organizationId;await query('insert into clients(id,organization_id,activity_id,name,email,phone,address,intervention_address,siret,estimated_minutes) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[id,org,aid,b.name.trim(),b.email||null,b.phone||null,b.address||null,b.interventionAddress||null,(String(b.siret||'').replace(/\D/g,'')||null),manual]);await query('insert into client_time_sessions(id,organization_id,user_id,client_id,activity_id,manual_minutes,started_at) values($1,$2,$3,$4,$5,$6,now())',[crypto.randomUUID(),org,r.auth!.userId,id,aid,manual]);return reply.code(201).send({id})});
+  app.post('/clients',async(r,reply)=>{
+    const parsed=clientCreateInputSchema.safeParse(r.body);
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const b:any=parsed.data;
+    const aid=await ensureActivity(r,activityId(r,b));
+    if(!aid)return reply.code(400).send({error:'INVALID_INPUT'});
+    let manual=0;
+    try{manual=optionalNumber(b.estimatedMinutes,'Temps manuel',0,1e7)??0}catch{return reply.code(400).send({error:'INVALID_INPUT'})}
+    const id=crypto.randomUUID(),org=r.auth!.organizationId;
+    await query('insert into clients(id,organization_id,activity_id,name,email,phone,address,intervention_address,siret,estimated_minutes) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[id,org,aid,b.name.trim(),b.email||null,b.phone||null,b.address||null,b.interventionAddress||null,(String(b.siret||'').replace(/\D/g,'')||null),manual]);
+    await query('insert into client_time_sessions(id,organization_id,user_id,client_id,activity_id,manual_minutes,started_at) values($1,$2,$3,$4,$5,$6,now())',[crypto.randomUUID(),org,r.auth!.userId,id,aid,manual]);
+    return reply.code(201).send({id});
+  });
   app.delete('/clients/:id',async(r,reply)=>{const x=await query('delete from clients where id=$1 and organization_id=$2',[((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true}});
-  app.patch('/clients/:id',async(r,reply)=>{const b:any=r.body,id=(r.params as any).id,hasManual=b.estimatedMinutes!==undefined,manual=hasManual?Math.max(0,Number(b.estimatedMinutes??0)||0):null;const x=await query('update clients set name=coalesce($1,name),email=$2,phone=$3,address=$4,intervention_address=$5,siret=$6,activity_id=coalesce($7,activity_id),estimated_minutes=coalesce($8,estimated_minutes),updated_at=now() where id=$9 and organization_id=$10 returning id',[b.name?.trim(),b.email||null,b.phone||null,b.address||null,b.interventionAddress||null,(String(b.siret||'').replace(/\D/g,'')||null),b.activityId||null,manual,id,r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return x.rows[0]});
+  app.patch('/clients/:id',async(r,reply)=>{
+    const parsed=clientPatchInputSchema.safeParse(r.body||{});
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const b:any=parsed.data,id=(r.params as any).id,hasManual=b.estimatedMinutes!==undefined;
+    let manual:number|null=null;
+    try{manual=hasManual?(optionalNumber(b.estimatedMinutes,'Temps manuel',0,1e7)??0):null}catch{return reply.code(400).send({error:'INVALID_INPUT'})}
+    const x=await query('update clients set name=coalesce($1,name),email=$2,phone=$3,address=$4,intervention_address=$5,siret=$6,activity_id=coalesce($7,activity_id),estimated_minutes=coalesce($8,estimated_minutes),updated_at=now() where id=$9 and organization_id=$10 returning id',[b.name?.trim(),b.email||null,b.phone||null,b.address||null,b.interventionAddress||null,(String(b.siret||'').replace(/\D/g,'')||null),b.activityId||null,manual,id,r.auth!.organizationId]);
+    if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
+    return x.rows[0];
+  });
 
   app.get('/clients/:id/summary',async(r,reply)=>{const x=await clientSummary(r.auth!.organizationId,(r.params as any).id);if(!x)return reply.code(404).send({error:'NOT_FOUND'});return x});
   app.get('/suppliers',async r=>(await query('select * from suppliers where organization_id=$1 and activity_id=$2 order by name',[r.auth!.organizationId,activityId(r)])).rows);
@@ -434,7 +477,9 @@ export async function businessRoutes(app:FastifyInstance){
     return reply.code(201).send({id,number,documentType,totalHt:p.totalHt,totalTva:p.vat,totalTtc:p.totalTtc,netMargin:p.netMargin,urssafEstimate:p.urssafEstimate,emailStatus});
   });
   app.patch('/quotes/:id',async(r,reply)=>{
-    const b:any=r.body||{},org=r.auth!.organizationId,id=String((r.params as any).id);
+    const parsedBody=quotePatchInputSchema.safeParse(r.body||{});
+    if(!parsedBody.success)return reply.code(400).send({error:'INVALID_INPUT',message:'Les données du devis sont invalides.'});
+    const b:any=parsedBody.data,org=r.auth!.organizationId,id=String((r.params as any).id);
     try{
       if(b.vatRate!==undefined)b.vatRate=requiredNumber(b.vatRate,'TVA',0,100);
       if(b.urssafRate!==undefined)b.urssafRate=optionalNumber(b.urssafRate,'Cotisations',0,99.99)??0;
