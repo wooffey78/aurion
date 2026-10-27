@@ -522,7 +522,7 @@ a{color:#1d4ed8}.eyebrow{color:#315b8a;text-shadow:none}.sidebar{background:#f8f
 #fs-toggle .fs-icon{display:inline-flex;align-items:center;justify-content:center;font-size:1.2rem;line-height:1}
 #fs-toggle.is-fullscreen{background:#1d4ed8!important;color:#fff!important;border-color:#1d4ed8!important}
 #fs-toggle.is-fullscreen .fs-icon{transform:rotate(45deg)}
-#fs-toggle:focus-visible{outline:3px solid #60a5fa!important;outline-offset:3px}
+#fs-toggle:focus-visible{outline:3px solid #2563eb!important;outline-offset:3px}
 @media(max-width:900px){
   #fs-toggle{font-size:.82rem!important;width:auto!important;min-width:44px;padding:8px 11px!important}
   #fs-toggle:before{content:none!important}
