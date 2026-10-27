@@ -9,7 +9,6 @@ const summary = routes.slice(routes.indexOf("app.get('/dashboard/summary'"), rou
 
 test('dashboard summary executes independent reads concurrently without changing response fields', () => {
   assert.match(summary, /const \[aid,t\]=await Promise\.all\(/);
-  assert.match(summary, /const \[u,f,r4,historicalResult,warrResult,appointmentsResult,subResult\]=await Promise\.all\(/);
   assert.match(summary, /const \[u,f,r4,historicalResult,warrResult,appointmentsResult,subResult,yearAccounting\]=await Promise\.all\(/);
   assert.match(summary, /monthlyAccounting\(org,aid,accountingYear\)/);
   assert.doesNotMatch(summary, /const yearAccounting=await monthlyAccounting/);
