@@ -17,6 +17,7 @@ const schema=z.object({
 });
 const parsed=schema.parse(process.env);
 if(parsed.NODE_ENV==='production'){
+ if(Boolean(parsed.STRIPE_SECRET_KEY)!==Boolean(parsed.STRIPE_WEBHOOK_SECRET))throw new Error('STRIPE_SECRET_KEY et STRIPE_WEBHOOK_SECRET doivent être définis ensemble en production.');
  if(!parsed.COOKIE_SECURE)throw new Error('COOKIE_SECURE=true est obligatoire en production.');
  if(!process.env.AURION_ENCRYPTION_KEY?.trim() || parsed.AURION_ENCRYPTION_KEY.trim().length<32)throw new Error('AURION_ENCRYPTION_KEY doit être défini avec au moins 32 caractères en production.');
  if(!process.env.AURION_ENCRYPTION_KEY_VERSION?.trim())throw new Error('AURION_ENCRYPTION_KEY_VERSION doit être défini en production.');
