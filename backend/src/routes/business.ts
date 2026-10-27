@@ -52,6 +52,22 @@ const clientPatchInputSchema = z.object({
   activityId: optionalUuid,
 }).passthrough();
 
+const supplyCreateInputSchema = z.object({
+  name: z.string().trim().min(1).max(240),
+  activityId: optionalUuid,
+  supplierId: optionalUuid,
+  reference: z.string().max(160).nullable().optional(),
+  description: z.string().max(4000).nullable().optional(),
+  purchasePrice: numericInput,
+}).passthrough();
+const supplyPatchInputSchema = z.object({
+  name: z.string().trim().min(1).max(240).optional(),
+  supplierId: optionalUuid,
+  reference: z.string().max(160).nullable().optional(),
+  description: z.string().max(4000).nullable().optional(),
+  purchasePrice: numericInput,
+}).passthrough();
+
 const quoteCreateInputSchema = z.object({
   clientId: optionalUuid, activityId: optionalUuid, intervention: z.string().max(240).optional(),
   documentType: z.enum(['quote','invoice']).optional(), items: z.array(quoteLineInputSchema).max(500).nullable().optional(),
@@ -364,8 +380,39 @@ export async function businessRoutes(app:FastifyInstance){
   app.delete('/suppliers/:id',async(r,reply)=>{const x=await query('delete from suppliers where id=$1 and organization_id=$2',[((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true}});
 
   app.get('/supplies',async r=>(await query('select s.*,sp.name supplier_name from supplies s left join suppliers sp on sp.id=s.supplier_id where s.organization_id=$1 and s.activity_id=$2 order by s.name',[r.auth!.organizationId,activityId(r)])).rows);
-  app.post('/supplies',async(r,reply)=>{const b:any=r.body||{},aid=await ensureActivity(r,b.activityId||activityId(r,b));if(!aid||!b.name?.trim())return reply.code(400).send({error:'INVALID_INPUT'});const id=crypto.randomUUID();await query('insert into supplies(id,organization_id,activity_id,supplier_id,name,reference,description,purchase_price) values($1,$2,$3,$4,$5,$6,$7,$8)',[id,r.auth!.organizationId,aid,b.supplierId||null,b.name.trim(),b.reference||null,b.description||null,Math.max(0,Number(b.purchasePrice||0))]);return reply.code(201).send({id})});
-  app.patch('/supplies/:id',async(r,reply)=>{const b:any=r.body||{},x=await query(`update supplies set supplier_id=$1,name=coalesce(nullif(trim($2),''),name),reference=$3,description=$4,purchase_price=greatest(0,$5),updated_at=now() where id=$6 and organization_id=$7 returning *`,[b.supplierId||null,b.name,b.reference||null,b.description||null,Number(b.purchasePrice||0),String((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return x.rows[0]});
+  app.post('/supplies',async(r,reply)=>{
+    const parsed=supplyCreateInputSchema.safeParse(r.body||{});
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const b:any=parsed.data,org=r.auth!.organizationId,aid=await ensureActivity(r,b.activityId||activityId(r,b));
+    if(!aid)return reply.code(400).send({error:'INVALID_INPUT'});
+    const supplierId=b.supplierId||null;
+    if(supplierId){
+      const supplier=await query('select id from suppliers where id=$1 and organization_id=$2 and activity_id=$3',[supplierId,org,aid]);
+      if(!supplier.rowCount)return reply.code(400).send({error:'INVALID_SUPPLIER'});
+    }
+    let purchasePrice=0;
+    try{purchasePrice=optionalNumber(b.purchasePrice,'Prix d’achat',0,1e9)??0}catch{return reply.code(400).send({error:'INVALID_INPUT'})}
+    const id=crypto.randomUUID();
+    await query('insert into supplies(id,organization_id,activity_id,supplier_id,name,reference,description,purchase_price) values($1,$2,$3,$4,$5,$6,$7,$8)',[id,org,aid,supplierId,b.name.trim(),b.reference||null,b.description||null,purchasePrice]);
+    return reply.code(201).send({id});
+  });
+  app.patch('/supplies/:id',async(r,reply)=>{
+    const parsed=supplyPatchInputSchema.safeParse(r.body||{});
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const b:any=parsed.data,id=String((r.params as any).id),org=r.auth!.organizationId;
+    const current=(await query('select id,activity_id from supplies where id=$1 and organization_id=$2',[id,org])).rows[0];
+    if(!current)return reply.code(404).send({error:'NOT_FOUND'});
+    const supplierId=b.supplierId||null;
+    if(supplierId){
+      const supplier=await query('select id from suppliers where id=$1 and organization_id=$2 and activity_id=$3',[supplierId,org,current.activity_id]);
+      if(!supplier.rowCount)return reply.code(400).send({error:'INVALID_SUPPLIER'});
+    }
+    let purchasePrice=0;
+    try{purchasePrice=optionalNumber(b.purchasePrice,'Prix d’achat',0,1e9)??0}catch{return reply.code(400).send({error:'INVALID_INPUT'})}
+    const x=await query(`update supplies set supplier_id=$1,name=coalesce(nullif(trim($2),''),name),reference=$3,description=$4,purchase_price=greatest(0,$5),updated_at=now() where id=$6 and organization_id=$7 returning *`,[supplierId,b.name,b.reference||null,b.description||null,purchasePrice,id,org]);
+    if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
+    return x.rows[0];
+  });
   app.delete('/supplies/:id',async(r,reply)=>{const x=await query('delete from supplies where id=$1 and organization_id=$2',[String((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true}});
   app.get('/search/all',async r=>{const q=String((r.query as any)?.q||'').trim();const org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));if(!aid)return {clients:[],suppliers:[],quotes:[],invoices:[],sav:[]};const like=`%${q}%`;const [clients,suppliers,docs,sav]=await Promise.all([query(`select id,name,email,phone,siret from clients where organization_id=$1 and activity_id=$2 and ($3='' or name ilike $3 or email ilike $3 or siret ilike $3) order by name limit 50`,[org,aid,like]),query(`select id,name,siret,legal_name from suppliers where organization_id=$1 and activity_id=$2 and ($3='' or name ilike $3 or legal_name ilike $3 or siret ilike $3) order by name limit 50`,[org,aid,like]),query(`select id,number,document_type,client_name,total_ttc,created_at from quotes where organization_id=$1 and activity_id=$2 and ($3='' or client_name ilike $3 or number ilike $3 or cast(total_ttc as text) ilike $3 or cast(created_at as text) ilike $3) order by created_at desc limit 100`,[org,aid,like]),query(`select s.id,s.invoice_id quote_id,s.amount_ttc amount,s.created_at,c.name client_name from sav_cases s left join clients c on c.id=s.client_id where s.organization_id=$1 and s.activity_id=$2 and ($3='' or c.name ilike $3 or cast(s.amount_ttc as text) ilike $3 or cast(s.created_at as text) ilike $3) order by s.created_at desc limit 50`,[org,aid,like]).catch(()=>({rows:[]}))]);return {clients:clients.rows,suppliers:suppliers.rows,quotes:docs.rows.filter(x=>x.document_type==='quote'),invoices:docs.rows.filter(x=>x.document_type==='invoice'),sav:sav.rows};});
   app.get('/parts',async r=>(await query(`select p.*,coalesce(json_agg(json_build_object('supplierId',s.id,'supplier',s.name,'supplierReference',sp.supplier_reference,'purchasePrice',sp.purchase_price,'available',sp.available) order by sp.purchase_price) filter(where s.id is not null),'[]') suppliers from parts p left join supplier_parts sp on sp.part_id=p.id left join suppliers s on s.id=sp.supplier_id where p.organization_id=$1 and p.activity_id=$2 group by p.id order by p.name`,[r.auth!.organizationId,activityId(r)])).rows);

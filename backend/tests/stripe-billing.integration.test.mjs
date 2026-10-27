@@ -250,6 +250,43 @@ if (!enabled) {
     assert.equal(login.statusCode, 200, login.body);
     assert.equal(login.json().organizationId, owner.organizationId);
 
+    const supplierResponse = await app.inject({
+      method: 'POST', url: '/suppliers', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: 'Fournisseur d’intégration' },
+    });
+    assert.ok([200, 201].includes(supplierResponse.statusCode), supplierResponse.body);
+    const supplierId = supplierResponse.json().id;
+
+    const foreignSupplyCreate = await app.inject({
+      method: 'POST', url: '/supplies', headers: { authorization: `Bearer ${other.token}` },
+      payload: { name: 'Fourniture inter-organisation', supplierId, purchasePrice: 12 },
+    });
+    assert.equal(foreignSupplyCreate.statusCode, 400, foreignSupplyCreate.body);
+
+    const ownerSupplyResponse = await app.inject({
+      method: 'POST', url: '/supplies', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: 'Fourniture propriétaire', supplierId, purchasePrice: 12 },
+    });
+    assert.equal(ownerSupplyResponse.statusCode, 201, ownerSupplyResponse.body);
+    const ownerSupplyId = ownerSupplyResponse.json().id;
+
+    const otherSupplyResponse = await app.inject({
+      method: 'POST', url: '/supplies', headers: { authorization: `Bearer ${other.token}` },
+      payload: { name: 'Fourniture locale', purchasePrice: 3 },
+    });
+    assert.equal(otherSupplyResponse.statusCode, 201, otherSupplyResponse.body);
+    const foreignSupplyPatch = await app.inject({
+      method: 'PATCH', url: `/supplies/${otherSupplyResponse.json().id}`,
+      headers: { authorization: `Bearer ${other.token}` },
+      payload: { supplierId, purchasePrice: 3 },
+    });
+    assert.equal(foreignSupplyPatch.statusCode, 400, foreignSupplyPatch.body);
+    const otherSupplies = await app.inject({
+      method: 'GET', url: '/supplies', headers: { authorization: `Bearer ${other.token}` },
+    });
+    assert.equal(otherSupplies.statusCode, 200, otherSupplies.body);
+    assert.equal(otherSupplies.json().some(item => item.id === ownerSupplyId), false);
+
     const malformedClient = await app.inject({
       method: 'POST', url: '/clients', headers: { authorization: `Bearer ${owner.token}` },
       payload: { name: 123 },
