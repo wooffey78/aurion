@@ -9,7 +9,21 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: aurion_test
+          POSTGRES_USER: aurion_test
+          POSTGRES_PASSWORD: aurion_test_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aurion_test -d aurion_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,16 +36,29 @@ jobs:
       - name: Build, type check and targeted smoke tests
         run: npm run check
 
-      - name: Run full legacy regression suite (diagnostic)
-        continue-on-error: true
+      - name: Apply migrations to disposable PostgreSQL 17
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://aurion_test:aurion_test_ci_only@localhost:5432/aurion_test
+          JWT_SECRET: aurion-ci-only-jwt-secret-never-use-in-production-2026
+          COOKIE_SECURE: "false"
+          APP_BASE_URL: http://localhost:4000
+          CORS_ORIGIN: http://localhost:4000
+        run: npm run migrate
+      - name: Run full regression and PostgreSQL integration suite (blocking)
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://aurion_test:aurion_test_ci_only@localhost:5432/aurion_test
+          AURION_INTEGRATION_TESTS: "1"
+          JWT_SECRET: aurion-ci-only-jwt-secret-never-use-in-production-2026
+          COOKIE_SECURE: "false"
+          APP_BASE_URL: http://localhost:4000
+          CORS_ORIGIN: http://localhost:4000
+          STRIPE_SECRET_KEY: sk_test_ci_dummy_key
+          STRIPE_WEBHOOK_SECRET: whsec_ci_only_dummy_signing_secret
         run: |
           mkdir -p dist-artifacts
-          set +e
-          npm test > dist-artifacts/full-regression.log 2>&1
-          result=$?
-          echo "exit_code=$result" >> dist-artifacts/full-regression.log
-          tail -n 80 dist-artifacts/full-regression.log
-          exit $result
+          npm test 2>&1 | tee dist-artifacts/full-regression.log
 
       - name: Package complete source archive
         run: |
