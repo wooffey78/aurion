@@ -326,6 +326,23 @@ if (!enabled) {
     });
     assert.equal(crossTenantActivity.statusCode, 400, crossTenantActivity.body);
 
+    const invalidPart = await app.inject({
+      method: 'POST', url: '/parts', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: 'Pièce invalide', stock: 'beaucoup' },
+    });
+    assert.equal(invalidPart.statusCode, 400, invalidPart.body);
+    const validPart = await app.inject({
+      method: 'POST', url: '/parts', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: 'Pièce test intégration', stock: 2, sellingPrice: 12.5, saleCoefficientPercent: 0 },
+    });
+    assert.equal(validPart.statusCode, 201, validPart.body);
+    const invalidPartPrice = await app.inject({
+      method: 'POST', url: `/parts/${validPart.json().id}/prices`,
+      headers: { authorization: `Bearer ${owner.token}` },
+      payload: { supplierId: 'not-a-uuid', purchasePrice: 'inconnu' },
+    });
+    assert.equal(invalidPartPrice.statusCode, 400, invalidPartPrice.body);
+
     const quoteResponse = await app.inject({
       method: 'POST', url: '/quotes', headers: { authorization: `Bearer ${owner.token}` },
       payload: {
