@@ -13,12 +13,13 @@ test('synchronisation globale du compte : toutes les tables organisationnelles f
   assert.match(route,/app\.get\('\/sync\/version'/);
   assert.match(sync,/\/sync\/version/);
   assert.match(sync,/aurion\.accountSyncRevision/);
-  assert.match(sync,/location\.reload\(\)/);
+  assert.match(sync,/aurion:account-sync-changed/);
+  assert.doesNotMatch(sync,/location\.reload\(\)/);
+  assert.doesNotMatch(sync,/window\.fetch=async/);
 });
 
-test('barre de chargement globale : les requêtes longues donnent un retour visuel',()=>{
+test('synchronisation inter-appareils sans barre ni rechargement complet',()=>{
   const sync=read('../../assets/js/account-sync.js');
-  assert.match(sync,/window\.fetch=async/);
-  assert.match(sync,/setTimeout\(\(\)=>\{if\(requests\)show\(\)\},250\)/);
-  assert.match(sync,/Chargement…/);
+  assert.doesNotMatch(sync,/window\.fetch=async|aurionLoading|Chargement…|location\.reload\(\)/);
+  assert.match(sync,/aurion:account-sync-changed/);
 });

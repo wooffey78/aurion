@@ -6,8 +6,10 @@ const read = p => readFileSync(new URL(p, import.meta.url), 'utf8');
 test('suppression totale de la barre de progression', () => {
   const main = read('../../assets/js/main.js');
   const css = read('../../assets/css/app.css');
+  const sync = read('../../assets/js/account-sync.js');
   assert.doesNotMatch(main, /__aurionNetworkProgressInstalled|installNetworkProgress|aurion-loading-popup|window\\.fetch\\s*=/);
   assert.doesNotMatch(css, /aurion-loading-popup|aurion-loading-mark|aurion-loading-progress/);
+  assert.doesNotMatch(sync, /aurionLoading|Chargement…|window\\.fetch=async|location\\.reload\\(\\)/);
 });
 
 test('déconnexion de toutes les sessions sans rechargement complet', () => {

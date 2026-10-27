@@ -183,6 +183,14 @@ function installBackgroundRefresh(){
     backgroundRefreshRunning=true;
     try{await refresh(S.view);lastBackgroundRefreshAt=Date.now()}catch(e){if(e?.status===401)invalidateSession()}finally{backgroundRefreshRunning=false}
   };
+  window.addEventListener('aurion:account-sync-changed',()=>{
+    if(document.visibilityState!=='visible'||!location.hash.startsWith('#/dashboard')||backgroundRefreshRunning)return;
+    if(Date.now()-lastUserInteractionAt<12000||document.querySelector('#view form'))return;
+    const focused=document.activeElement;
+    if(focused instanceof HTMLElement&&focused.matches('input,textarea,select,[contenteditable="true"]'))return;
+    backgroundRefreshRunning=true;
+    refresh(S.view).then(()=>{lastBackgroundRefreshAt=Date.now()}).catch(e=>{if(e?.status===401)invalidateSession()}).finally(()=>{backgroundRefreshRunning=false});
+  });
   window.addEventListener('focus',()=>maybeRefresh(true),{passive:true});
   window.addEventListener('online',()=>maybeRefresh(true),{passive:true});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')maybeRefresh(true)});
