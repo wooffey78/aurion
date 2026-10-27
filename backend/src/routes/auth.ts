@@ -292,6 +292,22 @@ async function googleLoginClient(){
     },
   );
 
+  app.get('/auth/webauthn/credentials', { preHandler: app.requireAuth }, async (request) => {
+    const rows=await query<{id:string,created_at:string,last_used_at:string|null,transports:string[]}>(
+      'select id,created_at,last_used_at,transports from webauthn_credentials where user_id=$1 order by created_at desc',
+      [request.auth!.userId]
+    );
+    return { credentials: rows.rows.map(row=>({id:row.id,createdAt:row.created_at,lastUsedAt:row.last_used_at,transports:row.transports||[]})) };
+  });
+
+  app.delete('/auth/webauthn/credentials/:id', { preHandler: app.requireAuth }, async (request, reply) => {
+    const id=String((request.params as any)?.id||'');
+    if(!id||id.length>80)return reply.code(400).send({error:'INVALID_CREDENTIAL_ID'});
+    const removed=await query('delete from webauthn_credentials where id=$1 and user_id=$2 returning id',[id,request.auth!.userId]);
+    if(!removed.rowCount)return reply.code(404).send({error:'PASSKEY_NOT_FOUND',message:'Cette clé d’accès est introuvable ou appartient à un autre compte.'});
+    return {ok:true};
+  });
+
   app.get('/auth/webauthn/register/options', { preHandler: app.requireAuth }, async (request, reply) => {
     const origin = configuredWebAuthnOrigin(request);
     if (!origin) return reply.code(403).send({ error: 'ORIGIN_NOT_ALLOWED' });
