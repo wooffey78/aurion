@@ -287,12 +287,20 @@ if (!enabled) {
     assert.equal(login.statusCode, 200, login.body);
     assert.equal(login.json().organizationId, owner.organizationId);
 
+    const invalidSupplier = await app.inject({
+      method: 'POST', url: '/suppliers', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: 123, email: 'adresse-invalide' },
+    });
+    assert.equal(invalidSupplier.statusCode, 400, invalidSupplier.body);
+
     const supplierResponse = await app.inject({
       method: 'POST', url: '/suppliers', headers: { authorization: `Bearer ${owner.token}` },
-      payload: { name: 'Fournisseur d’intégration' },
+      payload: { name: 'Fournisseur d’intégration', logoUrl: 'https://tracker.example.test/pixel.png' },
     });
     assert.ok([200, 201].includes(supplierResponse.statusCode), supplierResponse.body);
     const supplierId = supplierResponse.json().id;
+    const supplierLogo = await db.query('select logo_url from suppliers where id=$1 and organization_id=$2',[supplierId,owner.organizationId]);
+    assert.equal(supplierLogo.rows[0].logo_url, null, 'third-party logo URLs must never be persisted');
 
     const foreignSupplyCreate = await app.inject({
       method: 'POST', url: '/supplies', headers: { authorization: `Bearer ${other.token}` },
