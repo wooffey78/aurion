@@ -404,6 +404,17 @@ if (!enabled) {
       payload: { name: 'Prestation test', durationMinutes: '45', defaultPrice: '75.50' },
     });
     assert.equal(validIntervention.statusCode, 201, validIntervention.body);
+    const foreignClientForDevice = await app.inject({
+      method: 'POST', url: '/clients', headers: { authorization: `Bearer ${other.token}` },
+      payload: { name: 'Client étranger appareil' },
+    });
+    assert.equal(foreignClientForDevice.statusCode, 201, foreignClientForDevice.body);
+    const crossTenantDevice = await app.inject({
+      method: 'POST', url: '/devices', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { clientId: foreignClientForDevice.json().id, type: 'smartphone' },
+    });
+    assert.equal(crossTenantDevice.statusCode, 400, crossTenantDevice.body);
+
     const invalidDevice = await app.inject({
       method: 'POST', url: '/devices', headers: { authorization: `Bearer ${owner.token}` },
       payload: { clientId: 'not-a-uuid', type: 'smartphone' },
