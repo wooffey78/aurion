@@ -100,8 +100,9 @@ export async function accountRoutes(app: FastifyInstance) {
         if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)) {
           const result = await activateStripeCheckout(client, event.data?.object || {});
           if (result.status === 'invalid' || result.status === 'unmatched') {
-            await client.query('rollback');
-            return reply.code(400).send({ error: 'PAYMENT_SESSION_NOT_RECOGNIZED' });
+            // Signature et enveloppe Stripe sont valides : ne pas déclencher une boucle de retries
+            // pour une session inconnue/altérée. Journaliser et acquitter l'événement.
+            request.log.warn({ eventId: event.id, sessionId: event.data?.object?.id || null, status: result.status }, 'Stripe checkout event acknowledged without activation');
           }
           activationStatus = result.status;
         }
@@ -196,6 +197,8 @@ export async function accountRoutes(app: FastifyInstance) {
       const parsed = billingSubscribeSchema.safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: 'INVALID_INPUT' });
       const { planCode, method } = parsed.data;
+      // Stripe Checkout expire après 24 h ; les anciennes demandes en attente sont purgées.
+      await query("delete from billing_payment_requests where status='pending' and created_at < now()-interval '24 hours'");
       const plan=(await query('select code,name,price_ht_cents,billing_interval from plans where code=$1 and active=true',[planCode])).rows[0];
       if(!plan) return reply.code(400).send({error:'INVALID_INPUT'});
       let amount: number;
@@ -214,16 +217,28 @@ export async function accountRoutes(app: FastifyInstance) {
       form.set('mode','payment');form.set('success_url',`${base}/#/dashboard?billing=success&session_id={CHECKOUT_SESSION_ID}`);form.set('cancel_url',`${base}/#/dashboard?billing=cancelled`);form.set('payment_method_types[0]','card');
       form.set('line_items[0][price_data][currency]','eur');form.set('line_items[0][price_data][unit_amount]',String(amount));form.set('line_items[0][price_data][product_data][name]',String(plan.name));form.set('line_items[0][quantity]','1');
       form.set('metadata[organization_id]',org);form.set('metadata[plan_code]',planCode);form.set('metadata[reference]',ref);
+      const pending = (await query(
+        "insert into billing_payment_requests(organization_id,plan_code,method,reference,amount_ttc_cents) values($1,$2,'card',$3,$4) returning id",
+        [org,planCode,ref,amount],
+      )).rows[0];
       let sr: Response; let sd: any;
       try {
-        sr=await fetch('https://api.stripe.com/v1/checkout/sessions',{method:'POST',headers:{Authorization:`Bearer ${config.STRIPE_SECRET_KEY}`,'Content-Type':'application/x-www-form-urlencoded'},body:form,signal:AbortSignal.timeout(10_000)});
+        sr=await fetch('https://api.stripe.com/v1/checkout/sessions',{method:'POST',headers:{Authorization:`Bearer ${config.STRIPE_SECRET_KEY}`,'Content-Type':'application/x-www-form-urlencoded','Idempotency-Key':ref},body:form,signal:AbortSignal.timeout(10_000)});
         sd=await sr.json();
       } catch (e:any) {
-        request.log.warn({code:e?.name==='TimeoutError'?'STRIPE_TIMEOUT':'STRIPE_SESSION_CREATE_FAILED'},'Stripe checkout creation failed');
+        request.log.warn({code:e?.name==='TimeoutError'?'STRIPE_TIMEOUT':'STRIPE_SESSION_CREATE_FAILED',paymentRequestId:pending.id},'Stripe checkout creation failed');
+        if(e?.name!=='TimeoutError') await query("update billing_payment_requests set status='canceled' where id=$1 and status='pending'",[pending.id]);
         return reply.code(502).send({error:'PAYMENT_PROVIDER_UNAVAILABLE',message:'Le prestataire de paiement ne répond pas. Réessayez dans quelques instants.'});
       }
-      if(!sr.ok||!sd?.url||typeof sd.id!=='string')return reply.code(502).send({error:'PAYMENT_PROVIDER_ERROR',message:'Le prestataire de paiement n’a pas pu créer la session sécurisée.'});
-      await query(`insert into billing_payment_requests(organization_id,plan_code,method,reference,amount_ttc_cents,provider_session_id) values($1,$2,'card',$3,$4,$5)`,[org,planCode,ref,amount,sd.id]);
+      if(!sr.ok||!sd?.url||typeof sd.id!=='string'){
+        await query("update billing_payment_requests set status='canceled' where id=$1 and status='pending'",[pending.id]);
+        return reply.code(502).send({error:'PAYMENT_PROVIDER_ERROR',message:'Le prestataire de paiement n’a pas pu créer la session sécurisée.'});
+      }
+      const linked = await query("update billing_payment_requests set provider_session_id=$1 where id=$2 and status='pending' returning id",[sd.id,pending.id]);
+      if(!linked.rowCount){
+        request.log.error({paymentRequestId:pending.id,sessionId:sd.id},'Stripe session created but pending request could not be linked');
+        return reply.code(500).send({error:'PAYMENT_REQUEST_LINK_FAILED'});
+      }
       await subscriptionEvent(org,'payment_requested',{method,planCode,reference:ref,amountTtcCents:amount});
       return {ok:true,method,planCode,reference:ref,checkoutUrl:sd.url};
     });
