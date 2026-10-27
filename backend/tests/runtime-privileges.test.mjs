@@ -28,8 +28,8 @@ test('droits SQL : le runtime lit/écrit les tables applicatives sans accéder �
       }
       const history = await c.query("select has_table_privilege(current_user,'public.schema_migrations','SELECT') AS allowed");
       assert.equal(history.rows[0].allowed, false, 'le rôle runtime ne doit pas lire l’historique des migrations');
-      const sequence = await c.query("select count(*)::int n from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='S' and has_sequence_privilege(current_user,c.oid,'USAGE')");
-      assert.ok(Number(sequence.rows[0].n) >= 0);
+      const sequences = await c.query("select count(*)::int total, count(*) filter (where has_sequence_privilege(current_user,c.oid,'USAGE'))::int granted from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='S'");
+      assert.equal(Number(sequences.rows[0].granted), Number(sequences.rows[0].total), 'USAGE doit être accordé sur toutes les séquences applicatives');
     } finally {
       c.release();
     }
