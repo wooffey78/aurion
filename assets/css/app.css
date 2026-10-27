@@ -385,16 +385,3 @@ body.keyboard-open .toast-region{display:none}
 .part-photo-image{max-width:100%;max-height:280px;object-fit:contain;border-radius:12px}
 .support-edit-form-select{-webkit-appearance:auto;appearance:auto;background-image:none;padding-right:13px}
 
-/* Indicateur réseau non bloquant, ancré en bas à droite. */
-.aurion-loading-popup{position:fixed;z-index:1200;right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));display:flex;align-items:center;gap:11px;width:min(300px,calc(100vw - 28px));padding:12px 14px;border:1px solid var(--line,rgba(130,160,210,.25));border-radius:14px;background:rgba(8,17,32,.94);box-shadow:0 12px 34px rgba(0,0,0,.28);backdrop-filter:blur(14px);color:var(--text,#f4f7ff);opacity:0;transform:translateY(8px);visibility:hidden;pointer-events:none;transition:opacity .18s ease,transform .18s ease,visibility .18s ease}
-.aurion-loading-popup.is-visible{opacity:1;transform:translateY(0);visibility:visible}
-.aurion-loading-mark{flex:0 0 18px;width:18px;height:18px;border:2px solid rgba(120,170,255,.25);border-top-color:var(--accent,#6ea8ff);border-radius:50%;animation:aurion-loading-spin .8s linear infinite}
-.aurion-loading-copy{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}
-.aurion-loading-copy strong{font-size:12px;line-height:1.3;font-weight:650}
-.aurion-loading-detail{font-size:11px;line-height:1.3;color:var(--muted,#aebbd0)}
-.aurion-loading-track{display:block;overflow:hidden;width:100%;height:3px;margin-top:3px;border-radius:99px;background:rgba(130,160,210,.16)}
-.aurion-loading-track>span{display:block;width:38%;height:100%;border-radius:99px;background:var(--accent,#6ea8ff);animation:aurion-loading-progress 1.25s ease-in-out infinite}
-@keyframes aurion-loading-spin{to{transform:rotate(360deg)}}
-@keyframes aurion-loading-progress{0%{transform:translateX(-110%)}100%{transform:translateX(290%)}}
-@media(prefers-reduced-motion:reduce){.aurion-loading-mark,.aurion-loading-track>span{animation:none}.aurion-loading-track>span{width:100%}.aurion-loading-popup{transition:none}}
-@media(max-width:480px){.aurion-loading-popup{right:10px;bottom:max(10px,env(safe-area-inset-bottom));width:min(270px,calc(100vw - 20px));padding:10px 12px}}

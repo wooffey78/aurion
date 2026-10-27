@@ -1,5 +1,7 @@
 // Espace compte sécurisé (avatar) : profil, sécurité, abonnement, documents légaux acceptés.
 import{api}from'../../core/api.js';
+import{invalidateSession}from'../../core/session.js';
+import{go}from'../../core/router.js';
 import{passwordScore,suggestPassword}from'../../core/security.js';
 import{S,e,toast,askConfirm,hooks}from'./core.js';
 
@@ -60,7 +62,7 @@ export async function bind(){
   $('#pw-form').onsubmit=async ev=>{ev.preventDefault();const err=$('#pw-err');err.hidden=true;
     if(passwordScore(pw.value)<4){err.textContent='Choisissez un mot de passe plus robuste.';err.hidden=false;return}
     try{await api.changePassword($('#cur').value,pw.value);$('#cur').value='';pw.value='';toast('Mot de passe modifié. Vos autres sessions ont été déconnectées.','success')}catch(x){err.textContent=x.message;err.hidden=false}};
-  $('#logout-all').onclick=async()=>{if(!await askConfirm({title:'Se déconnecter partout ?',message:'Toutes vos sessions, y compris celle-ci, seront fermées. Vous devrez vous reconnecter.',confirmLabel:'Me déconnecter partout',danger:true}))return;try{await api.logoutAll();location.hash='#/auth';location.reload()}catch(x){toast(x.message,'error')}};
+  $('#logout-all').onclick=async()=>{if(!await askConfirm({title:'Se déconnecter partout ?',message:'Toutes vos sessions, y compris celle-ci, seront fermées. Vous devrez vous reconnecter.',confirmLabel:'Me déconnecter partout',danger:true}))return;try{await api.logoutAll();invalidateSession();go('/auth')}catch(x){toast(x.message,'error')}};
   $('#account-download')?.addEventListener('click',()=>api.downloadAll().catch(x=>toast(x.message,'error')));
   $('#sub-cancel')?.addEventListener('click',async()=>{if(!await askConfirm({title:'Ne pas poursuivre après l’essai ?',message:'Aucun prélèvement n’aura lieu. Vos données restent conservées. Vous pourrez reprendre à tout moment.',confirmLabel:'Confirmer',danger:true}))return;try{await api.cancelSubscription();toast('Demande enregistrée','success');bind()}catch(x){toast(x.message,'error')}});
   $('#sub-resume')?.addEventListener('click',async()=>{try{await api.resumeSubscription();toast('Demande annulée','success');bind()}catch(x){toast(x.message,'error')}});

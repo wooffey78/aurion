@@ -9,36 +9,6 @@ import{renderDashboard}from'./pages/dashboard.js';
 
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});window.__aurionDeferredInstall=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();window.__aurionDeferredInstall=e});
 
-// Indicateur discret des requêtes réseau : aucun rechargement ni changement de route.
-(function installNetworkProgress(){
-  if(window.__aurionNetworkProgressInstalled)return;
-  window.__aurionNetworkProgressInstalled=true;
-  const nativeFetch=window.fetch.bind(window);
-  let pending=0,showTimer=0,hideTimer=0,host=null;
-  const ensureHost=()=>{
-    if(host?.isConnected)return host;
-    host=document.createElement('aside');host.id='aurion-loading-popup';host.className='aurion-loading-popup';
-    host.setAttribute('role','status');host.setAttribute('aria-live','polite');host.setAttribute('aria-atomic','true');
-    host.innerHTML='<span class="aurion-loading-mark" aria-hidden="true"></span><span class="aurion-loading-copy"><strong>Chargement en cours</strong><span class="aurion-loading-detail">Mise à jour des données…</span><span class="aurion-loading-track" aria-hidden="true"><span></span></span></span>';
-    document.body.append(host);return host;
-  };
-  const show=()=>{if(!pending)return;const el=ensureHost();el.classList.add('is-visible');el.querySelector('.aurion-loading-detail').textContent=pending>1?`${pending} opérations en cours…`:'Mise à jour des données…';};
-  window.fetch=function(...args){
-    pending++;clearTimeout(hideTimer);
-    if(pending===1)showTimer=setTimeout(show,160);else if(host?.classList.contains('is-visible'))show();
-    let result;
-    try{result=nativeFetch(...args)}catch(error){pending=Math.max(0,pending-1);if(!pending){clearTimeout(showTimer);hideTimer=setTimeout(()=>host?.classList.remove('is-visible'),280)}throw error}
-    return Promise.resolve(result).finally(()=>{
-      pending=Math.max(0,pending-1);
-      if(pending){if(host?.classList.contains('is-visible'))show();return;}
-      clearTimeout(showTimer);
-      if(host?.classList.contains('is-visible')){
-        const detail=host.querySelector('.aurion-loading-detail');if(detail)detail.textContent='Chargement terminé';
-        hideTimer=setTimeout(()=>host?.classList.remove('is-visible'),320);
-      }
-    });
-  };
-})();
 
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 
