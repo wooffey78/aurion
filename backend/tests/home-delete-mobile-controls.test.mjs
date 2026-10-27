@@ -13,20 +13,18 @@ const css = read('assets/css/app.css');
 const sw = read('sw.js');
 const manifest = read('manifest.webmanifest');
 
-test('les boutons d’accueil déclenchent directement le mode attendu et gardent les routes natives', () => {
-  assert.ok(shell.includes('href="#/auth"'));
-  assert.ok(shell.includes('href="#/login"'));
-  assert.ok(main.includes("target.closest('.landing-hero .button-row a[href=\"#/auth\"], .landing-hero .button-row a[href=\"#/login\"]')"));
-  assert.ok(main.includes("if (route() !== destination) location.hash = destination;"));
-  assert.ok(main.includes("renderAuth(destination === '/login' ? 'login' : 'register')"));
-  assert.ok(main.includes("if(r==='/auth')return renderAuth('register')"));
-  assert.ok(main.includes("if(r==='/login')return renderAuth('login')"));
-  assert.ok(router.includes('location.hash=path'));
-  assert.ok(router.includes("addEventListener('hashchange',fn)"));
-  assert.ok(!main.includes('bindLandingNavigation'));
-  assert.ok(shell.includes('main.js?v=15.2.45-r1'));
-  assert.ok(shell.includes('app.css?v=15.2.45-r1'));
-  assert.ok(sw.includes('aurion-shell-v15.2.45-r1'));
+test('les boutons d’accueil ouvrent les pages d’authentification par navigation native', () => {
+  assert.ok(shell.includes('href="/?auth=register"'));
+  assert.ok(shell.includes('href="/?auth=login"'));
+  assert.ok(main.includes('href="/?auth=register"'));
+  assert.ok(main.includes('href="/?auth=login"'));
+  assert.ok(router.includes("new URLSearchParams(location.search).get('auth')"));
+  assert.ok(router.includes("if(entry==='register')return '/auth'"));
+  assert.ok(router.includes("if(entry==='login')return '/login'"));
+  assert.ok(!main.includes("document.addEventListener('click', event =>"));
+  assert.ok(shell.includes('main.js?v=15.2.46-r1'));
+  assert.ok(shell.includes('app.css?v=15.2.46-r1'));
+  assert.ok(sw.includes('aurion-shell-v15.2.46-r1'));
 });
 
 test('la suppression de facture reste disponible même si elle est déjà réglée', () => {
