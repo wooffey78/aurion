@@ -18,6 +18,7 @@ const NAV=[['home','Tableau de bord','⌂'],['clients','Clients','♙'],['catalo
 // Garde-fous de rafraîchissement : ne jamais remplacer l’écran en pleine interaction.
 let metricsRefreshInProgress = false;
 let lastUserInteractionAt = Date.now();
+let lastDashboardSummaryRefreshAt = 0, lastFinancialRefreshAt = 0;
 let lifecycleRefreshInstalled=false,lastBackgroundRefreshAt=0,backgroundRefreshRunning=false;
 let lastRenderedFinancialSnapshot = null;
 for (const eventName of ['pointerdown', 'keydown', 'input', 'change']) {
@@ -29,7 +30,7 @@ function financialSnapshot() {
 
 
 // Chargement ciblé : le noyau à chaque action, les jeux de données rares seulement quand leur écran l'exige.
-const EXTRAS={home:['accounting','timeMetrics','dashboardSummary'],settings:['company'],accounting:['accounting','treasury'],treasury:['treasury'],invoices:['treasury']};
+const EXTRAS={home:['timeMetrics','dashboardSummary'],settings:['company'],accounting:['accounting','treasury'],treasury:['treasury'],invoices:['treasury']};
 const DATASETS={
   clients:['clients','quotes','appointments','devices','sav'],
   catalog:['parts','suppliers','interventions','supplies','warranties','policies','devices','sav'],
@@ -40,7 +41,7 @@ const DATASETS={
   accounting:['accounting','treasury','quotes','sav'],
   treasury:['treasury','accounting','quotes','sav'],
   settings:['templates','mail'],
-  home:['clients','quotes','appointments','suppliers','parts','interventions','supplies','warranties','policies','devices','sav','accounting','treasury','timeMetrics','dashboardSummary','templates','mail'],
+  home:['clients','quotes','appointments'], 
 };
 const ALL_DATASETS=[...new Set(Object.values(DATASETS).flat())];
 let lastConfigLoadedAt=0;
@@ -71,7 +72,7 @@ async function load(extras=null,viewId=S.view){
   for(const key of wanted){
     if(!fetchers[key])continue;
     jobs.push((async()=>{
-      try{const value=await fetchers[key]();if(key==='dashboardSummary')S.dashboardCounters=value;else S[key]=value;if(key==='suppliers')S.suppliersError=null;}
+      try{const value=await fetchers[key]();if(key==='dashboardSummary'){S.dashboardCounters=value;lastDashboardSummaryRefreshAt=Date.now();}else S[key]=value;if(key==='suppliers')S.suppliersError=null;}
       catch(x){if(x?.status===401)throw x;if(key==='suppliers')S.suppliersError=x?.message||'Impossible de charger les fournisseurs. Vérifiez la connexion puis réessayez.';const stateKey=key==='dashboardSummary'?'dashboardCounters':key;if(S[stateKey]===undefined||S[stateKey]===null)S[stateKey]=fallback[key];}
     })());
   }
@@ -122,7 +123,7 @@ export async function refresh(id=S.view){
       else{S.quoteDraft=null;if(savedDraft){try{await api.deleteDraft()}catch{}}}
     }else if(savedDraft){S.quoteDraft=savedDraft;if(savedDraft.documentType==='invoice')S.documentType='invoice';else if(savedDraft.documentType==='quote')S.documentType='quote';}
   }
-  await load([...(EXTRAS[id]||[])],id);paintShell();show(id)
+  await load([...(EXTRAS[id]||[])],id);if(id==='accounting'||id==='treasury')lastFinancialRefreshAt=Date.now();paintShell();show(id)
 }
 hooks.refresh=refresh;hooks.show=show;
 
@@ -198,7 +199,9 @@ function installBackgroundRefresh(){
 }
 
 export async function renderDashboard(){
-  await load(null);
+  const initialView=S.view==='quote'?'home':S.view;
+  await load([...(EXTRAS[initialView]||[])],initialView);
+  if(initialView==='accounting'||initialView==='treasury')lastFinancialRefreshAt=Date.now();
   lastBackgroundRefreshAt=Date.now();installBackgroundRefresh();
   document.querySelector('#app').innerHTML=`<div class="dashboard-shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#/dashboard" aria-label="Aurion — retour au tableau de bord" title="Retour au tableau de bord">${appLogo('42')}<span>AURION<small>PRO</small></span></a><button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar"><span></span><span></span><span></span></button><nav class="nav"></nav><div class="sidebar-bottom"><button id="logout" class="nav-logout">Quitter</button><div class="status-dot"><i></i> Système opérationnel</div></div></aside><section class="workspace"><header class="dashboard-top"><div class="activity-switch"><span class="eyebrow" id="shell-company"></span><button id="activity-picker" class="activity-picker"><span>ACTIVITÉ ACTIVE</span><strong id="shell-activity"></strong><small>▾</small></button></div><div class="top-actions"><span class="pill" id="shell-pill"></span><button class="btn secondary small" id="fs-toggle" title="Plein écran (F11)">⛶ Plein écran</button><button class="avatar" id="shell-avatar" title="Mon compte" aria-label="Mon compte"></button></div></header><main id="main" class="content"><div id="view"></div></main></section></div><div id="activity-modal-root"></div>`;
   await syncShellAvatar();
@@ -211,14 +214,17 @@ export async function renderDashboard(){
   window.addEventListener('aurion-avatar-updated',ev=>applyShellAvatar(ev.detail?.url));
   document.querySelector('#logout').onclick=()=>api.logout().finally(()=>{invalidateSession();go('/')});
   document.querySelector('#fs-toggle').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen().catch(()=>toast('Plein écran indisponible : utilisez F11.','info'))};
-  paintShell();show(S.view==='quote'?'home':S.view);
+  paintShell();show(initialView);
   window.__aurionMetricsTimer&&clearInterval(window.__aurionMetricsTimer);
   window.__aurionMetricsTimer=setInterval(async()=>{
     if(metricsRefreshInProgress)return;
     metricsRefreshInProgress=true;
     const viewAtStart=S.view;
     try{
-      S.dashboardCounters=await api.dashboardSummary(S.forecastMonths||6);
+      if(viewAtStart==='home'&&Date.now()-lastDashboardSummaryRefreshAt>=30000){
+        S.dashboardCounters=await api.dashboardSummary(S.forecastMonths||6);
+        lastDashboardSummaryRefreshAt=Date.now();
+      }
       if(viewAtStart==='home'&&S.view==='home'){
         const cards=[...document.querySelectorAll('#view .quick-grid .action-card')];
         if(cards.length===2){
@@ -237,8 +243,9 @@ export async function renderDashboard(){
             metricCards.forEach((card,index)=>{const value=card.querySelector('b');if(value)value.textContent=values[index]});
           }
         }
-      }else if((viewAtStart==='accounting'||viewAtStart==='treasury')&&S.view===viewAtStart){
+      }else if((viewAtStart==='accounting'||viewAtStart==='treasury')&&S.view===viewAtStart&&Date.now()-lastFinancialRefreshAt>=30000){
         await load(['accounting','treasury']);
+        lastFinancialRefreshAt=Date.now();
         if(S.view===viewAtStart&&financialSnapshot()!==lastRenderedFinancialSnapshot){
           const viewRoot=document.querySelector('#view');
           const focused=document.activeElement;
