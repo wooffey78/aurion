@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import crypto from "node:crypto";
+import { CodeChallengeMethod } from 'google-auth-library';
 import { query, db } from "../db.js";
 import { config } from "../config.js";
 import { hashPassword, verifyPassword } from "../services/passwords.js";
@@ -63,7 +64,7 @@ async function googleLoginClient(){
       const oauth=await googleLoginClient();
       const url=oauth.generateAuthUrl({
         access_type:'online', prompt:'select_account', state,
-        scope:['openid','email','profile'], code_challenge:codeChallenge, code_challenge_method:'S256'
+        scope:['openid','email','profile'], code_challenge:codeChallenge, code_challenge_method:CodeChallengeMethod.S256
       });
       return reply.redirect(url);
     } catch {
