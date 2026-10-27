@@ -33,7 +33,7 @@ function section(c){
 }
 export const view=()=>{
  const c=cats(),total=c.reduce((a,x)=>a+list(x.id).length,0);
- return `<div id="catalogue-metier" class="catalog-page"><header class="page-head catalog-page-head"><div><span class="eyebrow">BASE MÉTIER · ${e(prof().title||'')}</span><h1>Catalogue métier</h1><p>Catalogue de <strong>${e(active()?.name||'l’activité courante')}</strong>. Les calculs des devis et factures restent centralisés dans Aurion.</p></div><div class="catalog-header-actions">${action('Suggestions métier','seed','all','')}${action('Exporter JSON','export','all','')}<label class="btn primary small catalog-import-label" for="catalog-import-file">Importer JSON</label><input id="catalog-import-file" class="visually-hidden" type="file" accept=".json,application/json" aria-describedby="catalog-import-help"></div></header>
+ return `<div id="catalogue-metier" class="catalog-page"><header class="page-head catalog-page-head"><div><span class="eyebrow">BASE MÉTIER · ${e(prof().title||'')}</span><h1>Catalogue métier</h1><p>Catalogue de <strong>${e(active()?.name||'l’activité courante')}</strong>. Les calculs des devis et factures restent centralisés dans Aurion.</p></div><div class="catalog-header-actions">${action('Suggestions métier','seed','all','')}${action('Exporter JSON','export','all','')}<input id="catalog-import-file" class="visually-hidden" type="file" accept=".json,application/json" aria-describedby="catalog-import-help"><label class="btn primary small catalog-import-label" for="catalog-import-file">Importer JSON</label></div></header>
  <section class="catalog-overview panel" aria-label="Vue d’ensemble du catalogue"><div class="catalog-overview-stats"><div><span>Total</span><strong>${total}</strong></div>${c.map(x=>`<div><span>${e(x.label)}</span><strong>${list(x.id).length}</strong></div>`).join('')}</div><label class="catalog-search field"><span>Rechercher dans le catalogue</span><input id="catalog-search" type="search" placeholder="Nom, modèle, référence, fournisseur…" aria-controls="catalog-category-grid"></label><p id="catalog-import-help" class="help">Les imports sont additifs : les doublons sont ignorés ; aucune donnée existante n’est remplacée ou supprimée. Utilisez un export JSON Aurion.</p><div class="catalog-filter-row" role="group" aria-label="Filtrer les catégories"><button class="catalog-filter active" type="button" data-filter="all" aria-pressed="true">Tout le catalogue</button>${c.map(x=>`<button class="catalog-filter" type="button" data-filter="${x.id}" aria-pressed="false">${e(x.label)}</button>`).join('')}</div><p id="catalog-result-status" class="catalog-result-status" aria-live="polite">${total} élément(s) · ${c.length} catégories</p></section><div id="catalog-category-grid" class="catalog-category-grid">${c.map(section).join('')}</div><p class="catalog-footer-note">Les routes existantes par activité sont conservées. Les documents émis ne sont pas réécrits et les calculs métier ne sont pas dupliqués dans le catalogue.</p></div>`;
 };
 function detail(t,x){
@@ -50,11 +50,28 @@ function detail(t,x){
 function showDetail(t,x,opener){
  document.querySelector('#catalog-detail-modal')?.remove();
  document.body.insertAdjacentHTML('beforeend',`<div class="modal-backdrop catalog-detail-backdrop" id="catalog-detail-modal"><section class="modal glass catalog-detail-modal" role="dialog" aria-modal="true" aria-labelledby="catalog-detail-title" tabindex="-1"><header class="section-title"><div><span class="eyebrow">CONSULTATION · ${e(cats().find(c=>c.id===t)?.label||t)}</span><h2 id="catalog-detail-title">${e(x.name)}</h2></div><button type="button" class="icon-btn" data-close aria-label="Fermer">×</button></header><dl class="catalog-detail-list">${detail(t,x)}</dl><footer class="button-row"><button type="button" class="btn secondary" data-close>Fermer</button><button type="button" class="btn primary small" data-edit>Modifier</button></footer></section></div>`);
- const m=document.querySelector('#catalog-detail-modal'),close=()=>{m?.remove();opener?.focus?.()};
- m.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);m.addEventListener('click',ev=>{if(ev.target===m)close()});
- const key=ev=>{if(ev.key==='Escape'&&document.querySelector('#catalog-detail-modal')===m){close();document.removeEventListener('keydown',key,true)}};
- document.addEventListener('keydown',key,true);m.querySelector('[data-close]')?.focus();m.querySelector('[data-edit]')?.addEventListener('click',()=>{close();edit(t,x)});
+ const m=document.querySelector('#catalog-detail-modal');
+ const focusable=()=>Array.from(m?.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')||[]).filter(node=>!node.hidden&&node.getAttribute('aria-hidden')!=='true');
+ let onKey;
+ const close=()=>{document.removeEventListener('keydown',onKey,true);m?.remove();opener?.focus?.()};
+ onKey=ev=>{
+  if(document.querySelector('#catalog-detail-modal')!==m){document.removeEventListener('keydown',onKey,true);return}
+  if(ev.key==='Escape'){ev.preventDefault();close();return}
+  if(ev.key==='Tab'){
+   const items=focusable();
+   if(!items.length){ev.preventDefault();m.querySelector('[role="dialog"]')?.focus();return}
+   const first=items[0],last=items[items.length-1];
+   if(ev.shiftKey&&document.activeElement===first){ev.preventDefault();last.focus()}
+   else if(!ev.shiftKey&&document.activeElement===last){ev.preventDefault();first.focus()}
+  }
+ };
+ m.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',close));
+ m.addEventListener('click',ev=>{if(ev.target===m)close()});
+ document.addEventListener('keydown',onKey,true);
+ m.querySelector('[data-close]')?.focus();
+ m.querySelector('[data-edit]')?.addEventListener('click',()=>{close();edit(t,x)});
 }
+
 function form(t,x={}){
  if(t==='interventions')return F('name','Nom de la prestation',x.name,'required maxlength="180"')+T('description','Description',x.description||'')+`<div class="grid-2">${F('duration','Durée par défaut (minutes)',x.default_duration_minutes??'','type="number" min="1" step="1"')}${F('price','Prix client habituel TTC (indicatif)',x.default_price??'','type="number" min="0" step="0.01"')}</div><p class="help">Le moteur de devis reste responsable des calculs finaux.</p>`;
  if(t==='parts')return F('name','Nom de l’article',x.name,'required maxlength="180"')+`<div class="grid-2">${F('model','Modèle',x.model)}${F('variant','Variante',x.variant)}</div><div class="grid-2">${F('color','Couleur',x.color)}${F('quality','Qualité',x.quality,'placeholder="OEM, compatible…"')}</div><div class="grid-2">${F('reference','Référence',x.reference)}${F('sell','Prix de vente HT (indicatif)',x.selling_price??'','type="number" min="0" step="0.01"')}</div><div class="grid-2">${F('coef','Coefficient de vente (%)',x.sale_coefficient_percent??'','type="number" min="0" step="0.01"')}${F('stock','Stock',x.stock??'','type="number" min="0" step="1"')}</div>`+T('notes','Notes internes',x.notes||'')+`<label class="field"><span>Photo (facultative)</span><input id="photo" type="file" accept="image/png,image/jpeg,image/webp"><small class="help">PNG, JPEG ou WebP · 5 Mo maximum.</small></label>`;
