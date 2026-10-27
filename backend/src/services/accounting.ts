@@ -31,8 +31,8 @@ export async function monthlyAccounting(orgId:string,activityId:string,year?:num
    select date_trunc('month',paid_at)::date month,
           sum(base_amount/nullif(1+vat_rate/100,0)+penalty_amount)::numeric revenue_ht,
           sum(base_amount-(base_amount/nullif(1+vat_rate/100,0)))::numeric vat,
-          sum((base_cost+coefficient_markup)*case when coalesce(total_ttc,0)>0 then least(1,base_amount/nullif(total_ttc,0)) else 0 end)::numeric purchases,
-          sum(base_cost*case when coalesce(total_ttc,0)>0 then least(1,base_amount/nullif(total_ttc,0)) else 0 end*case when purchase_vat_mode='exempt' then 0 else coalesce(purchase_vat_rate,vat_rate,0)/100 end)::numeric purchase_vat,
+          sum(base_cost*case when coalesce(total_ttc,0)>0 then least(1,base_amount/nullif(total_ttc,0)) else 0 end)::numeric purchases,
+          sum((coalesce(part_cost,0)+coalesce(shipping_cost,0))*case when coalesce(total_ttc,0)>0 then least(1,base_amount/nullif(total_ttc,0)) else 0 end*case when purchase_vat_mode='exempt' then 0 else coalesce(purchase_vat_rate,vat_rate,0)/100 end)::numeric purchase_vat,
           sum(((base_amount/nullif(1+vat_rate/100,0))+penalty_amount)*coalesce((select sum(coalesce((c->>'rate')::numeric,0)) from jsonb_array_elements(case when jsonb_typeof(contribution_snapshot)='array' then contribution_snapshot else '[]'::jsonb end) c where coalesce(c->>'basis','ca_ht')='ca_ht'),urssaf_rate,0)/100)::numeric social,
           sum(coalesce(mileage_total,0)*case when coalesce(total_ttc,0)>0 then least(1,base_amount/nullif(total_ttc,0)) else 0 end)::numeric mileage,
           count(distinct quote_id)::int invoice_count
