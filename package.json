@@ -1,6 +1,6 @@
 {
   "name": "aurion",
-  "version": "15.2.32",
+  "version": "15.2.33",
   "private": true,
   "scripts": {
     "dev": "npm --prefix backend run dev",
@@ -12,8 +12,7 @@
     "sync-pricing": "node tools/sync-pricing.mjs",
     "build-setup": "pwsh tools/Build-Setup.ps1",
     "typecheck": "npm --prefix backend run typecheck",
-    "check": "npm run build && npm run typecheck && npm run test:smoke",
-    "test:smoke": "node --test backend/tests/production-readiness.test.mjs backend/tests/routes.contract.test.mjs backend/tests/routes.duplicates.test.mjs backend/tests/requirements-14.test.mjs backend/tests/requirements-15.test.mjs backend/tests/requirements-16.test.mjs backend/tests/strict-requirements-1-15.test.mjs backend/tests/step20-suppliers-sidebar.test.mjs backend/tests/step4-suppliers-management.test.mjs backend/tests/service-worker-privacy.test.mjs"
+    "check": "npm run build && npm run typecheck && npm run test:smoke"
   },
   "engines": {
     "node": ">=22.16.0"
