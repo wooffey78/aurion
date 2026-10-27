@@ -3,13 +3,16 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 
-test('synchronisation globale du compte : toutes les tables organisationnelles font évoluer une révision serveur',()=>{
+test('synchronisation globale du compte : les tables métier autorisées font évoluer une révision serveur',()=>{
   const migration=read('../migrations/056_account_wide_sync.sql');
   const route=read('../src/routes/settings.ts');
   const sync=read('../../assets/js/account-sync.js');
+  const whitelist=read('../migrations/058_account_sync_trigger_whitelist.sql');
   assert.match(migration,/CREATE TABLE IF NOT EXISTS account_sync_versions/);
   assert.match(migration,/AFTER INSERT OR UPDATE OR DELETE ON/);
   assert.match(migration,/organization_id/);
+  assert.match(whitelist,/'activities','activity_contributions/);
+  assert.doesNotMatch(whitelist,/billing_webhook_events|subscription_events|notification_jobs/);
   assert.match(route,/app\.get\('\/sync\/version'/);
   assert.match(sync,/\/sync\/version/);
   assert.match(sync,/aurion\.accountSyncRevision:/);
