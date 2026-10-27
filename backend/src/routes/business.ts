@@ -114,6 +114,29 @@ const supplierCreateInputSchema = z.object({
 }).passthrough();
 const supplierPatchInputSchema = supplierCreateInputSchema.partial();
 
+const activityCreateInputSchema = z.object({
+  name: z.string().trim().min(1).max(240),
+  code: z.string().trim().max(160).optional(),
+  description: z.string().max(4000).nullable().optional(),
+  legalForm: z.string().max(240).nullable().optional(),
+  cgvText: z.string().max(12000).nullable().optional(),
+  urssafRate: numericInput,
+  vatRate: numericInput,
+  marginMinPercent: numericInput,
+  defaultPartCoefficientPercent: numericInput,
+  defaultLaborCoefficientPercent: numericInput,
+  profileCode: z.string().max(120).nullable().optional(),
+  autoFiscalDetect: z.boolean().optional(),
+  active: z.boolean().optional(),
+  paymentTerms: z.string().max(4000).nullable().optional(),
+  insuranceInfo: z.string().max(4000).nullable().optional(),
+  mediatorInfo: z.string().max(4000).nullable().optional(),
+  legalNotes: z.string().max(8000).nullable().optional(),
+  quoteValidityDays: numericInput,
+}).passthrough();
+const activityPatchInputSchema = activityCreateInputSchema.partial();
+const activityParamsSchema = z.object({ id: z.string().uuid() });
+
 const quoteCreateInputSchema = z.object({
   clientId: optionalUuid, activityId: optionalUuid, intervention: z.string().max(240).optional(),
   documentType: z.enum(['quote','invoice']).optional(), items: z.array(quoteLineInputSchema).max(500).nullable().optional(),
@@ -384,10 +407,85 @@ export async function businessRoutes(app:FastifyInstance){
   app.post('/activities/detect-legal-form',async(r,reply)=>{const b:any=r.body||{};return detectLegalFormFromProfile(String(b.name||''),String(b.description||''));});
   app.post('/activities/detect-profile',async(r,reply)=>{const b:any=r.body||{};const p=profileFor(String(b.name||''),String(b.description||''),b.profileCode);return {code:p.code,title:p.title,modules:p.modules,calc:p.calc,suggestedParts:p.suggestedParts.length,warranty:p.warranty};});
   app.get('/activities/:id/profile',async(r,reply)=>{const x=await query('select id,name,description from activities where id=$1 and organization_id=$2',[(r.params as any).id,r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});const ov=(await query('select profile_code from activity_profile_overrides o where o.activity_id=$1 and exists(select 1 from activities own where own.id=o.activity_id and own.organization_id=$2)',[(r.params as any).id,r.auth!.organizationId])).rows[0]?.profile_code;return profileFor(x.rows[0].name,x.rows[0].description||'',ov)});
-  app.post('/activities',async(r,reply)=>{const b:any=r.body;if(!b?.name?.trim())return reply.code(400).send({error:'INVALID_INPUT'});const id=crypto.randomUUID();const code=(b.code||b.name).toString().trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||`activity-${Date.now()}`;try{await query('insert into activities(id,organization_id,code,name,description,legal_form,cgv_text,urssaf_rate,vat_rate,margin_min_percent,default_part_coefficient_percent,default_labor_coefficient_percent) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[id,r.auth!.organizationId,code,b.name.trim(),b.description||null,b.legalForm||null,b.cgvText||null,b.urssafRate===''?null:Number(b.urssafRate||0),Number(b.vatRate??20),Math.max(0,Number(b.marginMinPercent??0)),Math.max(0,Number(b.defaultPartCoefficientPercent??0)),Math.max(0,Number(b.defaultLaborCoefficientPercent??0))]);if(b.profileCode&&PROFILE_CODES.includes(b.profileCode))await saveActivityProfileOverride(r.auth!.organizationId,id,b.profileCode);const profile=profileFor(b.name.trim(),b.description||'',b.profileCode);const detected=detectFiscalSettings(String(b.legalForm||''),profile.code,b.name.trim(),b.description||'');if(b.legalForm&&b.autoFiscalDetect!==false){await query('update activities set urssaf_rate=$1,vat_rate=coalesce($2,vat_rate),social_regime=$3,vat_regime=$4,social_auto_detected=true,vat_auto_detected=true where id=$5 and organization_id=$6',[detected.socialRate,detected.vatRate,detected.socialRegime,detected.vatRegime,id,r.auth!.organizationId]);await saveContributionPresets(r.auth!.organizationId,id,detected.contributions);}const defaultCgv=defaultCgvFor(profile.code,profile.title,String(b.legalForm||''));await query('update activities set cgv_text=coalesce(cgv_text,$1) where id=$2 and organization_id=$3',[defaultCgv,id,r.auth!.organizationId]);for(const n of profile.suggestedServices) await query('insert into interventions(organization_id,activity_id,name,description,default_duration_minutes) values($1,$2,$3,$4,$5)',[r.auth!.organizationId,id,n,`${profile.title} · prestation`,profile.serviceMinutes[n]||60]);for(const n of profile.suggestedParts) await query('insert into parts(organization_id,activity_id,name,category,selling_price) values($1,$2,$3,$4,0)',[r.auth!.organizationId,id,n,profile.itemLabel]);for(const w of (profile.warranty.length?profile.warranty:['Garantie standard'])){const m=/(\d+)\s*(mois|an)/.exec(w);await query('insert into warranty_policies(organization_id,activity_id,name,duration_months) values($1,$2,$3,$4)',[r.auth!.organizationId,id,w,m?(m[2]==='an'?12*Number(m[1]):Number(m[1])):12])}await saveLegalFields(id,r.auth!.organizationId,b);return reply.code(201).send({id,profile})}catch(e:any){if(e?.code==='23505')return reply.code(409).send({error:'INVALID_INPUT'});throw e}});
+  app.post('/activities',async(r,reply)=>{
+    const parsed=activityCreateInputSchema.safeParse(r.body);
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const b:any=parsed.data;
+    let urssafRate:number,vatRate:number,marginMinPercent:number,partCoefficient:number,laborCoefficient:number,quoteValidityDays:number;
+    try{
+      urssafRate=b.urssafRate===''?0:(optionalNumber(b.urssafRate,'Cotisations',0,99.99)??0);
+      vatRate=b.vatRate===''?0:(optionalNumber(b.vatRate,'TVA',0,100)??20);
+      marginMinPercent=optionalNumber(b.marginMinPercent,'Marge minimale',0,1e6)??0;
+      partCoefficient=optionalNumber(b.defaultPartCoefficientPercent,'Coefficient pièces',0,1e6)??0;
+      laborCoefficient=optionalNumber(b.defaultLaborCoefficientPercent,'Coefficient main-d’œuvre',0,1e6)??0;
+      quoteValidityDays=optionalNumber(b.quoteValidityDays,'Validité du devis',1,365)??30;
+    }catch{return reply.code(400).send({error:'INVALID_INPUT',message:'Les taux et coefficients de l’activité sont invalides.'})}
+    const id=crypto.randomUUID();
+    const code=(b.code||b.name).trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||`activity-${Date.now()}`;
+    try{
+      await query('insert into activities(id,organization_id,code,name,description,legal_form,cgv_text,urssaf_rate,vat_rate,margin_min_percent,default_part_coefficient_percent,default_labor_coefficient_percent) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[id,r.auth!.organizationId,code,b.name.trim(),b.description||null,b.legalForm||null,b.cgvText||null,b.urssafRate===''?null:urssafRate,vatRate,marginMinPercent,partCoefficient,laborCoefficient]);
+      if(b.profileCode&&PROFILE_CODES.includes(b.profileCode))await saveActivityProfileOverride(r.auth!.organizationId,id,b.profileCode);
+      const profile=profileFor(b.name.trim(),b.description||'',b.profileCode);
+      const detected=detectFiscalSettings(String(b.legalForm||''),profile.code,b.name.trim(),b.description||'');
+      if(b.legalForm&&b.autoFiscalDetect!==false){
+        await query('update activities set urssaf_rate=$1,vat_rate=coalesce($2,vat_rate),social_regime=$3,vat_regime=$4,social_auto_detected=true,vat_auto_detected=true where id=$5 and organization_id=$6',[detected.socialRate,detected.vatRate,detected.socialRegime,detected.vatRegime,id,r.auth!.organizationId]);
+        await saveContributionPresets(r.auth!.organizationId,id,detected.contributions);
+      }
+      const defaultCgv=defaultCgvFor(profile.code,profile.title,String(b.legalForm||''));
+      await query('update activities set cgv_text=coalesce(cgv_text,$1) where id=$2 and organization_id=$3',[defaultCgv,id,r.auth!.organizationId]);
+      for(const n of profile.suggestedServices)await query('insert into interventions(organization_id,activity_id,name,description,default_duration_minutes) values($1,$2,$3,$4,$5)',[r.auth!.organizationId,id,n,`${profile.title} · prestation`,profile.serviceMinutes[n]||60]);
+      for(const n of profile.suggestedParts)await query('insert into parts(organization_id,activity_id,name,category,selling_price) values($1,$2,$3,$4,0)',[r.auth!.organizationId,id,n,profile.itemLabel]);
+      for(const w of (profile.warranty.length?profile.warranty:['Garantie standard'])){
+        const m=/(\d+)\s*(mois|an)/.exec(w);
+        await query('insert into warranty_policies(organization_id,activity_id,name,duration_months) values($1,$2,$3,$4)',[r.auth!.organizationId,id,w,m?(m[2]==='an'?12*Number(m[1]):Number(m[1])):12]);
+      }
+      await saveLegalFields(id,r.auth!.organizationId,{...b,quoteValidityDays});
+      return reply.code(201).send({id,profile});
+    }catch(e:any){
+      if(e?.code==='23505')return reply.code(409).send({error:'INVALID_INPUT'});
+      throw e;
+    }
+  });
   app.delete('/activities/:id',async(r,reply)=>{const id=(r.params as any).id;const count=await query('select count(*)::int n from activities where organization_id=$1 and active=true',[r.auth!.organizationId]);if(Number(count.rows[0].n)<=1)return reply.code(400).send({error:'LAST_ACTIVITY',message:'Il faut conserver au moins une activité.'});const used=await query('select ((select count(*) from clients where activity_id=$1)+(select count(*) from quotes where activity_id=$1)+(select count(*) from appointments where activity_id=$1))::int n',[id]);if(Number(used.rows[0].n)>0)return reply.code(409).send({error:'ACTIVITY_NOT_EMPTY',message:'Cette activité contient encore des clients, devis ou rendez-vous : supprimez-les d’abord.'});const x=await query('delete from activities where id=$1 and organization_id=$2',[id,r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true}});
   app.post('/activities/:id/seed-catalog',async(r,reply)=>{const id=(r.params as any).id,org=r.auth!.organizationId;const a=await query('select id,name,description from activities where id=$1 and organization_id=$2',[id,org]);if(!a.rowCount)return reply.code(404).send({error:'NOT_FOUND'});const ov=(await query('select profile_code from activity_profile_overrides o where o.activity_id=$1 and exists(select 1 from activities own where own.id=o.activity_id and own.organization_id=$2)',[id,org])).rows[0]?.profile_code;const profile=profileFor(a.rows[0].name,a.rows[0].description||'',ov);let services=0,parts=0,warranties=0;for(const n of profile.suggestedServices){const x=await query('insert into interventions(organization_id,activity_id,name,description,default_duration_minutes) select $1::uuid,$2::uuid,$3::varchar,$4::text,$5::int where not exists(select 1 from interventions where activity_id=$2::uuid and lower(name)=lower($3::varchar))',[org,id,n,`${profile.title} · prestation`,profile.serviceMinutes[n]||60]);services+=x.rowCount||0}for(const n of profile.suggestedParts){const x=await query('insert into parts(organization_id,activity_id,name,category,selling_price) select $1::uuid,$2::uuid,$3::varchar,$4::varchar,0 where not exists(select 1 from parts where activity_id=$2::uuid and lower(name)=lower($3::varchar))',[org,id,n,profile.itemLabel]);parts+=x.rowCount||0}for(const w of profile.warranty){const m=/(\d+)\s*(mois|an)/.exec(w);const x=await query('insert into warranty_policies(organization_id,activity_id,name,duration_months) select $1::uuid,$2::uuid,$3::varchar,$4::int where not exists(select 1 from warranty_policies where activity_id=$2::uuid and lower(name)=lower($3::varchar))',[org,id,w,m?(m[2]==='an'?12*Number(m[1]):Number(m[1])):12]);warranties+=x.rowCount||0}return {added:{services,parts,warranties},profile:profile.code}});
-  app.patch('/activities/:id',async(r,reply)=>{const b:any=r.body,id=(r.params as any).id;const x=await query('update activities set name=coalesce($1,name),description=$2,legal_form=$3,cgv_text=$4,urssaf_rate=$5,vat_rate=coalesce($6,vat_rate),margin_min_percent=greatest(0,coalesce($7,margin_min_percent)),default_part_coefficient_percent=greatest(0,coalesce($8,default_part_coefficient_percent)),default_labor_coefficient_percent=greatest(0,coalesce($9,default_labor_coefficient_percent)),active=coalesce($10,active),configuration_defined=true,updated_at=now() where id=$11 and organization_id=$12 returning *',[b.name?.trim(),b.description??null,b.legalForm??null,b.cgvText??null,b.urssafRate===''?null:b.urssafRate===undefined?null:Number(b.urssafRate),b.vatRate===undefined?null:Number(b.vatRate),b.marginMinPercent===undefined?null:Number(b.marginMinPercent),b.defaultPartCoefficientPercent===undefined?null:Number(b.defaultPartCoefficientPercent),b.defaultLaborCoefficientPercent===undefined?null:Number(b.defaultLaborCoefficientPercent),b.active,id,r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});if(b.profileCode!==undefined){if(b.profileCode&&PROFILE_CODES.includes(b.profileCode))await saveActivityProfileOverride(r.auth!.organizationId,id,b.profileCode);else await query('delete from activity_profile_overrides o where o.activity_id=$1 and exists(select 1 from activities own where own.id=o.activity_id and own.organization_id=$2)',[id,r.auth!.organizationId])}if(b.autoFiscalDetect===false)await query('update activities set social_auto_detected=false,vat_auto_detected=false where id=$1 and organization_id=$2',[id,r.auth!.organizationId]);if(b.legalForm&&b.autoFiscalDetect!==false){const a=x.rows[0],p=profileFor(a.name,a.description||'',b.profileCode);const detected=detectFiscalSettings(String(b.legalForm),p.code,a.name,a.description||'');const keepManualSocial=a.social_auto_detected===false&&b.urssafRate!==undefined;const keepManualVat=a.vat_auto_detected===false&&b.vatRate!==undefined;const socialRate=keepManualSocial?Number(b.urssafRate):detected.socialRate;const vatRate=keepManualVat?Number(b.vatRate):detected.vatRate;const socialDetected=!keepManualSocial;const vatDetected=!keepManualVat;const cgv=defaultCgvFor(p.code,p.title,String(b.legalForm||''));await query('update activities set urssaf_rate=$1,vat_rate=coalesce($2,vat_rate),social_regime=$3,vat_regime=$4,cgv_text=$5,social_auto_detected=$6,vat_auto_detected=$7,updated_at=now() where id=$8 and organization_id=$9',[socialRate,vatRate,detected.socialRegime,detected.vatRegime,cgv,socialDetected,vatDetected,id,r.auth!.organizationId]);if(socialDetected||vatDetected)await saveContributionPresets(r.auth!.organizationId,id,detected.contributions);x.rows[0].urssaf_rate=socialRate;x.rows[0].vat_rate=vatRate;x.rows[0].cgv_text=cgv;x.rows[0].contributions=(socialDetected||vatDetected)?detected.contributions:[];}await saveLegalFields(id,r.auth!.organizationId,b);return x.rows[0]});
+  app.patch('/activities/:id',async(r,reply)=>{
+    const parsed=activityPatchInputSchema.safeParse(r.body||{});
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const params=activityParamsSchema.safeParse(r.params);
+    if(!params.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const b:any=parsed.data,id=params.data.id;
+    let urssafRate:any=null,vatRate:number|null=null,marginMinPercent:number|null=null,partCoefficient:number|null=null,laborCoefficient:number|null=null;
+    try{
+      urssafRate=b.urssafRate===undefined||b.urssafRate===''?null:optionalNumber(b.urssafRate,'Cotisations',0,99.99);
+      vatRate=b.vatRate===undefined?null:(b.vatRate===''?0:optionalNumber(b.vatRate,'TVA',0,100));
+      marginMinPercent=b.marginMinPercent===undefined?null:(optionalNumber(b.marginMinPercent,'Marge minimale',0,1e6)??0);
+      partCoefficient=b.defaultPartCoefficientPercent===undefined?null:(optionalNumber(b.defaultPartCoefficientPercent,'Coefficient pièces',0,1e6)??0);
+      laborCoefficient=b.defaultLaborCoefficientPercent===undefined?null:(optionalNumber(b.defaultLaborCoefficientPercent,'Coefficient main-d’œuvre',0,1e6)??0);
+      if(b.quoteValidityDays!==undefined)optionalNumber(b.quoteValidityDays,'Validité du devis',1,365);
+    }catch{return reply.code(400).send({error:'INVALID_INPUT',message:'Les taux et coefficients de l’activité sont invalides.'})}
+    const x=await query('update activities set name=coalesce($1,name),description=$2,legal_form=$3,cgv_text=$4,urssaf_rate=$5,vat_rate=coalesce($6,vat_rate),margin_min_percent=greatest(0,coalesce($7,margin_min_percent)),default_part_coefficient_percent=greatest(0,coalesce($8,default_part_coefficient_percent)),default_labor_coefficient_percent=greatest(0,coalesce($9,default_labor_coefficient_percent)),active=coalesce($10,active),configuration_defined=true,updated_at=now() where id=$11 and organization_id=$12 returning *',[b.name?.trim(),b.description??null,b.legalForm??null,b.cgvText??null,urssafRate,vatRate,marginMinPercent,partCoefficient,laborCoefficient,b.active,id,r.auth!.organizationId]);
+    if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
+    if(b.profileCode!==undefined){
+      if(b.profileCode&&PROFILE_CODES.includes(b.profileCode))await saveActivityProfileOverride(r.auth!.organizationId,id,b.profileCode);
+      else await query('delete from activity_profile_overrides o where o.activity_id=$1 and exists(select 1 from activities own where own.id=o.activity_id and own.organization_id=$2)',[id,r.auth!.organizationId]);
+    }
+    if(b.autoFiscalDetect===false)await query('update activities set social_auto_detected=false,vat_auto_detected=false where id=$1 and organization_id=$2',[id,r.auth!.organizationId]);
+    if(b.legalForm&&b.autoFiscalDetect!==false){
+      const a=x.rows[0],p=profileFor(a.name,a.description||'',b.profileCode);
+      const detected=detectFiscalSettings(String(b.legalForm),p.code,a.name,a.description||'');
+      const keepManualSocial=a.social_auto_detected===false&&b.urssafRate!==undefined;
+      const keepManualVat=a.vat_auto_detected===false&&b.vatRate!==undefined;
+      const socialRate=keepManualSocial?Number(urssafRate):detected.socialRate;
+      const vatRateDetected=keepManualVat?Number(vatRate):detected.vatRate;
+      const socialDetected=!keepManualSocial,vatDetected=!keepManualVat;
+      const cgv=defaultCgvFor(p.code,p.title,String(b.legalForm||''));
+      await query('update activities set urssaf_rate=$1,vat_rate=coalesce($2,vat_rate),social_regime=$3,vat_regime=$4,cgv_text=$5,social_auto_detected=$6,vat_auto_detected=$7,updated_at=now() where id=$8 and organization_id=$9',[socialRate,vatRateDetected,detected.socialRegime,detected.vatRegime,cgv,socialDetected,vatDetected,id,r.auth!.organizationId]);
+      if(socialDetected||vatDetected)await saveContributionPresets(r.auth!.organizationId,id,detected.contributions);
+      x.rows[0].urssaf_rate=socialRate;x.rows[0].vat_rate=vatRateDetected;x.rows[0].cgv_text=cgv;x.rows[0].contributions=(socialDetected||vatDetected)?detected.contributions:[];
+    }
+    await saveLegalFields(id,r.auth!.organizationId,b);
+    return x.rows[0];
+  });
 
   app.get('/clients',async r=>(await query('select id,name,email,phone,address,intervention_address,siret,estimated_minutes,activity_id,created_at from clients where organization_id=$1 and ($2::uuid is null or activity_id=$2) order by name',[r.auth!.organizationId,activityId(r)])).rows);
   app.post('/clients',async(r,reply)=>{

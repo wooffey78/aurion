@@ -281,11 +281,29 @@ if (!enabled) {
   test('Fastify inject: inscription/connexion, isolation inter-organisation et devis converti en facture', async () => {
     const owner = await registerAccount();
     const other = await registerAccount();
+    const invalidActivity = await app.inject({
+      method: 'POST', url: '/activities', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: 'Activité invalide', vatRate: 'pas-un-taux' },
+    });
+    assert.equal(invalidActivity.statusCode, 400, invalidActivity.body);
     const login = await app.inject({
       method: 'POST', url: '/auth/login', payload: { email: owner.email, password: owner.password },
     });
     assert.equal(login.statusCode, 200, login.body);
     assert.equal(login.json().organizationId, owner.organizationId);
+
+    const ownerActivities = await app.inject({
+      method: 'GET', url: '/activities', headers: { authorization: `Bearer ${owner.token}` },
+    });
+    assert.equal(ownerActivities.statusCode, 200, ownerActivities.body);
+    const ownerActivityId = ownerActivities.json()[0]?.id;
+    assert.ok(ownerActivityId);
+    const invalidActivityPatch = await app.inject({
+      method: 'PATCH', url: `/activities/${ownerActivityId}`,
+      headers: { authorization: `Bearer ${owner.token}` },
+      payload: { vatRate: 'pas-un-taux' },
+    });
+    assert.equal(invalidActivityPatch.statusCode, 400, invalidActivityPatch.body);
 
     const invalidSupplier = await app.inject({
       method: 'POST', url: '/suppliers', headers: { authorization: `Bearer ${owner.token}` },
@@ -365,6 +383,11 @@ if (!enabled) {
     assert.equal(otherActivities.statusCode, 200, otherActivities.body);
     const foreignActivityId = otherActivities.json()[0]?.id;
     assert.ok(foreignActivityId);
+    const crossTenantActivityUpdate = await app.inject({
+      method: 'PATCH', url: `/activities/${foreignActivityId}`, headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: 'Modification d’une activité étrangère' },
+    });
+    assert.equal(crossTenantActivityUpdate.statusCode, 404, crossTenantActivityUpdate.body);
     const crossTenantActivity = await app.inject({
       method: 'PATCH', url: `/clients/${clientId}`, headers: { authorization: `Bearer ${owner.token}` },
       payload: { activityId: foreignActivityId },
