@@ -11,7 +11,7 @@ BEGIN
     JOIN pg_namespace ns ON ns.oid=cl.relnamespace
     WHERE NOT tr.tgisinternal
       AND ns.nspname='public'
-      AND tr.tgname IN ('aurion_account_sync_trigger','aurion_user_sync_trigger')
+      AND tr.tgname IN ('aurion_account_sync_trigger','aurion_user_sync_trigger','aurion_author_sync_trigger')
       AND NOT (
         (tr.tgname='aurion_account_sync_trigger' AND cl.relname = ANY(ARRAY[
           'activities','activity_contributions','activity_profile_overrides','activity_regulatory_ack',
