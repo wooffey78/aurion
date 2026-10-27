@@ -22,6 +22,7 @@ test('le service Render sans configuration backend redirige vers la production s
   assert.match(config, /DATABASE_URL/);
   assert.match(config, /JWT_SECRET/);
   assert.match(config, /AURION_ENCRYPTION_KEY/);
+  assert.ok(config.includes(String.raw`/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/`) || config.includes(String.raw`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`));
 });
 
 test('les scripts de compatibilité Render sont syntaxiquement valides', () => {

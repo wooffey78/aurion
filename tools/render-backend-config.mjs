@@ -28,7 +28,7 @@ export function hasProductionBackendConfig(env = process.env) {
   if (REQUIRED.some(key => !String(env[key] || '').trim())) return false;
   if (String(env.AURION_ENCRYPTION_KEY).trim().length < 32) return false;
   if (Boolean(env.STRIPE_SECRET_KEY) !== Boolean(env.STRIPE_WEBHOOK_SECRET)) return false;
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(env.AURION_SUPPORT_EMAIL)) return false;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(env.AURION_SUPPORT_EMAIL)) return false;
   if (!isHttpsOrigin(env.APP_BASE_URL)) return false;
   const origins = String(env.CORS_ORIGIN).split(',').map(value => value.trim()).filter(Boolean);
   if (!origins.length || origins.some(origin => !isHttpsOrigin(origin))) return false;
