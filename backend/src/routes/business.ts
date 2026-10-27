@@ -31,6 +31,13 @@ const quoteLineInputSchema = z.object({
   quantity: numericInput, unitCost: numericInput, unitPrice: numericInput,
   partId: optionalUuid, saleCoefficientPercent: numericInput,
 }).passthrough();
+const forecastAssumptionsInputSchema = z.object({
+  potentialClientsPerMonth: z.number().int().min(0).max(10000),
+  averageTicketTtc: z.number().finite().min(0).max(1000000),
+  variableCostPerRepair: z.number().finite().min(0).max(1000000),
+  fixedMonthlyCosts: z.number().finite().min(0).max(10000000),
+  reservePercent: z.number().finite().min(0).max(100),
+}).strict();
 const clientCreateInputSchema = z.object({
   name: z.string().trim().min(1).max(240),
   email: z.string().trim().email().max(254).or(z.literal('')).nullable().optional(),
@@ -1168,6 +1175,30 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     const count=Number((await query(`select count(distinct q.id)::int n from quotes q join invoice_payments p on p.quote_id=q.id where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice' and p.paid_at>=make_date($3,1,1) and p.paid_at<make_date($3+1,1,1)`,[org,aid,year])).rows[0]?.n||0);
     const invoices={...totals,count};
     return{year,months:months.map(m=>({month:m.month,revenue:m.revenueHt,purchases:m.purchases,social:m.social,mileage:m.mileage,vat:m.vat,invoiceCount:m.invoiceCount})),invoices};
+  });
+  app.get('/forecast/assumptions',async r=>{
+    const org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));
+    const defaults={potentialClientsPerMonth:0,averageTicketTtc:0,variableCostPerRepair:0,fixedMonthlyCosts:0,reservePercent:0};
+    if(!aid)return {...defaults,activityId:null};
+    const result=await query(`select potential_clients_per_month,average_ticket_ttc,variable_cost_per_repair,fixed_monthly_costs,reserve_percent from activity_forecast_assumptions where organization_id=$1 and activity_id=$2`,[org,aid]);
+    const row=result.rows[0];
+    if(!row)return {...defaults,activityId:aid};
+    return {activityId:aid,potentialClientsPerMonth:Number(row.potential_clients_per_month||0),averageTicketTtc:Number(row.average_ticket_ttc||0),variableCostPerRepair:Number(row.variable_cost_per_repair||0),fixedMonthlyCosts:Number(row.fixed_monthly_costs||0),reservePercent:Number(row.reserve_percent||0)};
+  });
+  app.put('/forecast/assumptions',async(r,reply)=>{
+    const parsed=forecastAssumptionsInputSchema.safeParse(r.body||{});
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT',message:'Les hypothèses du prévisionnel sont invalides.'});
+    const org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));
+    if(!aid)return reply.code(400).send({error:'INVALID_INPUT',message:'Sélectionnez une activité valide.'});
+    const b=parsed.data;
+    const saved=await query(`insert into activity_forecast_assumptions(activity_id,organization_id,potential_clients_per_month,average_ticket_ttc,variable_cost_per_repair,fixed_monthly_costs,reserve_percent,updated_at)
+      values($1,$2,$3,$4,$5,$6,$7,now())
+      on conflict(activity_id) do update set potential_clients_per_month=excluded.potential_clients_per_month,average_ticket_ttc=excluded.average_ticket_ttc,variable_cost_per_repair=excluded.variable_cost_per_repair,fixed_monthly_costs=excluded.fixed_monthly_costs,reserve_percent=excluded.reserve_percent,updated_at=now()
+      where activity_forecast_assumptions.organization_id=excluded.organization_id
+      returning activity_id,potential_clients_per_month,average_ticket_ttc,variable_cost_per_repair,fixed_monthly_costs,reserve_percent`,[aid,org,b.potentialClientsPerMonth,b.averageTicketTtc,b.variableCostPerRepair,b.fixedMonthlyCosts,b.reservePercent]);
+    if(!saved.rowCount)return reply.code(404).send({error:'NOT_FOUND',message:'Cette activité est introuvable.'});
+    const row=saved.rows[0];
+    return {activityId:row.activity_id,potentialClientsPerMonth:Number(row.potential_clients_per_month||0),averageTicketTtc:Number(row.average_ticket_ttc||0),variableCostPerRepair:Number(row.variable_cost_per_repair||0),fixedMonthlyCosts:Number(row.fixed_monthly_costs||0),reservePercent:Number(row.reserve_percent||0)};
   });
   app.get('/treasury/summary',async r=>{
     const org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));
