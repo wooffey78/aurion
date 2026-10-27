@@ -16,6 +16,6 @@ test('passkeys are offered on secure desktop and mobile browsers supporting WebA
 });
 
 test('biometric flow keeps password fallback and only registers after a deliberate choice', () => {
-  assert.match(auth, /window\.confirm\('Activer la connexion biométrique sur cet appareil \?'\)/);
+  assert.match(auth, /window\.confirm\('Enregistrer une clé d’accès sur cet appareil/);
   assert.match(auth, /await enableBiometric\(biometric\)/);
 });
