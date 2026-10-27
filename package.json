@@ -1,10 +1,10 @@
 {
   "name": "aurion",
-  "version": "15.2.44",
+  "version": "15.2.45",
   "private": true,
   "scripts": {
     "dev": "npm --prefix backend run dev",
-    "build": "npm --prefix backend run build",
+    "build": "node tools/ensure-backend-deps.mjs && npm --prefix backend run build",
     "test": "npm run build && npm --prefix backend test",
     "migrate": "npm --prefix backend run migrate:prod",
     "db:reset:test": "npm --prefix backend run db:reset:test",

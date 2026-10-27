@@ -24,9 +24,9 @@ test('les boutons d’accueil déclenchent directement le mode attendu et garden
   assert.ok(router.includes('location.hash=path'));
   assert.ok(router.includes("addEventListener('hashchange',fn)"));
   assert.ok(!main.includes('bindLandingNavigation'));
-  assert.ok(shell.includes('main.js?v=15.2.44-r1'));
-  assert.ok(shell.includes('app.css?v=15.2.44-r1'));
-  assert.ok(sw.includes('aurion-shell-v15.2.44-r1'));
+  assert.ok(shell.includes('main.js?v=15.2.45-r1'));
+  assert.ok(shell.includes('app.css?v=15.2.45-r1'));
+  assert.ok(sw.includes('aurion-shell-v15.2.45-r1'));
 });
 
 test('la suppression de facture reste disponible même si elle est déjà réglée', () => {
@@ -50,4 +50,13 @@ test('l’interface et l’installation utilisent le thème clair et les centrag
   assert.match(css, /\.top-actions #fs-toggle\{margin:0 auto\}/);
   assert.match(manifest, /"theme_color":"#ffffff"/);
   assert.match(manifest, /"background_color":"#ffffff"/);
+});
+
+test('le build racine installe les dépendances backend absentes avant TypeScript', () => {
+  const rootPackage = JSON.parse(read('package.json'));
+  const bootstrap = read('tools/ensure-backend-deps.mjs');
+  assert.equal(rootPackage.scripts.build, 'node tools/ensure-backend-deps.mjs && npm --prefix backend run build');
+  assert.match(bootstrap, /backend\/node_modules\/fastify\/package\.json/);
+  assert.match(bootstrap, /backend\/node_modules\/typescript\/package\.json/);
+  assert.match(bootstrap, /npm ci/);
 });
