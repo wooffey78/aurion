@@ -6,7 +6,8 @@ const n=(v:any)=>Number(v||0);
 export async function monthlyAccounting(orgId:string,activityId:string,year?:number):Promise<MonthRow[]>{
  const filter=year?"and date_trunc('year',paid_at)=make_date($3,1,1)":'';
  const params:any[]=[orgId,activityId];if(year)params.push(year);
- const inv=await query(`
+ const entParams:any[]=[orgId,activityId];if(year)entParams.push(year);
+ const [inv,ent]=await Promise.all([query(`
    with payment_rows as (
      select p.id payment_id,p.quote_id,p.amount,p.paid_at,q.total_ttc,q.vat_rate,q.part_cost,q.shipping_cost,
             q.mileage_total,q.mileage_mode,q.mileage_internal_rate,q.mileage_km,q.labor_internal_cost_ht,
@@ -37,9 +38,7 @@ export async function monthlyAccounting(orgId:string,activityId:string,year?:num
           sum(coalesce(mileage_total,0)*case when coalesce(total_ttc,0)>0 then least(1,base_amount/nullif(total_ttc,0)) else 0 end)::numeric mileage,
           count(distinct quote_id)::int invoice_count
    from allocated where true ${filter}
-   group by 1`,params);
- const entParams:any[]=[orgId,activityId];if(year)entParams.push(year);
- const ent=await query(`select date_trunc('month',entry_date)::date as "month",coalesce(sum(case when entry_type='purchase' then amount else 0 end),0)::numeric purchases,coalesce(sum(case when entry_type='social' then amount else 0 end),0)::numeric social,coalesce(sum(case when entry_type='sav' then amount else 0 end),0)::numeric sav from accounting_entries where organization_id=$1 and activity_id=$2 ${year?"and date_trunc('year',entry_date)=make_date($3,1,1)":''} group by 1`,entParams);
+   group by 1`,params),query(`select date_trunc('month',entry_date)::date as "month",coalesce(sum(case when entry_type='purchase' then amount else 0 end),0)::numeric purchases,coalesce(sum(case when entry_type='social' then amount else 0 end),0)::numeric social,coalesce(sum(case when entry_type='sav' then amount else 0 end),0)::numeric sav from accounting_entries where organization_id=$1 and activity_id=$2 ${year?"and date_trunc('year',entry_date)=make_date($3,1,1)":''} group by 1`,entParams)]);
  const byMonth=new Map<string,MonthRow>();
  for(const r of inv.rows){const k=r.month.toISOString().slice(0,10);byMonth.set(k,{month:r.month,revenueHt:n(r.revenue_ht),vat:n(r.vat),purchases:n(r.purchases),purchaseVat:n(r.purchase_vat),social:n(r.social),mileage:n(r.mileage),invoiceCount:Number(r.invoice_count||0)})}
  for(const r of ent.rows){const k=r.month.toISOString().slice(0,10);const cur=byMonth.get(k)||{month:r.month,revenueHt:0,vat:0,purchases:0,purchaseVat:0,social:0,mileage:0,invoiceCount:0};cur.purchases+=n(r.purchases);cur.social+=n(r.social);cur.revenueHt+=n(r.sav);byMonth.set(k,cur)}
