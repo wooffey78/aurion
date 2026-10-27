@@ -471,6 +471,20 @@ if (!enabled) {
       payload: { name: 'Pièce test intégration', stock: '2', sellingPrice: '12.50', saleCoefficientPercent: '0' },
     });
     assert.equal(validPart.statusCode, 201, validPart.body);
+    const partId = validPart.json().id;
+    const partNamePatch = await app.inject({
+      method: 'PATCH', url: `/parts/${partId}`, headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: 'Pièce test intégration modifiée' },
+    });
+    assert.equal(partNamePatch.statusCode, 200, partNamePatch.body);
+    assert.equal(Number(partNamePatch.json().stock), 2, 'omitting stock must preserve existing stock');
+    assert.equal(Number(partNamePatch.json().selling_price), 12.5, 'omitting sellingPrice must preserve existing price');
+    const zeroStockPatch = await app.inject({
+      method: 'PATCH', url: `/parts/${partId}`, headers: { authorization: `Bearer ${owner.token}` },
+      payload: { stock: 0 },
+    });
+    assert.equal(zeroStockPatch.statusCode, 200, zeroStockPatch.body);
+    assert.equal(Number(zeroStockPatch.json().stock), 0, 'an explicit zero stock must not be rewritten');
     const invalidPartPrice = await app.inject({
       method: 'POST', url: `/parts/${validPart.json().id}/prices`,
       headers: { authorization: `Bearer ${owner.token}` },

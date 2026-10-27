@@ -671,15 +671,16 @@ export async function businessRoutes(app:FastifyInstance){
     const parsed=partPatchInputSchema.safeParse(r.body||{});
     if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
     const b:any=parsed.data,id=String((r.params as any).id),org=r.auth!.organizationId;
-    let stock=0,sellingPrice=0,saleCoefficient=0;
+    const current=(await query('select * from parts where id=$1 and organization_id=$2',[id,org])).rows[0];
+    if(!current)return reply.code(404).send({error:'NOT_FOUND'});
+    let stock=Number(current.stock||0),sellingPrice=Number(current.selling_price||0),saleCoefficient=Number(current.sale_coefficient_percent||0);
     try{
-      stock=optionalNumber(b.stock,'Stock',0,10_000_000)??0;
-      if(!Number.isInteger(stock))return reply.code(400).send({error:'INVALID_INPUT'});
-      sellingPrice=optionalNumber(b.sellingPrice,'Prix de vente',0,1e9)??0;
-      saleCoefficient=optionalNumber(b.saleCoefficientPercent,'Coefficient de vente',0,1e6)??0;
+      if(b.stock!==undefined){stock=optionalNumber(b.stock,'Stock',0,10_000_000)??0;if(!Number.isInteger(stock))return reply.code(400).send({error:'INVALID_INPUT'});}
+      if(b.sellingPrice!==undefined)sellingPrice=optionalNumber(b.sellingPrice,'Prix de vente',0,1e9)??0;
+      if(b.saleCoefficientPercent!==undefined)saleCoefficient=optionalNumber(b.saleCoefficientPercent,'Coefficient de vente',0,1e6)??0;
     }catch{return reply.code(400).send({error:'INVALID_INPUT'})}
-    const x=await query(`update parts p set name=coalesce($1,p.name),category=$2,model=$3,variant=$4,color=$5,quality=$6,reference=$7,stock=$8,selling_price=$9,sale_coefficient_percent=greatest(0,coalesce($10,p.sale_coefficient_percent)),notes=$11,updated_at=now() where p.id=$12 and p.organization_id=$13 returning p.*`,[b.name?.trim(),b.category||null,b.model||null,b.variant||null,b.color||null,b.quality||null,b.reference||null,stock,sellingPrice,saleCoefficient,b.notes||null,id,org]);
-    if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
+    const keepOrClear=(key:string,oldValue:unknown)=>b[key]===undefined?oldValue:(b[key]||null);
+    const x=await query(`update parts p set name=coalesce($1,p.name),category=$2,model=$3,variant=$4,color=$5,quality=$6,reference=$7,stock=$8,selling_price=$9,sale_coefficient_percent=greatest(0::numeric,$10::numeric),notes=$11,updated_at=now() where p.id=$12 and p.organization_id=$13 returning p.*`,[b.name?.trim(),keepOrClear('category',current.category),keepOrClear('model',current.model),keepOrClear('variant',current.variant),keepOrClear('color',current.color),keepOrClear('quality',current.quality),keepOrClear('reference',current.reference),stock,sellingPrice,saleCoefficient,keepOrClear('notes',current.notes),id,org]);
     return x.rows[0];
   });app.delete('/parts/:id',async(r,reply)=>{const x=await query('delete from parts where id=$1 and organization_id=$2',[((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true}});
   app.post('/parts/:id/prices',async(r,reply)=>{
