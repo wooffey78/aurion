@@ -6,9 +6,10 @@ import { readFileSync } from 'node:fs';
 const read = p => readFileSync(new URL(p, import.meta.url), 'utf8');
 const integration = process.env.AURION_INTEGRATION_TESTS === '1' && Boolean(process.env.DATABASE_URL);
 
-test('057 remplace les accès record.id fragiles et protège les suppressions en cascade', () => {
+test('057/059 : correction des triggers fragiles et restauration de la whitelist', () => {
   const sql = read('../migrations/057_account_sync_trigger_fixes.sql');
   const whitelist = read('../migrations/058_account_sync_trigger_whitelist.sql');
+  const recreate = read('../migrations/059_account_sync_trigger_recreate.sql');
   assert.match(sql, /CREATE OR REPLACE FUNCTION touch_account_sync/);
   assert.match(sql, /NOT EXISTS\s*\(\s*SELECT 1 FROM organizations WHERE id = p_organization_id/s);
   assert.match(sql, /r := to_jsonb\(OLD\)/);
@@ -20,6 +21,10 @@ test('057 remplace les accès record.id fragiles et protège les suppressions en
   assert.match(whitelist, /'quotes','sav_cases'/);
   assert.match(whitelist, /'organization_members','user_drafts'/);
   assert.doesNotMatch(whitelist, /billing_webhook_events|subscription_events|notification_jobs/);
+  assert.match(recreate, /aurion_bump_account_sync\(\)/);
+  assert.match(recreate, /aurion_bump_user_sync\(\)/);
+  assert.match(recreate, /aurion_bump_author_sync\(\)/);
+  assert.match(recreate, /'activities','activity_contributions'/);
 });
 
 test('057 : INSERT sur les tables user_id et DELETE organisation', { skip: !integration }, async () => {
@@ -58,7 +63,6 @@ test('057 : INSERT sur les tables user_id et DELETE organisation', { skip: !inte
     await c.query('INSERT INTO webauthn_credentials(id,user_id,credential_id,public_key) VALUES($1,$2,$3,$4)', [credential,user,Buffer.from('credential-057'),Buffer.from('public-key-057')]);
     await c.query('DELETE FROM organizations WHERE id=$1', [org]);
     assert.equal(Number((await c.query('SELECT count(*)::int n FROM organizations WHERE id=$1',[org])).rows[0].n), 0);
-    // RGPD/account deletion: clean explicit RESTRICT references, then delete the account.
     await c.query('DELETE FROM vip_guest_accounts WHERE user_id=$1', [guest]);
     await c.query('DELETE FROM admin_guest_invites WHERE id=$1', [invite]);
     await c.query('DELETE FROM users WHERE id=$1', [user]);
