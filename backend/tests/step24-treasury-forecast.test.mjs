@@ -13,7 +13,9 @@ test('prévisionnel exclut les factures déjà émises et les frais kilométriqu
   assert.doesNotMatch(treasuryRoute, /mileageTotal/);
   assert.doesNotMatch(treasuryRoute, /const invoiced=/);
   assert.doesNotMatch(treasuryRoute, /invoicedPurchases/);
-  assert.match(treasuryView, /Entrées prévues/);
+  assert.match(treasuryView, /Entrées déjà identifiées/);
+  assert.match(treasuryView, /Sorties déjà identifiées/);
+  assert.match(treasuryView, /Solde documentaire estimé/);
   assert.doesNotMatch(treasuryView, /Frais kilométriques/);
   assert.doesNotMatch(treasuryView, /Déjà facturé/);
   assert.doesNotMatch(treasuryView, /mileage_km/);
