@@ -32,6 +32,7 @@ test('la connexion Google exige une adresse vérifiée et refuse le choix arbitr
   assert.match(auth,/identity\.email_verified!==true/);
   assert.match(auth,/membership_count\)>1/);
   assert.match(auth,/disabledPasswordHash/);
+  assert.ok(auth.indexOf('membership_count)>1')>auth.indexOf('disabledPasswordHash'),'Le mot de passe doit être invalidé avant le refus de l’espace multi-organisation.');
   assert.match(auth,/email_verified_at=now\(\)/);
 });
 
@@ -42,7 +43,7 @@ test('la synchronisation est conditionnelle et ne sonde plus chaque seconde',()=
   assert.match(client,/MAX_POLL_MS=300000/);
   assert.match(client,/If-None-Match/);
   assert.doesNotMatch(client,/setInterval\(poll,1000\)/);
-  assert.match(route,/If-None-Match/);
+  assert.match(route,/if-none-match/i);
   assert.match(route,/max: 120, timeWindow: '1 minute'/);
 });
 

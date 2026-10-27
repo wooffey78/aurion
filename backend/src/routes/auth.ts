@@ -9,6 +9,7 @@ import { signAccessToken } from "../plugins/auth.js";
 import { recordAcceptances } from "../services/account.js";
 import { createRefreshSession, rotateRefreshSession, revokeRefreshSession, revokeAllRefreshSessions, REFRESH_SECONDS } from '../services/native-sessions.js';
 import { registrationOptions, verifyRegistration, authenticationOptions, verifyAuthentication, issueWebAuthnSession } from '../services/webauthn.js';
+import { platformMailerConfigured, sendPlatformMail } from '../services/platform-mailer.js';
 
 function configuredWebAuthnOrigin(request:any): string | null {
   const configured = [config.APP_BASE_URL, ...config.CORS_ORIGIN.split(',')].map((value:string) => value.trim()).filter(Boolean);
@@ -44,10 +45,20 @@ export async function authRoutes(app: FastifyInstance) {
 
 const googleLoginConfigured=()=>Boolean(config.GOOGLE_CLIENT_ID&&config.GOOGLE_CLIENT_SECRET&&config.APP_BASE_URL);
 const googleLoginRedirect=()=>new URL('/auth/google/callback',config.APP_BASE_URL).toString();
-const googleLoginFailure=(reply:any)=>reply.code(401).type('text/html; charset=utf-8').send('<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connexion Google impossible · Aurion</title><body style="font:16px system-ui;max-width:620px;margin:12vh auto;padding:24px;color:#252d2a"><h1>Connexion Google impossible</h1><p>Votre compte n’a pas pu être authentifié. Réessayez ou utilisez votre mot de passe ou une clé d’accès.</p><p><a href="/#/login">Retour à la connexion Aurion</a></p></body></html>');
+const googleLoginFailure=(reply:any,message='Votre compte n’a pas pu être authentifié. Réessayez ou utilisez votre mot de passe ou une clé d’accès.')=>reply.code(401).type('text/html; charset=utf-8').send(`<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connexion Google impossible · Aurion</title><body style="font:16px system-ui;max-width:620px;margin:12vh auto;padding:24px;color:#252d2a"><h1>Connexion Google impossible</h1><p>${message}</p><p><a href="/#/login">Retour à la connexion Aurion</a></p></body></html>`);
 async function googleLoginClient(){
  const {google}=await import('googleapis');
  return new google.auth.OAuth2(config.GOOGLE_CLIENT_ID,config.GOOGLE_CLIENT_SECRET,googleLoginRedirect());
+}
+
+const emailVerificationAvailable=()=>Boolean(platformMailerConfigured()&&(config.PLATFORM_SMTP_FROM||config.PLATFORM_SMTP_USER)&&config.APP_BASE_URL);
+async function issueEmailVerification(userId:string,email:string){
+ const token=crypto.randomBytes(32).toString('base64url');
+ const tokenHash=crypto.createHash('sha256').update(token).digest('hex');
+ await query('update email_verification_tokens set consumed_at=now() where user_id=$1 and consumed_at is null',[userId]);
+ await query('insert into email_verification_tokens(id,user_id,token_hash,expires_at) values($1,$2,$3,now()+interval \'30 minutes\')',[crypto.randomUUID(),userId,tokenHash]);
+ const verificationUrl=new URL('/#/verify-email?token='+encodeURIComponent(token),config.APP_BASE_URL).toString();
+ await sendPlatformMail(userId,{to:email,subject:'Confirmez votre adresse e-mail Aurion',text:`Bonjour,\n\nPour confirmer votre adresse e-mail et activer votre compte Aurion, ouvrez le lien suivant :\n${verificationUrl}\n\nCe lien est valable 30 minutes et ne peut être utilisé qu’une seule fois.\n\nSi vous n’avez pas demandé la création d’un compte Aurion, ignorez ce message.`});
 }
 
   app.get('/auth/google/status', async () => ({ configured: googleLoginConfigured() }));
@@ -74,7 +85,7 @@ async function googleLoginClient(){
   });
 
   app.get('/auth/google/callback', { config: { rateLimit: { max: 12, timeWindow: '15 minutes' } } }, async (request, reply) => {
-    const fail=()=>{reply.clearCookie('aurion_google_login',{path:'/auth/google/callback'});return googleLoginFailure(reply)};
+    const fail=(message?:string)=>{reply.clearCookie('aurion_google_login',{path:'/auth/google/callback'});return googleLoginFailure(reply,message)};
     if (!googleLoginConfigured()) return fail();
     const saved=request.cookies?.aurion_google_login;
     let transaction:any=null;
@@ -90,19 +101,39 @@ async function googleLoginClient(){
       const ticket=await oauth.verifyIdToken({idToken,audience:config.GOOGLE_CLIENT_ID});
       const identity=ticket.getPayload();
       if(!identity?.sub||!identity.email||identity.email_verified!==true)return fail();
-      const rows=await query<{id:string,email:string,session_version:number,organization_id:string,role:string}>(
-        `select u.id,u.email,u.session_version,om.organization_id,om.role
+      const rows=await query<{id:string,email:string,session_version:number,email_verified_at:string|null,organization_id:string,role:string,membership_count:number}>(
+        `select u.id,u.email,u.session_version,u.email_verified_at,om.organization_id,om.role,
+                count(*) over(partition by u.id)::int as membership_count
          from users u join organization_members om on om.user_id=u.id
          where lower(u.email)=lower($1)
          order by case when om.role='owner' then 0 else 1 end
-         limit 1`,
+         limit 2`,
         [identity.email]
       );
       const user=rows.rows[0];
       // Google authentication never creates an account or bypasses Aurion's legal acceptance flow.
       if(!user)return fail();
+      let sessionVersion=Number(user.session_version||0);
+      // A verified Google identity proves ownership of the e-mail. If the Aurion account
+      // was created but never verified, invalidate the password and every existing session
+      // before granting access to the legitimate address owner.
+      if(!user.email_verified_at){
+        const disabledPasswordHash=await hashPassword(crypto.randomBytes(48).toString('base64url'));
+        const invalidated=await query<{session_version:number}>(
+          'update users set password_hash=$1,email_verified_at=now(),session_version=coalesce(session_version,0)+1 where id=$2 and email_verified_at is null returning session_version',
+          [disabledPasswordHash,user.id]
+        );
+        if(invalidated.rowCount){
+          sessionVersion=Number(invalidated.rows[0].session_version||0);
+          await revokeAllRefreshSessions(user.id);
+        }else{
+          const latest=await query<{email_verified_at:string|null,session_version:number}>('select email_verified_at,session_version from users where id=$1',[user.id]);
+          if(!latest.rows[0]?.email_verified_at)return fail();
+          sessionVersion=Number(latest.rows[0].session_version||0);
+        }
+      }
+      if(Number(user.membership_count)>1)return fail('Ce compte appartient à plusieurs espaces Aurion. Pour éviter d’ouvrir un espace arbitraire, la connexion Google est suspendue ici. Utilisez « Mot de passe oublié » pour retrouver votre accès ou contactez le support.');
       reply.clearCookie('aurion_google_login',{path:'/auth/google/callback'});
-      const sessionVersion=Number(user.session_version||0);
       const accessToken=await signAccessToken({userId:user.id,organizationId:user.organization_id,role:user.role,sv:sessionVersion});
       app.setSession(reply,accessToken);
       const refresh=await createRefreshSession({userId:user.id,organizationId:user.organization_id,role:user.role,sessionVersion},request);
@@ -177,6 +208,8 @@ async function googleLoginClient(){
         return reply.code(400).send({ error: "INVALID_INPUT" });
       }
 
+      if(!emailVerificationAvailable())return reply.code(503).send({error:"EMAIL_VERIFICATION_UNAVAILABLE",message:"La vérification par e-mail n’est pas configurée. Réessayez plus tard ou contactez le support."});
+
       const email = parsed.data.email.toLowerCase();
       const id = crypto.randomUUID();
       const orgId = crypto.randomUUID();
@@ -218,23 +251,54 @@ async function googleLoginClient(){
         client.release();
       }
 
-      const token = await signAccessToken({
-        userId: id,
-        organizationId: orgId,
-        role: "owner",
-      });
-      app.setSession(reply, token);
-      const refresh=await createRefreshSession({userId:id,organizationId:orgId,role:'owner',sessionVersion:0},request);
-      app.setRefreshSession(reply,refresh.token);
-
+      try {
+        await issueEmailVerification(id,email);
+      } catch (error:any) {
+        request.log.error({err:error,userId:id},'E-mail de vérification impossible à envoyer.');
+        return reply.code(503).send({error:"EMAIL_VERIFICATION_DELIVERY_FAILED",message:"Le compte a été créé mais l’e-mail n’a pas pu être envoyé. Utilisez « Renvoyer l’e-mail de vérification » depuis la connexion."});
+      }
       return reply.code(201).send({
+        verificationRequired: true,
         user: { id, email },
-        organization: { id: orgId },
-        accessToken: token,
-        expiresIn: 30*60,
+        message: "Un lien de vérification vient d’être envoyé. Confirmez votre adresse avant de vous connecter."
       });
     },
   );
+
+  app.post('/auth/verify-email', { config: { rateLimit: { max: 8, timeWindow: '15 minutes' } } }, async (request, reply) => {
+    const token=String((request.body as any)?.token||'');
+    if(token.length<32)return reply.code(400).send({error:'EMAIL_VERIFICATION_TOKEN_INVALID',message:'Ce lien est invalide ou a expiré.'});
+    const tokenHash=crypto.createHash('sha256').update(token).digest('hex');
+    const client=await db.connect();
+    let userId='';
+    try{
+      await client.query('begin');
+      const found=await client.query<{user_id:string}>('select user_id from email_verification_tokens where token_hash=$1 and consumed_at is null and expires_at>now() for update',[tokenHash]);
+      if(!found.rowCount){await client.query('rollback');return reply.code(400).send({error:'EMAIL_VERIFICATION_TOKEN_INVALID',message:'Ce lien est invalide ou a expiré.'});}
+      userId=found.rows[0].user_id;
+      await client.query('update users set email_verified_at=coalesce(email_verified_at,now()),session_version=coalesce(session_version,0)+1 where id=$1',[userId]);
+      await client.query('update email_verification_tokens set consumed_at=now() where token_hash=$1',[tokenHash]);
+      await client.query('commit');
+    }catch(error){await client.query('rollback').catch(()=>{});throw error}
+    finally{client.release()}
+    await revokeAllRefreshSessions(userId);
+    return {ok:true,message:'Adresse e-mail confirmée. Vous pouvez vous connecter.'};
+  });
+
+  app.post('/auth/verification/resend', {
+    config: { rateLimit: { max: 3, timeWindow: '15 minutes' } },
+    schema: { body: { type: 'object', required: ['email'], additionalProperties: false, properties: { email: { type: 'string', maxLength: 254 } } } }
+  }, async (request, reply) => {
+    if(!emailVerificationAvailable())return reply.code(503).send({error:'EMAIL_VERIFICATION_UNAVAILABLE',message:'La vérification par e-mail n’est pas configurée. Réessayez plus tard ou contactez le support.'});
+    const email=String((request.body as any)?.email||'').trim().toLowerCase();
+    if(!email||!email.includes('@'))return reply.code(400).send({error:'INVALID_INPUT'});
+    const user=(await query<{id:string,email:string,email_verified_at:string|null}>('select id,email,email_verified_at from users where lower(email)=lower($1) limit 1',[email])).rows[0];
+    if(user&&!user.email_verified_at){
+      try{await issueEmailVerification(user.id,user.email)}
+      catch(error:any){request.log.error({err:error,userId:user.id},'Renvoi de la vérification impossible.')}
+    }
+    return {ok:true,message:'Si cette adresse correspond à un compte non vérifié, un nouveau lien vient d’être envoyé.'};
+  });
 
   app.post(
     "/auth/login",
@@ -262,11 +326,12 @@ async function googleLoginClient(){
         id: string;
         email: string;
         password_hash: string;
+        email_verified_at: string | null;
         organization_id: string;
         role: string;
         session_version: number;
       }>(
-        `select u.id,u.email,u.password_hash,u.session_version,om.organization_id,om.role
+        `select u.id,u.email,u.password_hash,u.email_verified_at,u.session_version,om.organization_id,om.role
          from users u
          join organization_members om on om.user_id=u.id
          where lower(u.email)=lower($1)
@@ -277,6 +342,9 @@ async function googleLoginClient(){
       const row = r.rows[0];
       if (!row || !(await verifyPassword(row.password_hash, parsed.data.password))) {
         return reply.code(401).send({ error: "INVALID_CREDENTIALS" });
+      }
+      if (!row.email_verified_at) {
+        return reply.code(403).send({error:"EMAIL_NOT_VERIFIED",message:"Votre adresse e-mail n’est pas encore vérifiée. Ouvrez le lien reçu ou demandez un nouvel e-mail de vérification."});
       }
 
       const token = await signAccessToken({
