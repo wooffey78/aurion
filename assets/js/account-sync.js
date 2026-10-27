@@ -4,6 +4,32 @@
   const busy=()=>document.activeElement?.matches?.('input,textarea,select,[contenteditable="true"]')||document.querySelector('#view form');
   const nativeFetch=window.fetch.bind(window);
   let lastKey='';
+
+  // Compatibilité ciblée avec les formulaires historiques : les champs facultatifs
+  // envoyés à null étaient rejetés par Zod, et l'édition d'une pièce sans champ stock
+  // pouvait remettre son stock à zéro. Rien d'autre n'est modifié dans les requêtes.
+  window.fetch=async(input,init={})=>{
+    const url=typeof input==='string'?input:input?.url||'';
+    const method=String(init?.method||'GET').toUpperCase();
+    if(method==='POST'&&/\/invoices\/[^/]+\/payments(?:\?|$)/.test(url)&&typeof init.body==='string'){
+      try{
+        const body=JSON.parse(init.body);
+        for(const key of ['paidAt','reference','note'])if(body[key]===null)delete body[key];
+        init={...init,body:JSON.stringify(body)};
+      }catch{}
+    }
+    if(method==='PATCH'&&/\/parts\/[^/]+(?:\?|$)/.test(url)&&typeof init.body==='string'){
+      try{
+        const body=JSON.parse(init.body);
+        if(Object.prototype.hasOwnProperty.call(body,'stock')&&Number(body.stock)===0){
+          const current=await nativeFetch('/parts',{credentials:'include',cache:'no-store'});
+          if(current.ok){const rows=await current.json();const id=url.match(/\/parts\/([^/?]+)/)?.[1];const part=Array.isArray(rows)&&rows.find(x=>String(x.id)===String(id));if(part&&Number(part.stock)>0){body.stock=part.stock;init={...init,body:JSON.stringify(body)}}}
+        }
+      }catch{}
+    }
+    return nativeFetch(input,init);
+  };
+
   async function readVersion(){
     const r=await nativeFetch('/sync/version',{credentials:'include',cache:'no-store'});
     if(!r.ok)throw new Error('SYNC_VERSION_FAILED');
