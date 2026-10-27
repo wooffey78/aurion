@@ -8,6 +8,7 @@ const integration = process.env.AURION_INTEGRATION_TESTS === '1' && Boolean(proc
 
 test('057 remplace les accès record.id fragiles et protège les suppressions en cascade', () => {
   const sql = read('../migrations/057_account_sync_trigger_fixes.sql');
+  const whitelist = read('../migrations/058_account_sync_trigger_whitelist.sql');
   assert.match(sql, /CREATE OR REPLACE FUNCTION touch_account_sync/);
   assert.match(sql, /NOT EXISTS\s*\(\s*SELECT 1 FROM organizations WHERE id = p_organization_id/s);
   assert.match(sql, /r := to_jsonb\(OLD\)/);
@@ -15,6 +16,10 @@ test('057 remplace les accès record.id fragiles et protège les suppressions en
   assert.match(sql, /TG_TABLE_NAME = 'users'/);
   assert.match(sql, /r ->> 'user_id'/);
   assert.doesNotMatch(sql, /COALESCE\(NEW\.id, OLD\.id\)/);
+  assert.match(whitelist, /DROP TRIGGER IF EXISTS/);
+  assert.match(whitelist, /'quotes','sav_cases'/);
+  assert.match(whitelist, /'organization_members','user_drafts'/);
+  assert.match(whitelist, /billing_webhook_events/);
 });
 
 test('057 : INSERT sur les tables user_id et DELETE organisation', { skip: !integration }, async () => {
