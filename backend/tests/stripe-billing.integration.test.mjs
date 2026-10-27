@@ -314,6 +314,18 @@ if (!enabled) {
     });
     assert.equal(crossTenantPatch.statusCode, 404);
 
+    const otherActivities = await app.inject({
+      method: 'GET', url: '/activities', headers: { authorization: `Bearer ${other.token}` },
+    });
+    assert.equal(otherActivities.statusCode, 200, otherActivities.body);
+    const foreignActivityId = otherActivities.json()[0]?.id;
+    assert.ok(foreignActivityId);
+    const crossTenantActivity = await app.inject({
+      method: 'PATCH', url: `/clients/${clientId}`, headers: { authorization: `Bearer ${owner.token}` },
+      payload: { activityId: foreignActivityId },
+    });
+    assert.equal(crossTenantActivity.statusCode, 400, crossTenantActivity.body);
+
     const quoteResponse = await app.inject({
       method: 'POST', url: '/quotes', headers: { authorization: `Bearer ${owner.token}` },
       payload: {

@@ -362,9 +362,11 @@ export async function businessRoutes(app:FastifyInstance){
     const parsed=clientPatchInputSchema.safeParse(r.body||{});
     if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
     const b:any=parsed.data,id=(r.params as any).id,hasManual=b.estimatedMinutes!==undefined;
+    const requestedActivityId=b.activityId?await ensureActivity(r,b.activityId):undefined;
+    if(b.activityId&&!requestedActivityId)return reply.code(400).send({error:'INVALID_ACTIVITY'});
     let manual:number|null=null;
     try{manual=hasManual?(optionalNumber(b.estimatedMinutes,'Temps manuel',0,1e7)??0):null}catch{return reply.code(400).send({error:'INVALID_INPUT'})}
-    const x=await query('update clients set name=coalesce($1,name),email=$2,phone=$3,address=$4,intervention_address=$5,siret=$6,activity_id=coalesce($7,activity_id),estimated_minutes=coalesce($8,estimated_minutes),updated_at=now() where id=$9 and organization_id=$10 returning id',[b.name?.trim(),b.email||null,b.phone||null,b.address||null,b.interventionAddress||null,(String(b.siret||'').replace(/\D/g,'')||null),b.activityId||null,manual,id,r.auth!.organizationId]);
+    const x=await query('update clients set name=coalesce($1,name),email=$2,phone=$3,address=$4,intervention_address=$5,siret=$6,activity_id=coalesce($7,activity_id),estimated_minutes=coalesce($8,estimated_minutes),updated_at=now() where id=$9 and organization_id=$10 returning id',[b.name?.trim(),b.email||null,b.phone||null,b.address||null,b.interventionAddress||null,(String(b.siret||'').replace(/\D/g,'')||null),requestedActivityId||null,manual,id,r.auth!.organizationId]);
     if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
     return x.rows[0];
   });
