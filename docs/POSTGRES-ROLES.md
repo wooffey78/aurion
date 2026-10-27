@@ -43,3 +43,21 @@ npm --prefix backend run secrets:rotate -- --apply
 ```
 
 Le script verrouille les lignes, travaille dans une transaction et annule tout si un secret est illisible. Il ne journalise jamais les secrets en clair. Garder l'ancienne clé jusqu'à ce que la rotation soit appliquée et vérifiée sur tous les environnements.
+
+
+## Procédure de production sur Render (pas à pas)
+
+1. Ouvrir Render Dashboard, sélectionner la base PostgreSQL de production, puis utiliser son SQL console en tant que rôle propriétaire/admin. Confirmer le nom réel de la base dans l'URL interne de la base. Les commandes suivantes sont à exécuter sur cette base, et non sur une base locale.
+2. Créer le rôle runtime avec un mot de passe généré par un gestionnaire de secrets :
+   ```sql
+   CREATE ROLE aurion_runtime LOGIN PASSWORD '<mot-de-passe-fort-unique>';
+   GRANT CONNECT ON DATABASE <nom_reel_de_la_base> TO aurion_runtime;
+   GRANT USAGE ON SCHEMA public TO aurion_runtime;
+   ```
+   Remplacer les deux valeurs entre chevrons par des identifiants SQL réels avant exécution. Ne pas stocker le mot de passe dans le dépôt ni dans un ticket.
+3. Dans le service backend Render, définir `DATABASE_URL` avec l'URL interne PostgreSQL utilisant le rôle `aurion_runtime`, `AURION_MIGRATION_DATABASE_URL` avec l'URL propriétaire distincte, et `AURION_RUNTIME_DB_ROLE=aurion_runtime`. Définir aussi `AURION_SUPPORT_EMAIL` selon la validation du service.
+4. Les migrations doivent être exécutées par le rôle indiqué dans `AURION_MIGRATION_DATABASE_URL`. Au démarrage, `migrate.ts` crée seulement les migrations nouvelles et accorde au runtime les privilèges de tables et séquences nécessaires, sans lui accorder de droits sur `schema_migrations`.
+5. Redéployer, puis vérifier les journaux pour les lignes de migration et le health check `/health/db`. Si une migration déjà appliquée présente un checksum différent, arrêter et corriger le nouveau fichier de migration ; ne jamais éditer l'ancien fichier appliqué.
+6. Révoquer l'accès temporaire SQL si un accès temporaire a été accordé, puis confirmer que l'application fonctionne avec le rôle runtime sans droits DDL.
+
+**Important :** ne copier aucune URL contenant des identifiants dans les logs ou les messages de diagnostic. La migration additive 061 ajoute les colonnes et tables de vérification d'adresse e-mail ; elle n'altère aucun SQL déjà appliqué.

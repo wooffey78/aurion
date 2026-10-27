@@ -132,7 +132,7 @@ async function googleLoginClient(){
     try{
       await client.query('begin');
       await client.query("insert into organizations(id,name,activity) values($1,$2,$3)",[orgId,'Espace VIP Aurion','À configurer']);
-      await client.query('insert into users(id,email,password_hash,full_name) values($1,$2,$3,nullif($4,\'\'))',[id,row.email,passwordHash,fullName]);
+      await client.query('insert into users(id,email,password_hash,full_name,email_verified_at) values($1,$2,$3,nullif($4,\'\'),now())',[id,row.email,passwordHash,fullName]);
       await client.query("insert into organization_members(organization_id,user_id,role) values($1,$2,'owner')",[orgId,id]);
       await client.query("insert into activities(organization_id,code,name,description,urssaf_rate,vat_rate) values($1,'principale','Activité principale','À configurer',null,20) on conflict do nothing",[orgId]);
       await client.query('insert into vip_guest_accounts(user_id,invited_by,invite_id) values($1,$2,$3)',[id,row.invited_by,row.id]);

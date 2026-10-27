@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { query } from '../db.js';
 import { loadSignature, saveSignature, renderSignature } from '../services/signature.js';
@@ -37,9 +38,14 @@ export async function settingsRoutes(app: FastifyInstance) {
   app.delete('/settings/document-theme', async (r, reply) => { if (!canEdit(r)) return reply.code(403).send({ error: 'FORBIDDEN' }); return { theme: await resetTheme(r.auth!.organizationId) }; });
 
   // ---- synchronisation globale du compte : une seule version serveur pour toutes les données persistées
-  app.get('/sync/version', async r => {
+  app.get('/sync/version', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (r, reply) => {
     const row = (await query('select revision, updated_at from account_sync_versions where organization_id=$1', [r.auth!.organizationId])).rows[0];
-    return { revision: Number(row?.revision || 0), updatedAt: row?.updated_at || null, organizationId: r.auth!.organizationId, userId: r.auth!.userId };
+    const payload = { revision: Number(row?.revision || 0), updatedAt: row?.updated_at || null, organizationId: r.auth!.organizationId, userId: r.auth!.userId };
+    const etag = '"' + createHash('sha256').update(JSON.stringify(payload)).digest('base64url') + '"';
+    reply.header('ETag', etag).header('Cache-Control', 'private, no-cache');
+    const requested = String(r.headers['if-none-match'] || '').split(',').map(x => x.trim());
+    if (requested.includes('*') || requested.includes(etag)) return reply.code(304).send();
+    return reply.send(payload);
   });
 
   // ---- brouillon de devis/facture synchronisé entre appareils, cloisonné par compte et entreprise
