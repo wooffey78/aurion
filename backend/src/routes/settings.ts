@@ -36,6 +36,12 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
   app.delete('/settings/document-theme', async (r, reply) => { if (!canEdit(r)) return reply.code(403).send({ error: 'FORBIDDEN' }); return { theme: await resetTheme(r.auth!.organizationId) }; });
 
+  // ---- synchronisation globale du compte : une seule version serveur pour toutes les données persistées
+  app.get('/sync/version', async r => {
+    const row = (await query('select revision, updated_at from account_sync_versions where organization_id=$1', [r.auth!.organizationId])).rows[0];
+    return { revision: Number(row?.revision || 0), updatedAt: row?.updated_at || null };
+  });
+
   // ---- brouillon de devis/facture synchronisé entre appareils, cloisonné par compte et entreprise
   app.get('/settings/draft', async r => {
     const row = (await query<{ payload: unknown; updated_at: string }>(
