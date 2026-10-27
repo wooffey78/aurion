@@ -4,7 +4,7 @@ import{S,e as escape,money,toast,modalForm,confirmDelete,prof,active,hooks}from'
 const e=v=>v==null?'':escape(v);
 
 const empty=t=>`<p class="muted">${t}</p>`;
-const rowBtns=(cls,id)=>`<div class="button-row"><button class="btn secondary small edit-${cls}" data-id="${id}">Modifier</button><button class="btn danger small del-${cls}" data-id="${id}">Supprimer</button></div>`;
+const rowBtns=(cls,id,extra='')=>`<div class="button-row">${extra}<button class="btn secondary small edit-${cls}" data-id="${id}">Modifier</button><button class="btn danger small del-${cls}" data-id="${id}">Supprimer</button></div>`;
 
 export const view=()=>{
   const p=prof();
@@ -17,7 +17,7 @@ export const view=()=>{
   </div>`;
 };
 
-const F=(id,label,val='',extra='')=>`<label class="field"><span>${label}</span><input id="${id}" value="${e(val)}" ${extra}${/placeholder=/.test(extra)?'':` placeholder="Saisissez ${e(label.toLowerCase())}…"`}></label>`;
+const F=(id,label,val='',extra='')=>`<label class="field"><span>${label}</span><input id="${id}" value="${e(val)}" ${extra}${/placeholder=/.test(extra)?'':` placeholder="Saisissez ${e(label.toLowerCase())}…`}></label>`;
 const v=(m,id)=>m.querySelector('#'+id).value.trim();
 
 const viewCatalogItem=(title,body)=>{
@@ -56,11 +56,11 @@ export function bind(){
   all('.edit-intervention').forEach(b=>b.onclick=()=>{const i=by(S.interventions,b.dataset.id);modalForm('Modifier la prestation',interventionForm(i),m=>api.updateIntervention(i.id,interventionBody(m)))});
   all('.del-intervention').forEach(b=>b.onclick=()=>confirmDelete('Supprimer cette prestation ? Les devis déjà créés ne sont pas modifiés.',()=>api.deleteIntervention(b.dataset.id)));
 
-  const partForm=(x={})=>`${F('name',`Nom (${e(p.itemLabel||'pièce')})`,x.name,'required')}<div class="grid-2">${F('model','Modèle',x.model)}${F('variant','Variante',x.variant)}</div><div class="grid-2">${F('color','Couleur',x.color)}${F('quality','Qualité',x.quality,'placeholder="OEM, compatible…"')}</div><div class="grid-2">${F('reference','Référence',x.reference)}${F('sell','Prix de vente HT (indicatif)',x.selling_price??'','type="number" min="0" step="0.01"')}</div><div class="grid-2">${F('coef','Coefficient de vente %',x.sale_coefficient_percent??'','type="number" min="0" step="0.01"')}<label class="field"><span>Photo de la pièce</span><input id="photo" type="file" accept="image/png,image/jpeg,image/webp"><small class="help">Facultative · conservée avec la pièce.</small></label></div>`;
+  const partForm=(x={})=>`${F('name',`Nom (${e(p.itemLabel||'pièce')})`,x.name,'required')}<div class="grid-2">${F('model','Modèle',x.model)}${F('variant','Variante',x.variant)}</div><div class="grid-2">${F('color','Couleur',x.color)}${F('quality','Qualité',x.quality,'placeholder="OEM, compatible…"')}</div><div class="grid-2">${F('reference','Référence',x.reference)}${F('sell','Prix de vente HT (indicatif)',x.selling_price??'','type="number" min="0" step="0.01"')}</div><div class="grid-2">${F('coef','Coefficient de vente %',x.sale_coefficient_percent??'','type="number" min="0" step="0.01")}<label class="field"><span>Photo de la pièce</span><input id="photo" type="file" accept="image/png,image/jpeg,image/webp"><small class="help">Facultative · conservée avec la pièce.</small></label></div>`;
   const partBody=(m,x={})=>({name:v(m,'name'),category:x.category||prof().itemLabel||null,model:v(m,'model'),variant:v(m,'variant'),color:v(m,'color'),quality:v(m,'quality'),reference:v(m,'reference'),stock:x.stock||0,sellingPrice:Number(v(m,'sell'))||0,saleCoefficientPercent:Math.max(0,Number(v(m,'coef')||0)),notes:x.notes||null});
   const savePart=async(m,x)=>{const r=x?await api.updatePart(x.id,partBody(m,x)):await api.createPart(partBody(m));const f=m.querySelector('#photo')?.files?.[0];if(f)await api.uploadPartPhoto(r.id||x.id,f);return r};
-  $('#add-part').onclick=()=>modalForm('Nouvel élément',partForm(),m=>savePart(m));
-  all('.edit-part').forEach(b=>b.onclick=()=>{const x=by(S.parts,b.dataset.id);modalForm('Modifier l’élément',partForm(x),m=>savePart(m,x))});
+  $('#add-part').onclick=()=>modalForm('Nouvel élément',partForm(),m=>savePart(m),{label:'Valider la pièce'});
+  all('.edit-part').forEach(b=>b.onclick=()=>{const x=by(S.parts,b.dataset.id);modalForm('Modifier l’élément',partForm(x),m=>savePart(m,x),{label:'Valider la pièce'})});
   all('.del-part').forEach(b=>b.onclick=()=>confirmDelete('Supprimer cet élément du catalogue ? Les devis déjà créés ne sont pas modifiés.',()=>api.deletePart(b.dataset.id)));
   all('.price-part').forEach(b=>b.onclick=()=>{
     if(!S.suppliers.length)return toast('Ajoutez d’abord un fournisseur.','info');
