@@ -32,6 +32,7 @@ if(parsed.NODE_ENV==='production'){
   let redirect: URL;
   try { redirect = new URL(parsed.GOOGLE_REDIRECT_URI); } catch { throw new Error('GOOGLE_REDIRECT_URI HTTPS doit être défini lorsque Google est activé.'); }
   if(redirect.protocol!=='https:' || redirect.username || redirect.password || redirect.origin!==baseUrl.origin || redirect.pathname!=='/integrations/google/callback' || redirect.search || redirect.hash)throw new Error('GOOGLE_REDIRECT_URI doit correspondre à APP_BASE_URL/integrations/google/callback en production.');
+  if(!process.env.GOOGLE_TOKEN_ENCRYPTION_KEY?.trim() || parsed.GOOGLE_TOKEN_ENCRYPTION_KEY.trim().length<32)throw new Error('GOOGLE_TOKEN_ENCRYPTION_KEY doit être défini avec au moins 32 caractères lorsque Google est activé en production.');
  }
  if(!process.env.AURION_SUPPORT_EMAIL?.trim())throw new Error('AURION_SUPPORT_EMAIL doit être défini en production.');
  if(parsed.AURION_ENCRYPTION_LEGACY_JWT_KEY)console.warn('[AURION] Déchiffrement transitoire des secrets v1 avec la clé JWT explicitement activé ; ré-encryptez les secrets avant de désactiver ce mode.')

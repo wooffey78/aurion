@@ -57,9 +57,18 @@ test('Google production setup requires the exact HTTPS callback', () => {
   assert.notEqual(wrongOrigin.status, 0);
   assert.match(wrongOrigin.stderr, /GOOGLE_REDIRECT_URI doit correspondre/);
 
+  const missingEncryptionKey = loadConfig({
+    GOOGLE_CLIENT_ID: 'client-id', GOOGLE_CLIENT_SECRET: 'client-secret',
+    GOOGLE_REDIRECT_URI: 'https://aurion.example.test/integrations/google/callback',
+    GOOGLE_TOKEN_ENCRYPTION_KEY: '',
+  });
+  assert.notEqual(missingEncryptionKey.status, 0);
+  assert.match(missingEncryptionKey.stderr, /GOOGLE_TOKEN_ENCRYPTION_KEY doit être défini/);
+
   const validCallback = loadConfig({
     GOOGLE_CLIENT_ID: 'client-id', GOOGLE_CLIENT_SECRET: 'client-secret',
     GOOGLE_REDIRECT_URI: 'https://aurion.example.test/integrations/google/callback',
+    GOOGLE_TOKEN_ENCRYPTION_KEY: 'g'.repeat(48),
   });
   assert.equal(validCallback.status, 0, validCallback.stderr);
 });
