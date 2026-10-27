@@ -38,7 +38,11 @@ export const view=()=>{
 function detail(t,x){
  const r=(label,value)=>`<div class="catalog-detail-row"><dt>${e(label)}</dt><dd>${e(value==null||value===''?'—':value)}</dd></div>`;
  if(t==='interventions')return [r('Nom',x.name),r('Description',x.description),r('Durée',x.default_duration_minutes?x.default_duration_minutes+' min':'—'),r('Prix TTC indicatif',num(x.default_price)!=null?price(x.default_price):'—')].join('');
- if(t==='parts')return [r('Nom',x.name),r('Modèle',x.model),r('Variante',x.variant),r('Couleur',x.color),r('Qualité',x.quality),r('Référence',x.reference),r('Stock',x.stock),r('Vente HT indicatif',num(x.selling_price)!=null?price(x.selling_price):'—'),r('Coefficient',num(x.sale_coefficient_percent)!=null?x.sale_coefficient_percent+' %':'—'),r('Notes',x.notes),r('Prix fournisseurs',(x.suppliers||[]).map(s=>[s.supplier,s.supplierReference,price(s.purchasePrice)].filter(Boolean).join(' · ')).join(' | ')||'—')].join('');
+ if(t==='parts'){
+  const rows=[r('Nom',x.name),r('Modèle',x.model),r('Variante',x.variant),r('Couleur',x.color),r('Qualité',x.quality),r('Référence',x.reference),r('Stock',x.stock),r('Vente HT indicatif',num(x.selling_price)!=null?price(x.selling_price):'—'),r('Coefficient',num(x.sale_coefficient_percent)!=null?x.sale_coefficient_percent+' %':'—'),r('Notes',x.notes),r('Prix fournisseurs',(x.suppliers||[]).map(s=>[s.supplier,s.supplierReference,price(s.purchasePrice)].filter(Boolean).join(' · ')).join(' | ')||'—')].join('');
+  const photo=x.photo_key?`<div class="catalog-part-photo"><img src="${e(api.partPhotoUrl(x.id))}" alt="Photo de ${e(x.name)}"><a class="link-btn" href="${e(api.partPhotoUrl(x.id))}" download> Télécharger la photo</a></div>`:'';
+  return rows+photo;
+ }
  if(t==='supplies')return [r('Nom',x.name),r('Référence',x.reference),r('Fournisseur',x.supplier_name),r('Achat HT',price(x.purchase_price))].join('');
  return [r('Nom',x.name),r('Durée',x.duration_months?x.duration_months+' mois':'—'),r('Périmètre',x.scope_type)].join('');
 }
