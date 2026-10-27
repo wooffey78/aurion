@@ -4,14 +4,6 @@
   const busy=()=>document.activeElement?.matches?.('input,textarea,select,[contenteditable="true"]')||document.querySelector('#view form');
   const nativeFetch=window.fetch.bind(window);
   let lastKey='';
-  window.fetch=async(input,init={})=>{
-    const url=typeof input==='string'?input:input?.url||'';
-    const method=String(init?.method||'GET').toUpperCase();
-    if(method==='POST'&&/\/invoices\/[^/]+\/payments(?:\?|$)/.test(url)&&typeof init.body==='string'){
-      try{const body=JSON.parse(init.body);for(const key of ['paidAt','reference','note'])if(body[key]===null)delete body[key];init={...init,body:JSON.stringify(body)}}catch{}
-    }
-    return nativeFetch(input,init);
-  };
   async function readVersion(){const r=await nativeFetch('/sync/version',{credentials:'include',cache:'no-store'});if(!r.ok)throw new Error('SYNC_VERSION_FAILED');const d=await r.json();lastKey=storageKey(d);return {d,key:lastKey,revision:String(d?.revision??'0')}}
   const set=(selectors,value)=>{for(const selector of selectors){const n=document.querySelector(selector);if(n){n.textContent=value;return true}}return false};
   const textByLabel=(label,value)=>{const nodes=[...document.querySelectorAll('#view article span,#view .metric span,#view .stat span,#view .kpi span')];const node=nodes.find(n=>n.textContent?.trim().toLowerCase()===label.toLowerCase());const parent=node?.closest('article,.metric,.stat,.kpi');const valueNode=parent?.querySelector('b,strong,.value');if(valueNode)valueNode.textContent=value};
