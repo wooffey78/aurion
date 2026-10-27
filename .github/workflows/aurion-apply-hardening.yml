@@ -1,0 +1,77 @@
+name: Verify Aurion hardening patch
+on:
+  push:
+    branches:
+      - aurion/production-hardening
+permissions:
+  contents: write
+jobs:
+  verify-and-stage:
+    if: ${{ !startsWith(github.event.head_commit.message, 'Verified source:') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: aurion_test
+          POSTGRES_USER: aurion_test
+          POSTGRES_PASSWORD: aurion_test_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aurion_test -d aurion_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Apply patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat tools/aurion-production-hardening.patch.xz.b64.part* | base64 --decode | xz --decompress --stdout > /tmp/aurion-production-hardening.patch
+          git apply --check /tmp/aurion-production-hardening.patch
+          git apply /tmp/aurion-production-hardening.patch
+          git diff --check
+      - name: Install dependencies
+        run: npm ci --prefix backend --include=dev --no-audit --no-fund
+      - name: Build, types and smoke tests
+        run: npm run check
+      - name: Migrate disposable PostgreSQL
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://aurion_test:aurion_test_ci_only@localhost:5432/aurion_test
+          JWT_SECRET: aurion-ci-only-jwt-secret-never-use-in-production-2026
+          COOKIE_SECURE: "false"
+          APP_BASE_URL: http://localhost:4000
+          CORS_ORIGIN: http://localhost:4000
+        run: npm run migrate
+      - name: Full regression and integration tests
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://aurion_test:aurion_test_ci_only@localhost:5432/aurion_test
+          AURION_INTEGRATION_TESTS: "1"
+          JWT_SECRET: aurion-ci-only-jwt-secret-never-use-in-production-2026
+          COOKIE_SECURE: "false"
+          APP_BASE_URL: http://localhost:4000
+          CORS_ORIGIN: http://localhost:4000
+          STRIPE_SECRET_KEY: sk_test_ci_dummy_key
+          STRIPE_WEBHOOK_SECRET: whsec_ci_only_dummy_signing_secret
+        run: npm test
+      - name: Commit verified source to staging branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Verified source: harden billing, migrations, WebAuthn and tenancy"
+          git push origin HEAD:aurion/production-hardening
