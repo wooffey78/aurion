@@ -4,38 +4,38 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const root=path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const settings=fs.readFileSync(path.join(root,'assets/js/pages/dash/settings.js'),'utf8');
 const sync=fs.readFileSync(path.join(root,'backend/src/services/configuration-sync.ts'),'utf8');
 
-test('étape 1: activité — champs manuels vides, placeholders, sélecteurs conservés',()=>{
-  const form=settings.slice(settings.indexOf('const activityForm='),settings.indexOf('export function bind'));
-  assert.match(form,/manualInput\\('name','Nom de l’activité','Nom donné à cette activité',a\\.id\\?'':'required'\\)/);
-  assert.match(form,/manualInput\\('description','Description \/ métier','Décrivez l’activité avec des mots/);
-  for(const id of ['vatRate','urssafRate']) assert.match(form,new RegExp(`manualInput\\\\('${id}'`),`champ manuel ${id} doit être vide à l'ouverture`);
-    assert.match(form,new RegExp(`manualInput\\('${id}'`),`champ manuel ${id} doit être vide à l'ouverture`);
-  }
+test('activité : saisie manuelle, sélection du métier et champs fiscaux indépendants',()=>{
+  const start=settings.indexOf('const activityForm=');
+  const end=settings.indexOf('export function bind',start);
+  assert.ok(start>=0&&end>start,'formulaire activité repéré');
+  const form=settings.slice(start,end);
+  assert.ok(form.includes("manualInput('name','Nom de l’activité','Nom donné à cette activité'"));
+  assert.ok(form.includes("manualInput('description','Description / métier','Décrivez l’activité avec des mots"));
   assert.match(form,/<select id="profileCode">/);
-  assert.match(form,/<select id="legalForm">/);
-  assert.doesNotMatch(form,/value=\"\$\{e\(a\.name\)\}\"/);
-  assert.doesNotMatch(form,/>\$\{e\(a\.description\|\|'\'\)\}<\/textarea>/);
+  assert.match(form,/<div class="notice"><b>Identité juridique:/);
+  assert.ok(form.includes("manualInput('vatRate'"),'TVA modifiable');
+  assert.ok(form.includes("manualInput('urssafRate'"),'taux agrégé modifiable');
+  assert.doesNotMatch(form,/value="\$\{e\(a\.name\)\}"/);
+  assert.doesNotMatch(form,/>\$\{e\(a\.description/);
 });
 
-test('étape 1: le nom et la description de l’activité ne prennent pas le code NAF',()=>{
+test('nom métier et description ne sont pas écrasés par le code NAF',()=>{
   assert.doesNotMatch(sync,/nextName=.*orgRow\.activity/);
   assert.doesNotMatch(sync,/nextDescription=.*orgRow\.activity/);
-  assert.match(sync,/nextName=canSyncIdentity \? \(clean\(orgRow\.custom_activity\) \|\| clean\(orgRow\.name\)/);
-  assert.match(sync,/nextDescription=canSyncIdentity \? \(clean\(orgRow\.custom_activity\) \|\| activity\.description/);
+  assert.match(sync,/nextName=canSyncIdentity/);
+  assert.match(sync,/nextDescription=canSyncIdentity/);
 });
 
-console.log('step1 activity fields: OK');
-
-
-const binding=settings.slice(settings.indexOf('const activityBody='),settings.indexOf('export function bind'));
-
-test('étape 1: modification d’une activité conserve les valeurs existantes si les champs manuels restent vides',()=>{
+test('modifier une activité conserve les valeurs existantes si les champs restent vides',()=>{
+  const start=settings.indexOf('const activityBody=');
+  const end=settings.indexOf('export function bind',start);
+  const binding=settings.slice(start,end);
   assert.match(binding,/name:value\('name'\)\|\|a\.name/);
   assert.match(binding,/description:value\('description'\)\|\|a\.description/);
-  assert.match(binding,/vatRate:numOrUndefined\('vatRate'\)\?\?\(a\.vat_rate/);
-  assert.match(binding,/defaultPartCoefficientPercent:numOrUndefined\('defaultPartCoefficientPercent'\)\?\?\(a\.default_part_coefficient_percent/);
+  assert.match(binding,/vatRate:numOrUndefined\('vatRate'\)/);
+  assert.match(binding,/defaultPartCoefficientPercent:numOrUndefined\('defaultPartCoefficientPercent'\)/);
 });

@@ -16,7 +16,8 @@ test('étape 2: Devis & factures propose Nouvelle facture',()=>{
   assert.match(docs,/data-new-type="invoice">\+ Nouvelle facture<\/button>/);
   assert.match(docs,/all\('\[data-new-type\]'\)|all\('\[data-new-type\]'\)/);
   assert.match(docs,/S\.documentType=b\.dataset\.newType/);
-  assert.match(quote,/documentKind=editing\\?\\(q\\?\\.document_type==='invoice'\\?'invoice':'quote'\\)/);
+  assert.match(quote,/documentKind=editing\?/);
+  assert.match(quote,/q\?\.document_type==='invoice'/);
   assert.match(quote,/q\?\.documentType&&\!editing\)S\.documentType=q\.documentType==='invoice'\?'invoice':'quote'/);
   assert.match(quote,/body\.documentType==='invoice'\?'Facture enregistrée\.'/);
   assert.doesNotMatch(quote,/toast\(documentType===/);

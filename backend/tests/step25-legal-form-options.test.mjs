@@ -31,6 +31,8 @@ test('step25: organization settings exposes the same legal-form list instead of 
 
 test('step25: automatic detection can still assign a detected label to the select', () => {
   assert.match(onboarding, /legal_form:merged\.legal_form/);
-  assert.match(settings, /\$\('#slegal'\)\.value=merged\.legal_form/);
-  assert.match(settings, /legalInput\.value=r\.legalForm/);
+  assert.match(settings, /const legalSelect=\$\('#slegal'\)/);
+  assert.match(settings, /if\(legalSelect\)legalSelect\.value=next\.legal_form\|\|''/);
+  assert.match(settings, /const detectLegal=async\(\)=>/);
+  assert.match(settings, /api\.detectLegalForm\(/);
 });
