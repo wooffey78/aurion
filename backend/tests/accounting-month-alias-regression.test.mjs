@@ -16,3 +16,17 @@ test('monthlyAccounting keeps the year filter parameterized and the output row c
   assert.match(source, /interface MonthRow \{ month:string; revenueHt:number/);
   assert.match(source, /r\.month\.toISOString\(\)/);
 });
+
+test('PostgreSQL parses the quoted month alias in the integration environment', {
+  skip: process.env.AURION_INTEGRATION_TESTS !== '1'
+}, async () => {
+  const { Client } = await import('pg');
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  try {
+    const result = await client.query("SELECT date_trunc('month', CURRENT_DATE)::date AS \"month\"");
+    assert.ok(result.rows[0].month instanceof Date || typeof result.rows[0].month === 'string');
+  } finally {
+    await client.end();
+  }
+});
