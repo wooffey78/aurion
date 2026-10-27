@@ -520,6 +520,22 @@ if (!enabled) {
       payload: { dueAt: '2027-01-15', reminderIntervalDays: 0, sendEmail: false },
     });
     assert.equal(invoiceResponse.statusCode, 200, invoiceResponse.body);
+    const paymentResponse = await app.inject({
+      method: 'POST', url: `/invoices/${quote.id}/payments`, headers: { authorization: `Bearer ${owner.token}` },
+      payload: { amount: '120.00', paymentMethod: 'transfer' },
+    });
+    assert.equal(paymentResponse.statusCode, 201, paymentResponse.body);
+    assert.equal(paymentResponse.json().status, 'paid');
+    const paymentHistory = await app.inject({
+      method: 'GET', url: `/invoices/${quote.id}/payments`, headers: { authorization: `Bearer ${owner.token}` },
+    });
+    assert.equal(paymentHistory.statusCode, 200, paymentHistory.body);
+    assert.equal(paymentHistory.json().payments.length, 1);
+    const accountingSummary = await app.inject({
+      method: 'GET', url: `/accounting/summary?year=${new Date().getFullYear()}`, headers: { authorization: `Bearer ${owner.token}` },
+    });
+    assert.equal(accountingSummary.statusCode, 200, accountingSummary.body);
+    assert.ok(Number(accountingSummary.json().invoices.revenue_ht) >= 99.99, 'a 120 € paid invoice at 20% VAT contributes 100 € HT');
     const invoices = await app.inject({ method: 'GET', url: '/quotes', headers: { authorization: `Bearer ${owner.token}` } });
     assert.ok(invoices.json().some(document => document.id === quote.id && document.document_type === 'invoice'));
     const crossTenantInvoice = await app.inject({
