@@ -302,7 +302,7 @@ async function googleLoginClient(){
 
   app.delete('/auth/webauthn/credentials/:id', { preHandler: app.requireAuth }, async (request, reply) => {
     const id=String((request.params as any)?.id||'');
-    if(!id||id.length>80)return reply.code(400).send({error:'INVALID_CREDENTIAL_ID'});
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))return reply.code(400).send({error:'INVALID_CREDENTIAL_ID'});
     const removed=await query('delete from webauthn_credentials where id=$1 and user_id=$2 returning id',[id,request.auth!.userId]);
     if(!removed.rowCount)return reply.code(404).send({error:'PASSKEY_NOT_FOUND',message:'Cette clé d’accès est introuvable ou appartient à un autre compte.'});
     return {ok:true};
