@@ -96,6 +96,24 @@ const supplyPatchInputSchema = z.object({
   purchasePrice: numericInput,
 }).passthrough();
 
+const supplierCreateInputSchema = z.object({
+  activityId: optionalUuid,
+  name: z.string().trim().min(1).max(240),
+  legalName: z.string().max(240).nullable().optional(),
+  email: z.string().trim().email().max(254).or(z.literal('')).nullable().optional(),
+  phone: z.string().max(80).nullable().optional(),
+  website: z.string().max(2048).nullable().optional(),
+  notes: z.string().max(4000).nullable().optional(),
+  siret: z.string().max(40).nullable().optional(),
+  siren: z.string().max(40).nullable().optional(),
+  address: z.string().max(1000).nullable().optional(),
+  postalCode: z.string().max(20).nullable().optional(),
+  city: z.string().max(160).nullable().optional(),
+  registrySource: z.string().max(160).nullable().optional(),
+  legalForm: z.string().max(160).nullable().optional(),
+}).passthrough();
+const supplierPatchInputSchema = supplierCreateInputSchema.partial();
+
 const quoteCreateInputSchema = z.object({
   clientId: optionalUuid, activityId: optionalUuid, intervention: z.string().max(240).optional(),
   documentType: z.enum(['quote','invoice']).optional(), items: z.array(quoteLineInputSchema).max(500).nullable().optional(),
@@ -404,8 +422,66 @@ export async function businessRoutes(app:FastifyInstance){
   app.get('/suppliers/lookup',async(r,reply)=>{try{const id=String((r.query as any)?.identifier||'');const company=await lookupFrenchCompany(id);return {company}}catch(e:any){return reply.code(400).send({error:'INVALID_INPUT',message:String(e?.message||e)})}});
   app.get('/suppliers/search',async(r,reply)=>{try{return {companies:await searchFrenchCompanies(String((r.query as any)?.q||''))}}catch(e:any){return reply.code(400).send({error:'INVALID_INPUT',message:String(e?.message||e)})}});
 
-  app.post('/suppliers',async(r,reply)=>{const b:any=r.body||{},aid=await ensureActivity(r,b.activityId||activityId(r,b));if(!aid||!b.name?.trim())return reply.code(400).send({error:'INVALID_INPUT',message:'Le fournisseur et l’activité sont obligatoires.'});let siret=null,siren=null;try{if(b.siret)siret=normalizeSiret(b.siret);if(b.siren)siren=normalizeSiren(b.siren)}catch(e:any){return reply.code(400).send({error:'INVALID_INPUT',message:e.message})}const org=r.auth!.organizationId;const client=await db.connect();try{await client.query('begin');if(siret){const existing=(await client.query('select id from suppliers where organization_id=$1 and siret=$2 limit 1',[org,siret])).rows[0];if(existing){await client.query('commit');return reply.code(200).send({id:existing.id,existing:true})}}const id=crypto.randomUUID();const x=await client.query('insert into suppliers(id,organization_id,activity_id,name,email,phone,website,notes,siren,siret,legal_name,address,postal_code,city,registry_source,legal_form,logo_url,registry_checked_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9::varchar,$10::varchar,$11,$12,$13,$14,$15,$16,$17,case when $9::varchar is not null or $10::varchar is not null then now() else null end) returning id',[id,org,aid,String(b.name).trim(),b.email||null,b.phone||null,b.website||null,b.notes||null,siren,siret,b.legalName||null,b.address||null,b.postalCode||null,b.city||null,b.registrySource||null,b.legalForm||null,b.logoUrl||null]);await client.query('commit');return reply.code(201).send({id:x.rows[0].id,existing:false})}catch(e:any){await client.query('rollback').catch(()=>{});if(e?.code==='23505'&&siret){const existing=await query('select id from suppliers where organization_id=$1 and siret=$2 limit 1',[org,siret]);if(existing.rowCount)return reply.code(200).send({id:existing.rows[0].id,existing:true})}r.log.error({err:e},'supplier creation failed');return reply.code(500).send({error:'SUPPLIER_SAVE_FAILED',message:String(e?.message||'Le fournisseur n’a pas pu être enregistré.')})}finally{client.release()}});
-  app.patch('/suppliers/:id',async(r,reply)=>{const b:any=r.body||{},id=String((r.params as any).id||''),org=r.auth!.organizationId;let siret=null,siren=null;try{if(b.siret)siret=normalizeSiret(b.siret);if(b.siren)siren=normalizeSiren(b.siren)}catch(e:any){return reply.code(400).send({error:'INVALID_INPUT',message:e.message})}try{const current=await query('select id from suppliers where id=$1 and organization_id=$2',[id,org]);if(!current.rowCount)return reply.code(404).send({error:'NOT_FOUND'});if(siret){const duplicate=await query('select id from suppliers where organization_id=$1 and siret=$2 and id<>$3 limit 1',[org,siret,id]);if(duplicate.rowCount)return reply.code(409).send({error:'SUPPLIER_SIRET_EXISTS',message:'Ce SIRET est déjà utilisé par un autre fournisseur.'})}const x=await query(`update suppliers set name=coalesce(nullif(trim($1),''),name),email=$2,phone=$3,website=$4,notes=$5,siren=$6,siret=$7,legal_name=$8,address=$9,postal_code=$10,city=$11,registry_source=$12,legal_form=$13,logo_url=$14,registry_checked_at=case when $7::varchar is not null then now() else registry_checked_at end,updated_at=now() where id=$15::uuid and organization_id=$16::uuid returning *`,[b.name,b.email||null,b.phone||null,b.website||null,b.notes||null,siren,siret,b.legalName||null,b.address||null,b.postalCode||null,b.city||null,b.registrySource||null,b.legalForm||null,b.logoUrl||null,id,org]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return x.rows[0]}catch(e:any){r.log.error({err:e,supplierId:id},'supplier update failed');if(e?.code==='23505')return reply.code(409).send({error:'SUPPLIER_SIRET_EXISTS',message:'Ce SIRET est déjà utilisé par un autre fournisseur.'});return reply.code(500).send({error:'SUPPLIER_UPDATE_FAILED',message:String(e?.message||'Le fournisseur n’a pas pu être modifié.')})}});
+  app.post('/suppliers',async(r,reply)=>{
+    const parsed=supplierCreateInputSchema.safeParse(r.body||{});
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT',message:'Les informations du fournisseur sont invalides.'});
+    const b:any=parsed.data,aid=await ensureActivity(r,b.activityId||activityId(r,b));
+    if(!aid)return reply.code(400).send({error:'INVALID_INPUT',message:'L’activité du fournisseur est invalide.'});
+    let siret:string|null=null,siren:string|null=null;
+    try{if(b.siret)siret=normalizeSiret(b.siret);if(b.siren)siren=normalizeSiren(b.siren)}
+    catch(e:any){return reply.code(400).send({error:'INVALID_INPUT',message:e.message})}
+    const org=r.auth!.organizationId,client=await db.connect();
+    try{
+      await client.query('begin');
+      if(siret){
+        const existing=(await client.query('select id from suppliers where organization_id=$1 and siret=$2 limit 1',[org,siret])).rows[0];
+        if(existing){await client.query('commit');return reply.code(200).send({id:existing.id,existing:true})}
+      }
+      const id=crypto.randomUUID();
+      const x=await client.query(
+        'insert into suppliers(id,organization_id,activity_id,name,email,phone,website,notes,siren,siret,legal_name,address,postal_code,city,registry_source,legal_form,logo_url,registry_checked_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9::varchar,$10::varchar,$11,$12,$13,$14,$15,$16,$17,case when $9::varchar is not null or $10::varchar is not null then now() else null end) returning id',
+        [id,org,aid,b.name.trim(),b.email||null,b.phone||null,b.website||null,b.notes||null,siren,siret,b.legalName||null,b.address||null,b.postalCode||null,b.city||null,b.registrySource||null,b.legalForm||null,null],
+      );
+      await client.query('commit');
+      return reply.code(201).send({id:x.rows[0].id,existing:false});
+    }catch(e:any){
+      await client.query('rollback').catch(()=>{});
+      if(e?.code==='23505'&&siret){
+        const existing=await query('select id from suppliers where organization_id=$1 and siret=$2 limit 1',[org,siret]);
+        if(existing.rowCount)return reply.code(200).send({id:existing.rows[0].id,existing:true});
+      }
+      r.log.error({err:e},'supplier creation failed');
+      return reply.code(500).send({error:'SUPPLIER_SAVE_FAILED',message:'Le fournisseur n’a pas pu être enregistré.'});
+    }finally{client.release()}
+  });
+  app.patch('/suppliers/:id',async(r,reply)=>{
+    const parsed=supplierPatchInputSchema.safeParse(r.body||{});
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT',message:'Les informations du fournisseur sont invalides.'});
+    const params=z.object({id:z.string().uuid()}).safeParse(r.params);
+    if(!params.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const b:any=parsed.data,id=params.data.id,org=r.auth!.organizationId;
+    let siret:string|null=null,siren:string|null=null;
+    try{if(b.siret)siret=normalizeSiret(b.siret);if(b.siren)siren=normalizeSiren(b.siren)}
+    catch(e:any){return reply.code(400).send({error:'INVALID_INPUT',message:e.message})}
+    try{
+      const current=await query('select id from suppliers where id=$1 and organization_id=$2',[id,org]);
+      if(!current.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
+      if(siret){
+        const duplicate=await query('select id from suppliers where organization_id=$1 and siret=$2 and id<>$3 limit 1',[org,siret,id]);
+        if(duplicate.rowCount)return reply.code(409).send({error:'SUPPLIER_SIRET_EXISTS',message:'Ce SIRET est déjà utilisé par un autre fournisseur.'});
+      }
+      const x=await query(
+        'update suppliers set name=coalesce(nullif(trim($1),\'\'),name),email=$2,phone=$3,website=$4,notes=$5,siren=$6,siret=$7,legal_name=$8,address=$9,postal_code=$10,city=$11,registry_source=$12,legal_form=$13,logo_url=$14,registry_checked_at=case when $7::varchar is not null then now() else registry_checked_at end,updated_at=now() where id=$15::uuid and organization_id=$16::uuid returning *',
+        [b.name,b.email||null,b.phone||null,b.website||null,b.notes||null,siren,siret,b.legalName||null,b.address||null,b.postalCode||null,b.city||null,b.registrySource||null,b.legalForm||null,null,id,org],
+      );
+      if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
+      return x.rows[0];
+    }catch(e:any){
+      r.log.error({err:e,supplierId:id},'supplier update failed');
+      if(e?.code==='23505')return reply.code(409).send({error:'SUPPLIER_SIRET_EXISTS',message:'Ce SIRET est déjà utilisé par un autre fournisseur.'});
+      return reply.code(500).send({error:'SUPPLIER_UPDATE_FAILED',message:'Le fournisseur n’a pas pu être modifié.'});
+    }
+  });
   app.get('/suppliers/:id.pdf',async(r,reply)=>{const id=String((r.params as any).id),org=r.auth!.organizationId;try{const {supplierPdf}=await import('../services/pdf.js');const {buffer}=await supplierPdf(org,id);return reply.header('Content-Type','application/pdf').header('Content-Disposition',`inline; filename="fiche-fournisseur-${id}.pdf"`).send(buffer)}catch(e:any){return reply.code(e?.message==='NOT_FOUND'?404:500).send({error:e?.message||'PDF_ERROR'})}});
   app.delete('/suppliers/:id',async(r,reply)=>{const x=await query('delete from suppliers where id=$1 and organization_id=$2',[((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true}});
 
