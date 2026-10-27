@@ -1108,7 +1108,8 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     ]);
     if(!aid)return {tickets:Number(t.rows[0]?.n||0),unpaidCount:0,unpaidTotal:0,forecastEntries:0};
     const historyMonths=Math.min(120,Math.max(1,Number((r.query as any)?.forecastMonths||6)));
-    const [u,f,r4,historicalResult,warrResult,appointmentsResult,subResult]=await Promise.all([
+    const accountingYear=new Date().getFullYear();
+    const [u,f,r4,historicalResult,warrResult,appointmentsResult,subResult,yearAccounting]=await Promise.all([
       query(`select count(*)::int n,coalesce(sum(greatest(0,total_ttc-coalesce(amount_paid,0))),0)::numeric total,min(coalesce(due_at,created_at)) first_date from quotes where organization_id=$1 and activity_id=$2 and document_type='invoice' and payment_status<>'paid'`,[org,aid]),
       query(`select coalesce(sum(total_ht),0)::numeric total from quotes where organization_id=$1 and activity_id=$2 and document_type='quote' and status<>'canceled'`,[org,aid]),
       query(`select count(*)::int n,min(coalesce(next_reminder_at,due_at,created_at)) first_date from quotes where organization_id=$1 and activity_id=$2 and document_type='invoice' and payment_status<>'paid' and reminder_count=3`,[org,aid]),
@@ -1124,14 +1125,13 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
       )::numeric total`,[org,aid,historyMonths]),
       query(`select count(*)::int n,min(ends_at) next_end from warranties where organization_id=$1 and ends_at>now()`,[org]),
       query(`select title,starts_at,client_id from appointments where organization_id=$1 and activity_id=$2 and starts_at>now() order by starts_at asc limit 5`,[org,aid]),
-      query('select trial_ends_at,current_period_end from subscriptions where organization_id=$1',[org])
+      query('select trial_ends_at,current_period_end from subscriptions where organization_id=$1',[org]),
+      monthlyAccounting(org,aid,accountingYear)
     ]);
     const historical=historicalResult.rows[0];
     const historicalAverage=Number(historical?.total||0)/Math.max(1,historyMonths);
     const open=Number(f.rows[0]?.total||0);
     const nextMonth=open;
-    const accountingYear=new Date().getFullYear();
-    const yearAccounting=await monthlyAccounting(org,aid,accountingYear);
     const currentDate=new Date();
     const monthHt=Number(yearAccounting.find(m=>{const d=new Date(m.month);return d.getFullYear()===accountingYear&&d.getMonth()===currentDate.getMonth()})?.revenueHt||0);
     const yearToDateHt=yearAccounting.reduce((sum,m)=>sum+Number(m.revenueHt||0),0);
