@@ -10,7 +10,7 @@ const sync=fs.readFileSync(path.join(root,'backend/src/services/configuration-sy
 
 test('activité : saisie manuelle, sélection du métier et champs fiscaux indépendants',()=>{
   const start=settings.indexOf('const activityForm=');
-  const end=settings.indexOf('export function bind',start);
+  const end=settings.indexOf('const fillActivityValues=',start);
   assert.ok(start>=0&&end>start,'formulaire activité repéré');
   const form=settings.slice(start,end);
   assert.ok(form.includes("manualInput('name','Nom de l’activité','Nom donné à cette activité'"));
