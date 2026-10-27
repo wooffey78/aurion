@@ -933,9 +933,10 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
   app.delete('/quotes/:id',async(r,reply)=>{
     const org=r.auth!.organizationId,id=(r.params as any).id;
     const gen=await query('select docx_key,odt_key,pdf_key from generated_documents where quote_id=$1 and organization_id=$2',[id,org]);
+    // Supprimer les métadonnées avant le devis : la FK met quote_id à NULL lors de la suppression.
+    await query('delete from generated_documents where quote_id=$1 and organization_id=$2',[id,org]);
     const x=await query('delete from quotes where id=$1 and organization_id=$2',[id,org]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
     for(const g of gen.rows)for(const k of [g.docx_key,g.odt_key,g.pdf_key])if(k){try{await unlink(fileFromKey(k))}catch{}}
-    await query('delete from generated_documents where quote_id=$1 and organization_id=$2',[id,org]);
     return {ok:true};
   });
   app.post('/quotes/:id/invoice',async(r,reply)=>{
