@@ -932,11 +932,20 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
   });
   app.delete('/quotes/:id',async(r,reply)=>{
     const org=r.auth!.organizationId,id=(r.params as any).id;
-    const gen=await query('select docx_key,odt_key,pdf_key from generated_documents where quote_id=$1 and organization_id=$2',[id,org]);
-    // Supprimer les métadonnées avant le devis : la FK met quote_id à NULL lors de la suppression.
-    await query('delete from generated_documents where quote_id=$1 and organization_id=$2',[id,org]);
-    const x=await query('delete from quotes where id=$1 and organization_id=$2',[id,org]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
-    for(const g of gen.rows)for(const k of [g.docx_key,g.odt_key,g.pdf_key])if(k){try{await unlink(fileFromKey(k))}catch{}}
+    const client=await db.connect();
+    let gen:any[]=[];
+    try{
+      await client.query('begin');
+      const exists=await client.query('select id from quotes where id=$1 and organization_id=$2 for update',[id,org]);
+      if(!exists.rowCount){await client.query('rollback');return reply.code(404).send({error:'NOT_FOUND'});}
+      gen=(await client.query('select docx_key,odt_key,pdf_key from generated_documents where quote_id=$1 and organization_id=$2',[id,org])).rows;
+      // Les métadonnées doivent disparaître avant la facture/le devis (FK ON DELETE SET NULL).
+      await client.query('delete from generated_documents where quote_id=$1 and organization_id=$2',[id,org]);
+      await client.query('delete from quotes where id=$1 and organization_id=$2',[id,org]);
+      await client.query('commit');
+    }catch(e){await client.query('rollback').catch(()=>{});throw e;}
+    finally{client.release();}
+    for(const g of gen)for(const k of [g.docx_key,g.odt_key,g.pdf_key])if(k){try{await unlink(fileFromKey(k))}catch{}}
     return {ok:true};
   });
   app.post('/quotes/:id/invoice',async(r,reply)=>{
