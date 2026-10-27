@@ -21,3 +21,17 @@ jobs:
         run: npm ci --prefix backend --include=dev --no-audit --no-fund
       - name: Build, type check and targeted smoke tests
         run: npm run check
+
+      - name: Package complete source archive
+        run: |
+          mkdir -p dist-artifacts
+          git archive --format=zip --prefix=Aurion-15.2.31/ -o "dist-artifacts/Aurion-15.2.31-source-${GITHUB_SHA:0:7}.zip" HEAD
+          sha256sum dist-artifacts/*.zip
+
+      - name: Upload complete source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: aurion-source-${{ github.sha }}
+          path: dist-artifacts/*.zip
+          if-no-files-found: error
+          retention-days: 14
