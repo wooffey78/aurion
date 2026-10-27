@@ -28,7 +28,8 @@
       }
     }catch{}
   };
-  window.setInterval(poll,20000);
+  // Synchronisation inter-appareils quasi instantanée, sans rechargement de page.
+  window.setInterval(poll,1000);
   window.addEventListener('online',poll,{passive:true});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')poll()});
   window.addEventListener('pageshow',()=>window.setTimeout(poll,1200),{passive:true});
