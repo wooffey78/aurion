@@ -36,7 +36,7 @@ jobs:
       - name: Package complete source archive
         run: |
           mkdir -p dist-artifacts
-          git archive --format=zip --prefix=Aurion-15.2.31/ -o "dist-artifacts/Aurion-15.2.31-source-${GITHUB_SHA:0:7}.zip" HEAD
+          git archive --format=zip --prefix=Aurion-15.2.32/ -o "dist-artifacts/Aurion-15.2.32-source-${GITHUB_SHA:0:7}.zip" HEAD
           sha256sum dist-artifacts/*.zip
 
       - name: Upload complete source archive
