@@ -203,7 +203,7 @@ export async function renderDashboard(){
   await load([...(EXTRAS[initialView]||[])],initialView);
   if(initialView==='accounting'||initialView==='treasury')lastFinancialRefreshAt=Date.now();
   lastBackgroundRefreshAt=Date.now();installBackgroundRefresh();
-  document.querySelector('#app').innerHTML=`<div class="dashboard-shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#/dashboard" aria-label="Aurion — retour au tableau de bord" title="Retour au tableau de bord">${appLogo('42')}<span>AURION<small>PRO</small></span></a><button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar"><span></span><span></span><span></span></button><nav class="nav"></nav><div class="sidebar-bottom"><button id="logout" class="nav-logout">Quitter</button><div class="status-dot"><i></i> Système opérationnel</div></div></aside><section class="workspace"><header class="dashboard-top"><div class="activity-switch"><span class="eyebrow" id="shell-company"></span><button id="activity-picker" class="activity-picker"><span>ACTIVITÉ ACTIVE</span><strong id="shell-activity"></strong><small>▾</small></button></div><div class="top-actions"><span class="pill" id="shell-pill"></span><button class="btn secondary small" id="fs-toggle" title="Plein écran (F11)">⛶ Plein écran</button><button class="avatar" id="shell-avatar" title="Mon compte" aria-label="Mon compte"></button></div></header><main id="main" class="content"><div id="view"></div></main></section></div><div id="activity-modal-root"></div>`;
+  document.querySelector('#app').innerHTML=`<div class="dashboard-shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#/dashboard" aria-label="Aurion — retour au tableau de bord" title="Retour au tableau de bord">${appLogo('42')}<span>AURION<small>PRO</small></span></a><button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar"><span></span><span></span><span></span></button><nav class="nav"></nav><div class="sidebar-bottom"><button id="logout" class="nav-logout">Quitter</button><div class="status-dot"><i></i> Système opérationnel</div></div></aside><section class="workspace"><header class="dashboard-top"><div class="activity-switch"><span class="eyebrow" id="shell-company"></span><button id="activity-picker" class="activity-picker"><span>ACTIVITÉ ACTIVE</span><strong id="shell-activity"></strong><small>▾</small></button></div><div class="top-actions"><span class="pill" id="shell-pill"></span><button class="btn secondary small" id="fs-toggle" type="button" title="Activer le plein écran" aria-label="Activer le plein écran" aria-pressed="false"><span class="fs-icon" aria-hidden="true">⛶</span><span class="fs-label">Plein écran</span></button><button class="avatar" id="shell-avatar" title="Mon compte" aria-label="Mon compte"></button></div></header><main id="main" class="content"><div id="view"></div></main></section></div><div id="activity-modal-root"></div>`;
   await syncShellAvatar();
   const side=document.querySelector('#sidebar'),burger=document.querySelector('#burger');
   const setMenu=open=>{side.classList.toggle('open',open);burger.setAttribute('aria-expanded',String(open));burger.setAttribute('aria-label',open?'Fermer le menu':'Ouvrir le menu')};
@@ -213,7 +213,23 @@ export async function renderDashboard(){
   document.querySelector('#shell-avatar').onclick=()=>show('account');
   window.addEventListener('aurion-avatar-updated',ev=>applyShellAvatar(ev.detail?.url));
   document.querySelector('#logout').onclick=()=>api.logout().finally(()=>{invalidateSession();go('/')});
-  document.querySelector('#fs-toggle').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen().catch(()=>toast('Plein écran indisponible : utilisez F11.','info'))};
+  const fullscreenButton=document.querySelector('#fs-toggle');
+  const syncFullscreenButton=()=>{
+    const enabled=Boolean(document.fullscreenElement);
+    fullscreenButton.classList.toggle('is-fullscreen',enabled);
+    fullscreenButton.setAttribute('aria-pressed',String(enabled));
+    fullscreenButton.setAttribute('aria-label',enabled?'Quitter le plein écran':'Activer le plein écran');
+    fullscreenButton.title=enabled?'Quitter le plein écran':'Activer le plein écran';
+    const label=fullscreenButton.querySelector('.fs-label');
+    if(label)label.textContent=enabled?'Quitter le plein écran':'Plein écran';
+  };
+  document.addEventListener('fullscreenchange',syncFullscreenButton);
+  fullscreenButton.onclick=async()=>{
+    try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen()}
+    catch{toast('Plein écran indisponible : utilisez F11.','info')}
+    finally{syncFullscreenButton()}
+  };
+  syncFullscreenButton();
   paintShell();show(initialView);
   window.__aurionMetricsTimer&&clearInterval(window.__aurionMetricsTimer);
   window.__aurionMetricsTimer=setInterval(async()=>{
