@@ -10,9 +10,6 @@
     if(method==='POST'&&/\/invoices\/[^/]+\/payments(?:\?|$)/.test(url)&&typeof init.body==='string'){
       try{const body=JSON.parse(init.body);for(const key of ['paidAt','reference','note'])if(body[key]===null)delete body[key];init={...init,body:JSON.stringify(body)}}catch{}
     }
-    if(method==='PATCH'&&/\/parts\/[^/]+(?:\?|$)/.test(url)&&typeof init.body==='string'){
-      try{const body=JSON.parse(init.body);if(Object.prototype.hasOwnProperty.call(body,'stock')&&Number(body.stock)===0){const current=await nativeFetch('/parts',{credentials:'include',cache:'no-store'});if(current.ok){const rows=await current.json();const id=url.match(/\/parts\/([^/?]+)/)?.[1];const part=Array.isArray(rows)&&rows.find(x=>String(x.id)===String(id));if(part&&Number(part.stock)>0){body.stock=part.stock;init={...init,body:JSON.stringify(body)}}}}}catch{}
-    }
     return nativeFetch(input,init);
   };
   async function readVersion(){const r=await nativeFetch('/sync/version',{credentials:'include',cache:'no-store'});if(!r.ok)throw new Error('SYNC_VERSION_FAILED');const d=await r.json();lastKey=storageKey(d);return {d,key:lastKey,revision:String(d?.revision??'0')}}
