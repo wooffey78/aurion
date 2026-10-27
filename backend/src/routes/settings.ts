@@ -39,7 +39,7 @@ export async function settingsRoutes(app: FastifyInstance) {
   // ---- synchronisation globale du compte : une seule version serveur pour toutes les données persistées
   app.get('/sync/version', async r => {
     const row = (await query('select revision, updated_at from account_sync_versions where organization_id=$1', [r.auth!.organizationId])).rows[0];
-    return { revision: Number(row?.revision || 0), updatedAt: row?.updated_at || null };
+    return { revision: Number(row?.revision || 0), updatedAt: row?.updated_at || null, organizationId: r.auth!.organizationId, userId: r.auth!.userId };
   });
 
   // ---- brouillon de devis/facture synchronisé entre appareils, cloisonné par compte et entreprise
