@@ -22,9 +22,9 @@ test('les boutons d’accueil ouvrent les pages d’authentification par navigat
   assert.ok(router.includes("if(entry==='register')return '/auth'"));
   assert.ok(router.includes("if(entry==='login')return '/login'"));
   assert.ok(!main.includes("document.addEventListener('click', event =>"));
-  assert.ok(shell.includes('main.js?v=15.2.46-r1'));
-  assert.ok(shell.includes('app.css?v=15.2.46-r1'));
-  assert.ok(sw.includes('aurion-shell-v15.2.46-r1'));
+  assert.ok(shell.includes('main.js?v=15.2.47-r1'));
+  assert.ok(shell.includes('app.css?v=15.2.47-r1'));
+  assert.ok(sw.includes('aurion-shell-v15.2.47-r1'));
 });
 
 test('la suppression de facture reste disponible même si elle est déjà réglée', () => {
