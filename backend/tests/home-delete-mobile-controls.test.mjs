@@ -56,5 +56,5 @@ test('le build racine installe les dépendances backend absentes avant TypeScrip
   assert.equal(rootPackage.scripts.build, 'node tools/ensure-backend-deps.mjs && npm --prefix backend run build');
   assert.match(bootstrap, /backend\/node_modules\/fastify\/package\.json/);
   assert.match(bootstrap, /backend\/node_modules\/typescript\/package\.json/);
-  assert.match(bootstrap, /npm ci/);
+  assert.match(bootstrap, /'ci'/);
 });
