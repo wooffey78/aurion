@@ -340,3 +340,42 @@ body{overflow-x:hidden}
 .install-card .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @media(max-width:760px){.dashboard-shell #view .catalog-grid{grid-template-columns:minmax(0,1fr)!important;row-gap:18px!important}.dashboard-shell #view .catalog-grid>.catalog-section{width:100%}.install-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;padding-inline:8px}.platform-download-copy{text-align:center;padding:0;font-size:.84rem}.install-card{min-height:68px;padding:0}.install-card img{width:38px;height:38px}.line-row{min-width:0;grid-template-columns:minmax(0,1fr) minmax(60px,.5fr)}.line-row input{width:100%;max-width:100%}.lines-head{display:none}}
 @media(max-width:420px){.install-grid{gap:5px}.install-card{border-radius:10px;min-height:60px}.install-card img{width:32px;height:32px}.platform-download-copy{font-size:.78rem}.fiscal-contribution-row{gap:6px}.button-row>.btn{max-width:100%;white-space:normal}}
+
+
+/* Clavier virtuel mobile : la zone visible suit visualViewport, les champs restent lisibles. */
+:root{--aurion-viewport-height:100vh;--aurion-keyboard-inset:0px}
+@supports(height:100dvh){body{min-height:100dvh}}
+input,select,textarea{font-size:16px;max-width:100%}
+@media(max-width:900px){
+  .dashboard-shell{min-height:var(--aurion-viewport-height)}
+  .workspace{min-width:0;min-height:0}
+  #main{min-height:calc(var(--aurion-viewport-height) - 78px);padding:18px 14px calc(26px + env(safe-area-inset-bottom))}
+  .dashboard-top{padding:10px 14px;gap:10px;min-height:72px;height:auto}
+  .top-actions{gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .page-head{align-items:flex-start;flex-direction:column;gap:8px}
+  .page-head h1{font-size:clamp(1.8rem,8vw,2.7rem)}
+  .panel{padding:16px}
+  .stack{gap:13px}
+  .field input,.field select,.field textarea{font-size:16px;line-height:1.35;min-height:46px}
+  .field textarea{min-height:94px}
+  .modal-backdrop{place-items:start center;overflow-y:auto;overscroll-behavior:contain;padding:8px 10px calc(12px + env(safe-area-inset-bottom))}
+  .modal{max-height:calc(var(--aurion-viewport-height) - 16px);overflow-y:auto;overscroll-behavior:contain}
+  .auth-shell{min-height:var(--aurion-viewport-height);padding:16px;grid-template-columns:minmax(0,1fr)}
+  .auth-card{width:100%;padding:24px 18px}
+  .auth-visual{display:none}
+  .quote-layout{grid-template-columns:minmax(0,1fr)}
+  .line-row{gap:8px}
+}
+body.keyboard-open .dashboard-top{position:relative;top:auto;backdrop-filter:none}
+body.keyboard-open #main{scroll-padding-bottom:calc(var(--aurion-keyboard-inset) + 22px);padding-bottom:calc(var(--aurion-keyboard-inset) + 28px + env(safe-area-inset-bottom))}
+body.keyboard-open .modal-backdrop{position:fixed;inset:0;display:block;overflow-y:auto;padding-top:4px}
+body.keyboard-open .modal{max-height:calc(var(--aurion-viewport-height) - 8px);width:100%!important;padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+body.keyboard-open .toast-region{display:none}
+@media(max-width:420px){
+  #main{padding-inline:10px}
+  .dashboard-top{align-items:flex-start}
+  #shell-pill{display:none}
+  .field input,.field select,.field textarea{padding:11px 10px}
+  .modal{border-radius:16px;padding:16px 13px calc(22px + env(safe-area-inset-bottom))}
+  .button-row .btn{flex:1 1 auto}
+}

@@ -1,5 +1,19 @@
 const clean = v => String(v ?? '').trim();
 
+/** Identifiant suffisamment complet et valide pour interroger le registre public. */
+export function isValidRegistryIdentifier(value) {
+  const digits = String(value ?? '').replace(/\D/g, '');
+  if (digits.length !== 9 && digits.length !== 14) return false;
+  let sum = 0;
+  const parity = digits.length % 2;
+  for (let i = 0; i < digits.length; i += 1) {
+    let digit = Number(digits[i]);
+    if (i % 2 === parity) { digit *= 2; if (digit > 9) digit -= 9; }
+    sum += digit;
+  }
+  return sum % 10 === 0;
+}
+
 export function normalizeWebsite(value) {
   const raw = clean(value);
   if (!raw) return '';

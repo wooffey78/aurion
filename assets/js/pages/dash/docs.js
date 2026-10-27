@@ -62,7 +62,7 @@ export const view=()=>{
 
 export function bind(){
   const all=s=>document.querySelectorAll(s),get=id=>S.quotes.find(x=>x.id===id); const search=document.querySelector('#doc-search'); search?.addEventListener('input',ev=>{const q=String(ev.target.value||'').trim().toLowerCase();all('.doc-row').forEach(r=>r.hidden=!!q&&!r.dataset.docSearch.includes(q))});
-  all('[data-new-type]').forEach(b=>b.onclick=()=>{S.editing=null;S.quoteDraft=null;S.documentType=b.dataset.newType;hooks.refresh('quote').catch(x=>toast(x.message,'error'))});
+  all('[data-new-type]').forEach(b=>b.onclick=()=>{S.editing=null;S.quoteDraft=null;S.startBlankQuote=true;S.documentType=b.dataset.newType;hooks.refresh('quote').catch(x=>toast(x.message,'error'))});
   all('[data-filter]').forEach(b=>b.onclick=()=>{S.docFilter=b.dataset.filter;hooks.show('invoices')});
   all('.pdf-view').forEach(b=>b.onclick=()=>{const q=get(b.dataset.id);openDoc(kindOf(q),q.id,'pdf','view')});
   all('.dl').forEach(b=>b.onclick=()=>{const q=get(b.dataset.id);openDoc(kindOf(q),q.id,b.dataset.ext,'download')});

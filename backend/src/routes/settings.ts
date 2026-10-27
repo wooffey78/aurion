@@ -36,6 +36,36 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
   app.delete('/settings/document-theme', async (r, reply) => { if (!canEdit(r)) return reply.code(403).send({ error: 'FORBIDDEN' }); return { theme: await resetTheme(r.auth!.organizationId) }; });
 
+  // ---- brouillon de devis/facture synchronisé entre appareils, cloisonné par compte et entreprise
+  app.get('/settings/draft', async r => {
+    const row = (await query<{ payload: unknown; updated_at: string }>(
+      'select payload, updated_at from user_drafts where organization_id=$1 and user_id=$2 and draft_key=$3',
+      [r.auth!.organizationId, r.auth!.userId, 'quote'],
+    )).rows[0];
+    return { draft: row?.payload ?? null, updatedAt: row?.updated_at ?? null };
+  });
+  app.put('/settings/draft', async (r, reply) => {
+    const body = r.body as { payload?: unknown } | undefined;
+    if (!body?.payload || typeof body.payload !== 'object' || Array.isArray(body.payload)) {
+      return reply.code(400).send({ error: 'INVALID_DRAFT' });
+    }
+    let serialized: string;
+    try { serialized = JSON.stringify(body.payload); } catch { return reply.code(400).send({ error: 'INVALID_DRAFT' }); }
+    if (Buffer.byteLength(serialized, 'utf8') > 200_000) return reply.code(413).send({ error: 'DRAFT_TOO_LARGE' });
+    await query(
+      `insert into user_drafts(organization_id,user_id,draft_key,payload,updated_at)
+       values($1,$2,$3,$4::jsonb,now())
+       on conflict(organization_id,user_id,draft_key) do update set payload=excluded.payload,updated_at=now()`,
+      [r.auth!.organizationId, r.auth!.userId, 'quote', serialized],
+    );
+    return { ok: true, updatedAt: new Date().toISOString() };
+  });
+  app.delete('/settings/draft', async r => {
+    await query('delete from user_drafts where organization_id=$1 and user_id=$2 and draft_key=$3',
+      [r.auth!.organizationId, r.auth!.userId, 'quote']);
+    return { ok: true };
+  });
+
   // ---- contrôle des mentions légales d'une activité (provenance de chaque mention)
   app.post('/documents/check-mentions', async (r, reply) => {
     const b: any = r.body || {};

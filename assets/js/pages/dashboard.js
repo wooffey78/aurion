@@ -18,6 +18,7 @@ const NAV=[['home','Tableau de bord','⌂'],['clients','Clients','♙'],['catalo
 // Garde-fous de rafraîchissement : ne jamais remplacer l’écran en pleine interaction.
 let metricsRefreshInProgress = false;
 let lastUserInteractionAt = Date.now();
+let lifecycleRefreshInstalled=false,lastBackgroundRefreshAt=0,backgroundRefreshRunning=false;
 let lastRenderedFinancialSnapshot = null;
 for (const eventName of ['pointerdown', 'keydown', 'input', 'change']) {
   document.addEventListener(eventName, () => { lastUserInteractionAt = Date.now(); }, true);
@@ -28,28 +29,55 @@ function financialSnapshot() {
 
 
 // Chargement ciblé : le noyau à chaque action, les jeux de données rares seulement quand leur écran l'exige.
-const EXTRAS={home:['accounting','timeMetrics','dashboardSummary'],settings:['company'],accounting:['accounting','treasury'],treasury:['treasury'],invoices:['treasury'],};
-async function load(extras=null){
+const EXTRAS={home:['accounting','timeMetrics','dashboardSummary'],settings:['company'],accounting:['accounting','treasury'],treasury:['treasury'],invoices:['treasury']};
+const DATASETS={
+  clients:['clients','quotes','appointments','devices','sav'],
+  catalog:['parts','suppliers','interventions','supplies','warranties','policies','devices','sav'],
+  suppliers:['suppliers','parts'],
+  quote:['clients','quotes','suppliers','parts','interventions','warranties','policies','sav'],
+  invoices:['clients','quotes','treasury','sav'],
+  agenda:['appointments','clients','quotes'],
+  accounting:['accounting','treasury','quotes','sav'],
+  treasury:['treasury','accounting','quotes','sav'],
+  settings:['templates','mail'],
+  home:['clients','quotes','appointments','suppliers','parts','interventions','supplies','warranties','policies','devices','sav','accounting','treasury','timeMetrics','dashboardSummary','templates','mail'],
+};
+const ALL_DATASETS=[...new Set(Object.values(DATASETS).flat())];
+let lastConfigLoadedAt=0;
+async function load(extras=null,viewId=S.view){
   const safe=(p,d)=>Promise.resolve(p).catch(x=>{if(x?.status===401)throw x;return d});
-  const want=k=>extras===null||extras.includes(k);
-  const supplierRequest=api.suppliers().then(rows=>{S.suppliersError=null;return rows}).catch(x=>{
-    if(x?.status===401)throw x;
-    S.suppliersError=x?.message||'Impossible de charger les fournisseurs. Vérifiez la connexion puis réessayez.';
-    return [];
-  });
-  // Toujours synchroniser l'organisation AVANT les activités : la détection et le remplissage
-  // automatique de l'entreprise doivent être visibles immédiatement dans l'activité principale
-  // et dans toutes les sections qui consomment ces données.
-  const company=await safe(api.organization(),S.company||{name:'Entreprise'});
-  const activities=await safe(api.activities(),[]);
-  if((!getActiveActivity()||!activities.some(a=>a.id===getActiveActivity()))&&activities[0])setActiveActivity(activities[0].id);
-  const [clients,quotes,appointments,suppliers,parts,interventions,supplies,warranties,policies,mail,templates,accounting,treasury,sav]=await Promise.all([
-    safe(api.clients(),[]),safe(api.quotes(),[]),safe(api.appointments(),[]),supplierRequest,safe(api.parts(),[]),safe(api.interventions(),[]),safe(api.supplies(),[]),safe(api.warranties(),[]),safe(api.warrantyPolicies(),[]),safe(api.mailStatus(),{configured:false}),
-    want('templates')?safe(api.documentTemplates(),[]):S.templates,want('accounting')?safe(api.accounting(S.accountingYear||new Date().getFullYear()),{}):S.accounting,want('treasury')?safe(api.treasury(),{}):S.treasury,safe(api.sav(),[])]);
-  Object.assign(S,{company,activities,clients,quotes,appointments,templates,suppliers,parts,interventions,supplies,warranties,policies,accounting,treasury,mail,sav}); try{S.isPlatformAdmin=!!(await api.adminMe()).admin}catch{}
-  if(want('timeMetrics')) S.timeMetrics=await safe(api.timeMetrics(),null);
-  if(want('dashboardSummary')) { S.dashboardCounters=await safe(api.dashboardSummary(S.forecastMonths||6),S.dashboardCounters); try { const sub=await api.subscription(); S.dashboardCounters.trialDaysLeft=Number(sub.daysLeft||0); S.dashboardCounters.subscription=sub; } catch {} }
-  S.profile=await safe(api.activityProfile(getActiveActivity()),{});
+  const full=extras===null;
+  const wanted=new Set(full?ALL_DATASETS:[...(DATASETS[viewId]||[]),...(extras||[]).filter(k=>k!=='company')]);
+  const needConfig=full||extras?.includes('company')||['home','settings','quote','catalog'].includes(viewId)||!S.company||Date.now()-lastConfigLoadedAt>120000;
+  if(needConfig){
+    const [company,activities]=await Promise.all([
+      safe(api.organization(),S.company||{name:'Entreprise'}),
+      safe(api.activities(),S.activities||[]),
+    ]);
+    S.company=company;S.activities=activities;lastConfigLoadedAt=Date.now();
+    if((!getActiveActivity()||!activities.some(a=>a.id===getActiveActivity()))&&activities[0])setActiveActivity(activities[0].id);
+  }
+  const fallback={clients:[],quotes:[],appointments:[],suppliers:[],parts:[],interventions:[],supplies:[],warranties:[],policies:[],devices:[],sav:[],templates:[],accounting:{},treasury:{},mail:{configured:false},timeMetrics:null,dashboardSummary:S.dashboardCounters};
+  const fetchers={
+    clients:()=>api.clients(),quotes:()=>api.quotes(),appointments:()=>api.appointments(),
+    suppliers:()=>api.suppliers(),parts:()=>api.parts(),interventions:()=>api.interventions(),
+    supplies:()=>api.supplies(),warranties:()=>api.warranties(),policies:()=>api.warrantyPolicies(),
+    devices:()=>api.devices(),sav:()=>api.sav(),templates:()=>api.documentTemplates(),
+    accounting:()=>api.accounting(S.accountingYear||new Date().getFullYear()),treasury:()=>api.treasury(),
+    mail:()=>api.mailStatus(),timeMetrics:()=>api.timeMetrics(),
+    dashboardSummary:async()=>{const counters=await api.dashboardSummary(S.forecastMonths||6);try{const sub=await api.subscription();counters.trialDaysLeft=Number(sub.daysLeft||0);counters.subscription=sub}catch{}return counters;},
+  };
+  const jobs=[];
+  for(const key of wanted){
+    if(!fetchers[key])continue;
+    jobs.push((async()=>{
+      try{const value=await fetchers[key]();if(key==='dashboardSummary')S.dashboardCounters=value;else S[key]=value;if(key==='suppliers')S.suppliersError=null;}
+      catch(x){if(x?.status===401)throw x;if(key==='suppliers')S.suppliersError=x?.message||'Impossible de charger les fournisseurs. Vérifiez la connexion puis réessayez.';const stateKey=key==='dashboardSummary'?'dashboardCounters':key;if(S[stateKey]===undefined||S[stateKey]===null)S[stateKey]=fallback[key];}
+    })());
+  }
+  if(full||viewId==='admin'||!S.adminChecked){jobs.push((async()=>{try{S.isPlatformAdmin=!!(await api.adminMe()).admin}catch(x){if(x?.status===401)throw x;S.isPlatformAdmin=false}finally{S.adminChecked=true}})());}
+  await Promise.all(jobs);
+  if(full||needConfig||!S.profile)S.profile=await safe(api.activityProfile(getActiveActivity()),S.profile||{});
 }
 
 function show(id){
@@ -71,22 +99,31 @@ function show(id){
   navRoot.onclick=ev=>{
     const b=ev.target.closest('button[data-view]');
     if(!b||!navRoot.contains(b))return;
-    if(b.dataset.view==='quote'){S.editing=null;S.quoteDraft=null;S.prefillClient=null;S.documentType='quote'}
-    if(b.dataset.view==='suppliers'){
-      hooks.refresh('suppliers').catch(x=>toast(x.message,'error'));
-      return;
-    }
-    show(b.dataset.view);
+    // Chaque navigation recharge uniquement les jeux de données utiles à l'écran ciblé.
+    // Les listes reflètent ainsi les changements d'un autre appareil sans recharger toute l'application.
+    hooks.refresh(b.dataset.view).catch(x=>toast(x.message,'error'));
   };
   const view=document.querySelector('#view');
   view.innerHTML=VIEWS[id].view();
   VIEWS[id].bind?.();
   if(id==='accounting'||id==='treasury')lastRenderedFinancialSnapshot=financialSnapshot();
   if(previous!==id){window.requestAnimationFrame(()=>{window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;const main=document.querySelector('#main');if(main)main.scrollTop=0;});}
-  view.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{if(b.dataset.go==='quote'){S.editing=null;S.quoteDraft=null;S.prefillClient=null;S.documentType='quote'}hooks.refresh(b.dataset.go).catch(x=>toast(x.message,'error'))});
+  view.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{if(b.dataset.go==='quote'){S.editing=null;S.quoteDraft=null;S.startBlankQuote=true;S.prefillClient=null;S.documentType='quote'}hooks.refresh(b.dataset.go).catch(x=>toast(x.message,'error'))});
 }
 
-export async function refresh(id=S.view){await load([...(EXTRAS[id]||[]),...(id==='home'?[]:[])]);paintShell();show(id)}
+export async function refresh(id=S.view){
+  if(id==='quote'&&!S.editing){
+    let savedDraft=null;
+    try{const saved=await api.getDraft();if(saved?.draft&&typeof saved.draft==='object'&&!Array.isArray(saved.draft))savedDraft=saved.draft}catch{}
+    if(S.startBlankQuote){
+      S.startBlankQuote=false;
+      const replaceExisting=savedDraft&&window.confirm('Un brouillon de devis/facture est déjà synchronisé avec votre compte. Voulez-vous le remplacer par un nouveau document ? Choisissez « Annuler » pour reprendre le brouillon existant.');
+      if(savedDraft&&!replaceExisting){S.quoteDraft=savedDraft;if(savedDraft.documentType==='invoice')S.documentType='invoice';else if(savedDraft.documentType==='quote')S.documentType='quote';}
+      else{S.quoteDraft=null;if(savedDraft){try{await api.deleteDraft()}catch{}}}
+    }else if(savedDraft){S.quoteDraft=savedDraft;if(savedDraft.documentType==='invoice')S.documentType='invoice';else if(savedDraft.documentType==='quote')S.documentType='quote';}
+  }
+  await load([...(EXTRAS[id]||[])],id);paintShell();show(id)
+}
 hooks.refresh=refresh;hooks.show=show;
 
 function paintShell(){
@@ -135,8 +172,26 @@ function applyShellAvatar(url){
   avatar.style.backgroundPosition='center';
 }
 
+function installBackgroundRefresh(){
+  if(lifecycleRefreshInstalled)return;lifecycleRefreshInstalled=true;
+  const maybeRefresh=async(force=false)=>{
+    if(document.visibilityState!=='visible'||!location.hash.startsWith('#/dashboard')||backgroundRefreshRunning)return;
+    const now=Date.now();if(now-lastBackgroundRefreshAt<(force?30000:60000))return;
+    if(Date.now()-lastUserInteractionAt<12000||document.querySelector('#view form'))return;
+    const focused=document.activeElement;
+    if(focused instanceof HTMLElement&&focused.matches('input,textarea,select,[contenteditable="true"]'))return;
+    backgroundRefreshRunning=true;
+    try{await refresh(S.view);lastBackgroundRefreshAt=Date.now()}catch(e){if(e?.status===401)invalidateSession()}finally{backgroundRefreshRunning=false}
+  };
+  window.addEventListener('focus',()=>maybeRefresh(true),{passive:true});
+  window.addEventListener('online',()=>maybeRefresh(true),{passive:true});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')maybeRefresh(true)});
+  window.setInterval(()=>maybeRefresh(false),45000);
+}
+
 export async function renderDashboard(){
   await load(null);
+  lastBackgroundRefreshAt=Date.now();installBackgroundRefresh();
   document.querySelector('#app').innerHTML=`<div class="dashboard-shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#/dashboard" aria-label="Aurion — retour au tableau de bord" title="Retour au tableau de bord">${appLogo('42')}<span>AURION<small>PRO</small></span></a><button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar"><span></span><span></span><span></span></button><nav class="nav"></nav><div class="sidebar-bottom"><button id="logout" class="nav-logout">Quitter</button><div class="status-dot"><i></i> Système opérationnel</div></div></aside><section class="workspace"><header class="dashboard-top"><div class="activity-switch"><span class="eyebrow" id="shell-company"></span><button id="activity-picker" class="activity-picker"><span>ACTIVITÉ ACTIVE</span><strong id="shell-activity"></strong><small>▾</small></button></div><div class="top-actions"><span class="pill" id="shell-pill"></span><button class="btn secondary small" id="fs-toggle" title="Plein écran (F11)">⛶ Plein écran</button><button class="avatar" id="shell-avatar" title="Mon compte" aria-label="Mon compte"></button></div></header><main id="main" class="content"><div id="view"></div></main></section></div><div id="activity-modal-root"></div>`;
   await syncShellAvatar();
   const side=document.querySelector('#sidebar'),burger=document.querySelector('#burger');

@@ -5,6 +5,7 @@ import{S,e,money,toast,prof,active,hooks,emailToast,askConfirm}from'./core.js';
 import{attachSuggest}from'../../core/suggest.js';import{detectService,rankRelevantParts}from'../../core/recommendations.js';
 
 let lines=[],driver='ttc',catalogPricing=true;
+let draftTimer=null,draftSequence=0;
 const blank=()=>({label:'',quantity:'',unitCost:'',unitPrice:'',partId:null,saleCoefficientPercent:null});
 const cheapest=p=>{const c=(p?.suppliers||[]).map(s=>Number(s.purchasePrice)).filter(n=>n>0);return c.length?Math.min(...c):0};
 const finiteNumber=v=>{const n=Number(String(v??'').replace(',','.'));return Number.isFinite(n)?n:null};
@@ -29,6 +30,7 @@ const savedBaseTtc=q=>{
 export const view=()=>{
   const p=prof(),c=p.calc||{},configQ=S.company?.configuration_data?.questionnaire||{},orgPricing=S.company?.configuration_data?.pricing||{},orgFiscal=S.company?.configuration_data?.fiscal||{},orgBilling=S.company?.configuration_data?.billing||{},itemsEnabled=c.items!==false&&configQ.parts!=='Non',a=active()||{},editing=S.editing,q=S.editing||S.quoteDraft,documentKind=editing?(q?.document_type==='invoice'?'invoice':'quote'):(S.documentType==='invoice'?'invoice':(q?.documentType==='invoice'?'invoice':'quote')),doc=p.doc||{},coefficientBasis='purchase',coefficientUnit=(q?.coefficient_unit||q?.coefficientUnit)==='euro'?'euro':'percent',coefficientValue=q?.coefficient_basis!=='margin'?(q?.coefficient_value!=null?q.coefficient_value:(q?.coefficientValue!=null?q.coefficientValue:(q?.part_coefficient_percent??a.default_part_coefficient_percent??0))):(q?.part_coefficient_percent??a.default_part_coefficient_percent??0),mileageMode=q?.mileage_mode?(q.mileage_mode==='client_price'?'client_price':'margin'):(orgPricing.default_mileage_mode==='client_price'?'client_price':'margin'),mileageInternalRate=q?.mileage_internal_rate??q?.mileageInternalRate??q?.mileage_rate??orgPricing.internal_mileage_rate??0,mileageClientRate=q?.mileage_client_rate??q?.mileageClientRate??q?.mileage_rate??orgPricing.client_mileage_rate??0,invoiceAddressSource=q?.invoice_address_source==='intervention'?'intervention':q?.invoice_address_source==='free'?'free':'client',billingAddress=q?.billing_address_snapshot||'',targetTtcValue=savedBaseTtc(q);
   return`<div class="page-head"><div><span class="eyebrow">${e(editing?'MODIFIER':(documentKind==='invoice'?'FACTURE':(p.quoteLabel||'DEVIS')).toUpperCase())} · ${e(a.name||'')}</span><h1>${editing?`${documentKind==='invoice'?'Modifier la facture':'Modifier le devis'} ${e(q.number)}`:(documentKind==='invoice'?'Nouvelle facture':'Nouveau devis')}</h1><p>Le client verra uniquement : ${e((doc.interventionLabel||'la prestation').toLowerCase())}, ${e((doc.itemsLabel||'les pièces').toLowerCase())} avec leur quantité, et le total TTC. Le reste est interne.</p></div></div>
+  ${editing?'':'<p id="draft-sync-status" class="help" role="status" aria-live="polite">Le brouillon sera synchronisé à votre compte automatiquement.</p>'}
   <form id="quote-form" class="quote-layout"><section class="panel stack">
    <h2>1 · Client et ${e((doc.interventionLabel||'prestation').toLowerCase())}</h2>
    <label class="field"><span>Client</span><select id="qclient"><option value="">Votre choix</option>${S.clients.map(x=>`<option value="${x.id}" ${q&&q.client_id===x.id?'selected':''}>${e(x.name)}</option>`).join('')}</select></label>
@@ -63,7 +65,7 @@ export async function bind(){
   const documentType=editing?(q?.document_type==='invoice'?'invoice':'quote'):(S.documentType==='invoice'?'invoice':(q?.documentType==='invoice'?'invoice':'quote'));
   S.documentType=documentType;
   if(q?.documentType&&!editing)S.documentType=q.documentType==='invoice'?'invoice':'quote';
-  driver=q?'ttc':'net';const catalogPricing=q?((q.catalogPricing??q.catalog_pricing)!==false):true;
+  driver=q?(q.driver==='net'?'net':'ttc'):'net';const catalogPricing=q?((q.catalogPricing??q.catalog_pricing)!==false):true;
   if(!q&&S.prefillClient){$('#qclient').value=S.prefillClient;S.prefillClient=null}
   lines=q?(q.items||[]).map(i=>({label:i.label,quantity:Number(i.quantity),unitCost:Number(i.unitCost),unitPrice:i.unitPrice==null?'':Number(i.unitPrice),partId:i.partId,saleCoefficientPercent:Number(i.saleCoefficientPercent??0)})):[];
   if(q&&!lines.length&&q.product)lines=[{label:q.product,quantity:1,unitCost:Number(q.part_cost)||0,unitPrice:'',partId:null}];
@@ -71,7 +73,7 @@ export async function bind(){
 
   const selectedClient=()=>S.clients.find(x=>x.id===$('#qclient').value);
   const interventionAddress=async()=>{const c=selectedClient();return c?.intervention_address||''};
-  const refreshBillingAddress=async()=>{const source=$('#invoiceAddressSource').value;if(source==='free')return;const c=selectedClient();if(!c){$('#billingAddress').value='';return}if(source==='client'){$('#billingAddress').value=c.address||'';return}$('#billingAddress').value=await interventionAddress()};
+  const refreshBillingAddress=async(preserveSnapshot=false)=>{const source=$('#invoiceAddressSource').value;if(source==='free')return;if(preserveSnapshot&&q?.billing_address_snapshot){$('#billingAddress').value=q.billing_address_snapshot;return}const c=selectedClient();if(!c){$('#billingAddress').value='';return}if(source==='client'){$('#billingAddress').value=c.address||'';return}$('#billingAddress').value=await interventionAddress()};
   const inputs=()=>({partCost:lines.reduce((t,l)=>t+(Number(l.quantity)||0)*(Number(l.unitCost)||0),0),partQuantity:Math.max(1,lines.reduce((t,l)=>t+(Number(l.quantity)||0),0)),shippingCost:num('#shipping'),mileageKm:num('#mileageKm'),mileageRate:num('#mileageClientRate'),mileageInternalRate:num('#mileageInternalRate'),mileageClientRate:num('#mileageClientRate'),mileageMode:$('#mileageMode').value,laborSellingHt:$('#laborSellingHt').value===''?undefined:num('#laborSellingHt'),laborInternalCostHt:$('#laborSellingHt').value===''?0:num('#laborSellingHt'),vatRate:num('#vat'),urssafRate:Number(active()?.urssaf_rate||0),contributions:Array.from(document.querySelectorAll('.contrib-rate')).map(x=>({name:x.dataset.name,rate:Number(x.value||0),basis:x.dataset.basis,mandatory:x.dataset.mandatory!=='false'})),coefficientBasis:$('#coefficientBasis').value,coefficientUnit:$('#coefficientUnit').value,coefficientValue:num('#coefficientValue'),targetTtc:num('#targetTtc'),targetNet:num('#minimumProfit'),driver,targetIncludesMileage:true});
   const mileageModeForCatalog=()=>$('#mileageMode')?.value==='client_price'?'client_price':'margin';
   const syncCatalogTarget=()=>{
@@ -98,12 +100,30 @@ export async function bind(){
       <div class="calc-line"><span>TVA</span><b>${money(r.vat)}</b></div>`;
     return r;
   };
-  const persistDraft=()=>{if(editing)return;const basis='purchase',unit=$('#coefficientUnit')?.value||'percent',value=num('#coefficientValue');S.quoteDraft={documentType:S.documentType,mileage_mode:$('#mileageMode')?.value||'margin',client_id:$('#qclient').value||null,intervention:$('#intervention').value.trim(),shipping_cost:num('#shipping'),mileage_km:num('#mileageKm'),mileage_rate:num('#mileageClientRate'),mileage_internal_rate:num('#mileageInternalRate'),mileage_client_rate:num('#mileageClientRate'),mileage_total:Math.round(num('#mileageKm')*(($('#mileageMode').value==='client_price'?num('#mileageClientRate'):num('#mileageInternalRate')))*100)/100,margin_coefficient_percent:unit==='percent'?value:0,coefficient_basis:basis,coefficientUnit:unit,coefficientValue:value,invoice_address_source:$('#invoiceAddressSource')?.value||'client',billing_address_snapshot:$('#billingAddress')?.value||'',part_coefficient_percent:basis==='purchase'&&unit==='percent'?value:0,labor_coefficient_percent:basis==='margin'&&unit==='percent'?value:0,catalogPricing:catalogPricing,total_ttc:num('#targetTtc'),final_price_ttc:num('#targetTtc'),labor_selling_ht:num('#laborSellingHt'),vat_rate:num('#vat'),urssaf_rate:num('#urssaf'),purchase_vat_mode:$('#purchaseVatMode')?.value||'auto',purchase_vat_rate:$('#purchaseVatRate')?.value||null,contribution_snapshot:Array.from(document.querySelectorAll('.contrib-rate')).map(x=>({name:x.dataset.name,rate:Number(x.value||0),basis:x.dataset.basis,mandatory:x.dataset.mandatory!=='false'})),warranty_text:$('#warrantyText').value.trim(),items:lines.map(l=>({label:l.label,quantity:Number(l.quantity)||1,unitCost:Number(l.unitCost)||0,unitPrice:l.unitPrice===''||l.unitPrice==null?null:Number(l.unitPrice),partId:l.partId,saleCoefficientPercent:l.saleCoefficientPercent==null?null:Number(l.saleCoefficientPercent)}))};};
+  const persistDraft=()=>{
+    if(editing)return;
+    const basis='purchase',unit=$('#coefficientUnit')?.value||'percent',value=num('#coefficientValue');
+    S.quoteDraft={documentType:S.documentType,mileage_mode:$('#mileageMode')?.value||'margin',client_id:$('#qclient').value||null,intervention:$('#intervention').value.trim(),shipping_cost:num('#shipping'),mileage_km:num('#mileageKm'),mileage_rate:num('#mileageClientRate'),mileage_internal_rate:num('#mileageInternalRate'),mileage_client_rate:num('#mileageClientRate'),mileage_total:Math.round(num('#mileageKm')*(($('#mileageMode').value==='client_price'?num('#mileageClientRate'):num('#mileageInternalRate')))*100)/100,margin_coefficient_percent:unit==='percent'?value:0,coefficient_basis:basis,coefficientUnit:unit,coefficientValue:value,invoice_address_source:$('#invoiceAddressSource')?.value||'client',billing_address_snapshot:$('#billingAddress')?.value||'',part_coefficient_percent:basis==='purchase'&&unit==='percent'?value:0,labor_coefficient_percent:basis==='margin'&&unit==='percent'?value:0,catalogPricing:catalogPricing,total_ttc:num('#targetTtc'),final_price_ttc:num('#targetTtc'),targetNet:num('#minimumProfit'),driver,labor_selling_ht:num('#laborSellingHt'),vat_rate:num('#vat'),urssaf_rate:num('#urssaf'),purchase_vat_mode:$('#purchaseVatMode')?.value||'auto',purchase_vat_rate:$('#purchaseVatRate')?.value||null,contribution_snapshot:Array.from(document.querySelectorAll('.contrib-rate')).map(x=>({name:x.dataset.name,rate:Number(x.value||0),basis:x.dataset.basis,mandatory:x.dataset.mandatory!=='false'})),warranty_text:$('#warrantyText').value.trim(),items:lines.map(l=>({label:l.label,quantity:Number(l.quantity)||1,unitCost:Number(l.unitCost)||0,unitPrice:l.unitPrice===''||l.unitPrice==null?null:Number(l.unitPrice),partId:l.partId,saleCoefficientPercent:l.saleCoefficientPercent==null?null:Number(l.saleCoefficientPercent)}))};
+    const seq=++draftSequence;
+    clearTimeout(draftTimer);
+    const status=$('#draft-sync-status');
+    if(status)status.textContent='Synchronisation du brouillon…';
+    const snapshot=JSON.parse(JSON.stringify(S.quoteDraft));
+    draftTimer=setTimeout(async()=>{
+      try{
+        await api.saveDraft(snapshot);
+        if(seq===draftSequence&&document.querySelector('#quote-form')){const label=$('#draft-sync-status');if(label)label.textContent='Brouillon synchronisé à votre compte — reprenez-le sur votre téléphone ou votre ordinateur.';}
+      }catch{
+        if(seq===draftSequence&&document.querySelector('#quote-form')){const label=$('#draft-sync-status');if(label)label.textContent='Brouillon non synchronisé : gardez cette page ouverte et vérifiez votre connexion avant de la quitter.';}
+        window.addEventListener('online',()=>{if(seq===draftSequence)persistDraft()},{once:true});
+      }
+    },650);
+  };
+
   const draw=()=>{
     $('#lines').innerHTML=lines.map((l,i)=>`<div class="line-row" data-i="${i}"><input class="ln-label" placeholder="${e(prof().calc?.itemPlaceholder||'Désignation')}" value="${e(l.label)}"><input class="ln-qty" type="number" min="0.01" step="any" value="${l.quantity??''}"><input class="ln-cost" type="number" min="0" step="0.01" value="${l.unitCost??''}"><input class="ln-sale" type="number" min="0" step="0.01" value="${l.unitPrice??''}"><button type="button" class="btn danger small ln-del">Retirer</button></div>`).join('');
   };
   let learnedParts=[];
-  const loadPriceMemory=async()=>{try{const r=await api.priceSuggestions({service:$('#intervention').value,parts:S.parts.map(x=>({id:x.id,name:x.name,model:x.model,variant:x.variant,color:x.color,quality:x.quality,reference:x.reference}))}); const iv=S.interventions.find(i=>i.name.trim().toLowerCase()===$('#intervention').value.trim().toLowerCase()); const hasCatalogService=Number(iv?.default_price||0)>0; if(r.servicePrice!=null&&!hasCatalogService&&!num('#targetTtc')){ $('#targetTtc').value=Number(r.servicePrice);driver='ttc'; } learnedParts=r.recommendedPartSignatures||[];}catch{learnedParts=[]}};
   let detectedService=null;
   const partItems=()=>{const ranked=rankRelevantParts(detectedService,S.parts,learnedParts);const list=ranked.length?ranked:S.parts;return list.map(x=>({value:x.name,hint:`Achat ${money(cheapest(x))} HT · Vente ${money(Number(x.selling_price||0))} HT`,partId:x.id}))};
   const suggestLines=()=>document.querySelectorAll('.ln-label').forEach(i=>attachSuggest(i,partItems,{title:`Suggestions · ${prof().itemLabel||'catalogue'}`,onPick:item=>{const row=i.closest('.line-row');if(!row)return;const l=lines[Number(row.dataset.i)];const part=S.parts.find(x=>x.id===item.partId)||S.parts.find(x=>x.name.toLowerCase()===String(item.value).trim().toLowerCase());if(!l||!part)return;l.label=part.name;l.partId=part.id;l.unitCost=cheapest(part);l.unitPrice=Number(part.selling_price||0)>0?Number(part.selling_price):'';l.saleCoefficientPercent=null;catalogPricing=true;row.querySelector('.ln-cost').value=String(l.unitCost);row.querySelector('.ln-sale').value=l.unitPrice===''?'':Number(l.unitPrice).toFixed(2);syncCatalogTarget();recalc();persistDraft();}}));
@@ -111,7 +131,7 @@ export async function bind(){
   const warrantyScopeLabel=g=>g.scope_type==='parts'?'Pièces uniquement':g.scope_type==='labor'?'Main-d’œuvre uniquement':g.scope_type==='both'?'Pièces et main-d’œuvre':'';
   attachSuggest($('#warrantyText'),()=>[...S.policies.map(g=>({value:g.name,scopeType:g.scope_type,hint:warrantyScopeLabel(g)})),...(prof().warranty||[]).map(v=>({value:v}))],{title:'Suggestions · garanties',onPick:item=>{const scope=warrantyScopeLabel(item);if(scope&&!/pi[eè]ces?|main.?d.?oeuvre/i.test(item.value))$('#warrantyText').value=`${item.value} · ${scope}`;}});
   const drawAll=()=>{draw();suggestLines()};
-  const refreshServiceDetection=async()=>{detectedService=detectService($('#intervention').value,S.interventions);suggestLines();if(!detectedService)return;const label=document.querySelector('#service-detected');if(label)label.textContent=`Prestation détectée : ${detectedService.name}`;try{const r=await api.priceSuggestions({service:detectedService.name,parts:S.parts.map(x=>({id:x.id,name:x.name,model:x.model,variant:x.variant,color:x.color,quality:x.quality,reference:x.reference}))});learnedParts=r.recommendedPartSignatures||[];const ranked=rankRelevantParts(detectedService,S.parts,learnedParts);if(ranked.length)drawAll()}catch{}};
+  const refreshServiceDetection=async()=>{detectedService=detectService($('#intervention').value,S.interventions);suggestLines();if(!detectedService)return;const label=document.querySelector('#service-detected');if(label)label.textContent=`Prestation détectée : ${detectedService.name}`;try{const r=await api.priceSuggestions({service:detectedService.name,parts:S.parts.map(x=>({id:x.id,name:x.name,model:x.model,variant:x.variant,color:x.color,quality:x.quality,reference:x.reference}))});learnedParts=r.recommendedPartSignatures||[];const iv=S.interventions.find(i=>i.name.trim().toLowerCase()===detectedService.name.trim().toLowerCase());if(r.servicePrice!=null&&!Number(iv?.default_price||0)&&!num('#targetTtc')){$('#targetTtc').value=String(Number(r.servicePrice));driver='ttc';recalc();persistDraft()}const ranked=rankRelevantParts(detectedService,S.parts,learnedParts);if(ranked.length)drawAll()}catch{}};
   drawAll();
   const updateLine=ev=>{
     const row=ev.target.closest('.line-row');if(!row)return;const l=lines[Number(row.dataset.i)];
@@ -138,12 +158,11 @@ export async function bind(){
   document.querySelectorAll('.contrib-rate').forEach(x=>x.addEventListener('input',()=>{recalc();persistDraft()}));
   $('#invoiceAddressSource').addEventListener('change',async()=>{await refreshBillingAddress();persistDraft()});
   $('#billingAddress').addEventListener('input',persistDraft);
-  await refreshBillingAddress();
-  $('#intervention').addEventListener('input',()=>{detectedService=detectService($('#intervention').value,S.interventions);catalogPricing=Boolean(detectedService);const label=document.querySelector('#service-detected');if(label)label.textContent=detectedService?`Prestation détectée : ${detectedService.name}`:'';suggestLines();});
+  await refreshBillingAddress(Boolean(q?.billing_address_snapshot));
+  let detectionTimer=null;$('#intervention').addEventListener('input',()=>{detectedService=detectService($('#intervention').value,S.interventions);catalogPricing=Boolean(detectedService);const label=document.querySelector('#service-detected');if(label)label.textContent=detectedService?`Prestation détectée : ${detectedService.name}`:'';suggestLines();persistDraft();clearTimeout(detectionTimer);if(detectedService)detectionTimer=setTimeout(()=>refreshServiceDetection().catch(()=>{}),350);});
   $('#intervention').addEventListener('change',async()=>{
     catalogPricing=true;
     const iv=S.interventions.find(i=>i.name===$('#intervention').value);
-    await loadPriceMemory();
     await refreshServiceDetection();
     if(iv&&Number(iv.default_price)&&!num('#targetTtc')){$('#targetTtc').value=Number(iv.default_price);driver='ttc';recalc()}
     if(!editing){syncCatalogTarget();if(!num('#targetTtc')){driver='net';recalc()}}
@@ -157,7 +176,7 @@ export async function bind(){
   if(!editing)persistDraft();
 
   $('#quote-form').onsubmit=async ev=>{
-    ev.preventDefault();
+    ev.preventDefault();clearTimeout(draftTimer);draftSequence++;
     const submitButton=ev.currentTarget?.querySelector('button[type=submit]');
     if(submitButton?.disabled)return;
     if(submitButton){submitButton.disabled=true;submitButton.dataset.originalLabel=submitButton.textContent||'';submitButton.textContent='Enregistrement…'}
@@ -169,6 +188,7 @@ export async function bind(){
       const coefficientBasis=$('#coefficientBasis').value,coefficientUnit=$('#coefficientUnit').value,coefficientValue=num('#coefficientValue');const body={documentType,clientId:$('#qclient').value||null,catalogPricing,mileageKm:num('#mileageKm'),mileageRate:num('#mileageClientRate'),mileageInternalRate:num('#mileageInternalRate'),mileageClientRate:num('#mileageClientRate'),coefficientBasis,coefficientUnit,coefficientValue,marginCoefficientPercent:coefficientUnit==='percent'?coefficientValue:0,partCoefficientPercent:coefficientBasis==='purchase'&&coefficientUnit==='percent'?coefficientValue:0,laborCoefficientPercent:coefficientBasis==='margin'&&coefficientUnit==='percent'?coefficientValue:0,intervention:$('#intervention').value.trim(),laborSellingHt:$('#laborSellingHt').value===''?undefined:num('#laborSellingHt'),laborInternalCostHt:$('#laborSellingHt').value===''?0:num('#laborSellingHt'),purchaseVatMode:$('#purchaseVatMode')?.value||'auto',purchaseVatRate:$('#purchaseVatRate')?.value===''?null:num('#purchaseVatRate'),contributions:Array.from(document.querySelectorAll('.contrib-rate')).map(x=>({name:x.dataset.name,rate:Number(x.value||0),basis:x.dataset.basis,mandatory:x.dataset.mandatory!=='false'})),invoiceAddressSource:$('#invoiceAddressSource').value,billingAddress:$('#billingAddress').value.trim(),items,partCost:lines.reduce((t,l)=>t+(Number(l.quantity)||0)*(Number(l.unitCost)||0),0),partQuantity:Math.max(1,lines.reduce((t,l)=>t+(Number(l.quantity)||0),0)),shippingCost:num('#shipping'),vatRate:num('#vat'),urssafRate:Number(active()?.urssaf_rate||0),reminderIntervalDays:orgBilling.reminder_interval_days!=null?Number(orgBilling.reminder_interval_days):undefined,latePenaltyMode:orgBilling.late_penalty_mode||undefined,latePenaltyValue:orgBilling.late_penalty_value!=null?Number(orgBilling.late_penalty_value):undefined,finalPriceTtc:num('#targetTtc'),mileageMode:$('#mileageMode').value,mileage_mode:$('#mileageMode').value,warrantyText:$('#warrantyText').value.trim(),allowLoss};
       if(editing){await api.updateQuote(q.id,body);S.editing=null}
       else {await api.createQuote({...body,sendEmail:false});S.quoteDraft=null}
+      if(!editing){try{await api.deleteDraft()}catch{} }
       try{await api.recordQuotePattern({service:body.intervention,servicePrice:r.totalTtc,parts:items.map(x=>{const p=S.parts.find(z=>z.id===x.partId);return {name:x.label,model:p?.model,variant:p?.variant,color:p?.color,quality:p?.quality,reference:p?.reference,price:Number(x.unitCost||0)}})});}catch{}
       let refreshed=true;try{await hooks.refresh('invoices')}catch{refreshed=false;hooks.show('invoices')}
       const noun=editing?'Modifications enregistrées.':(body.documentType==='invoice'?'Facture enregistrée.':'Devis enregistré. Vous pouvez maintenant choisir de l’envoyer ou de le modifier.');

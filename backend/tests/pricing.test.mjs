@@ -75,3 +75,28 @@ test('frais kilométriques : calcul inverse en pilotage net', () => {
   assert.equal(r.mileageTotal, 30);
   assert.equal(r.netMargin, 30);
 });
+
+
+test('moteur en centimes entiers : les demi-centimes sont arrondis commercialement', () => {
+  const r = browser({ partCost: '1,005', shippingCost: '0,105', targetTtc: '1,005', vatRate: 20, driver: 'ttc' });
+  assert.equal(r.purchaseHt, 1.01);
+  assert.equal(r.shippingHt, 0.11);
+  assert.equal(r.totalTtc, 1.01);
+  assert.equal(r.vat, 0.17);
+});
+
+test('un cumul de cotisations supérieur ou égal à 100 % du CA est refusé en calcul inverse', () => {
+  assert.throws(() => browser({ partCost: 1, targetNet: 1, driver: 'net', contributions: [{ rate: 75, basis: 'ca_ht' }, { rate: 25, basis: 'ca_ht' }] }), /inférieur à 100/);
+});
+
+
+test('calcul inverse : le bénéfice cible intègre le kilométrage facturé et les différentes assiettes', () => {
+  const r = browser({ partCost: 20, shippingCost: 10, mileageKm: 50, mileageInternalRate: 0.3, mileageClientRate: 0.6, mileageMode: 'client_price', vatRate: 20, driver: 'net', targetNet: 30, contributions: [
+    { name: 'CA', rate: 10, basis: 'ca_ht' },
+    { name: 'Marge', rate: 5, basis: 'gross_margin' },
+    { name: 'Résultat', rate: 5, basis: 'profit' },
+  ] });
+  assert.ok(Math.abs(r.netResult - 30) <= 0.01, `résultat obtenu : ${r.netResult}`);
+  assert.equal(r.mileageTotal, 30);
+  assert.equal(r.billedMileageHt, 30);
+});

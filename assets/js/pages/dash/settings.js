@@ -3,6 +3,7 @@ import{api,getActiveActivity,setActiveActivity}from'../../core/api.js';
 import{S,e,toast,modalForm,confirmDelete,hooks,askConfirm}from'./core.js';
 import{renderMailbox}from'../mailbox.js';
 import{mergeRegistryFields}from'../../core/registry-fill.js';
+import{isValidRegistryIdentifier}from'../../core/registry-fill.js';
 
 const F=(id,label,val='',extra='')=>`<label class="field"><span>${label}</span><input id="${id}" value="${e(val)}" ${extra}${/placeholder=/.test(extra)?'':` placeholder="Saisissez ${e(label.toLowerCase())}…"`}></label>`;
 const v=(m,id)=>m.querySelector('#'+id)?.value.trim()??'';
@@ -267,8 +268,15 @@ export function bind(){
   $('#company-logo')?.addEventListener('change',async ev=>{const f=ev.target.files?.[0];if(!f)return;try{await api.uploadLogo(f);toast('Logo enregistré.','success');await hooks.refresh()}catch(x){toast(x.message,'error')}});
   $('#lookup-company-siret')?.addEventListener('click',()=>lookupRegistry(true));
   $('#lookup-company-name')?.addEventListener('click',()=>lookupRegistry(true));
-  let lookupTimer=0;['#ssiret','#ssiren','#sname'].forEach(sel=>$(sel)?.addEventListener('input',()=>{markCompanyDirty();clearTimeout(lookupTimer);lookupTimer=window.setTimeout(()=>lookupRegistry(false),650)}));
-  if(S.company?.siret||S.company?.siren)setTimeout(()=>lookupRegistry(false),0);
+  const registryLookupReady=()=>{
+    const siret=$('#ssiret')?.value.replace(/\D/g,'')||'';
+    const siren=$('#ssiren')?.value.replace(/\D/g,'')||'';
+    if(siret)return isValidRegistryIdentifier(siret);
+    if(siren)return isValidRegistryIdentifier(siren);
+    return ($('#sname')?.value.trim().length||0)>=3;
+  };
+  let lookupTimer=0;['#ssiret','#ssiren','#sname'].forEach(sel=>$(sel)?.addEventListener('input',()=>{markCompanyDirty();clearTimeout(lookupTimer);lookupTimer=window.setTimeout(()=>{if(registryLookupReady())lookupRegistry(false)},700)}));
+  if(isValidRegistryIdentifier(S.company?.siret)||isValidRegistryIdentifier(S.company?.siren))setTimeout(()=>lookupRegistry(false),0);
   $('#settings')?.addEventListener('input',()=>markCompanyDirty());
   $('#settings')?.addEventListener('change',()=>markCompanyDirty());
   $('#settings')?.addEventListener('submit',async ev=>{

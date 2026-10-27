@@ -44,8 +44,8 @@ test('requirement 2 quote submit uses the existing coefficientBasis field safely
 });
 
 test('requirement 2 opens a fresh quote without reusing state',()=>{
-  assert.match(dashboard,/S\.editing=null;S\.quoteDraft=null;S\.prefillClient=null;S\.documentType='quote'/);
-  assert.match(docs,/S\.editing=null;S\.quoteDraft=null;S\.documentType=b\.dataset\.newType/);
+  assert.match(dashboard,/S\.editing=null;S\.quoteDraft=null;S\.startBlankQuote=true;S\.prefillClient=null;S\.documentType='quote'/);
+  assert.match(docs,/S\.editing=null;S\.quoteDraft=null;S\.startBlankQuote=true;S\.documentType=b\.dataset\.newType/);
 });
 
 // Cahier 3/10.
@@ -94,7 +94,7 @@ test('requirement 5 uses detected profile metadata to prefill configuration choi
 });
 
 test('requirement 15 re-runs registry detection when saved identifiers already exist',()=>{
-  assert.match(settings,/S\.company\?\.siret\s*\|\|\s*S\.company\?\.siren/);
+  assert.match(settings,/isValidRegistryIdentifier\(S\.company\?\.siret\)\|\|isValidRegistryIdentifier\(S\.company\?\.siren\)/);
   assert.match(onboarding,/val\('siret'\)\s*\|\|\s*val\('siren'\)/);
 });
 

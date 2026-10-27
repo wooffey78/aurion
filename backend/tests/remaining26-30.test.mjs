@@ -38,7 +38,8 @@ const read=f=>fs.readFileSync(path.join(root,f),'utf8');
 {
   const x=read('assets/js/pages/dashboard.js');
   for(const name of ['clients','quotes','suppliers','parts','interventions','supplies','warranties','warrantyPolicies','sav']) assert.match(x,new RegExp(`api\\.${name}\\(\\)`));
-  assert.match(x,/Object\.assign\(S,/);
+  assert.match(x,/S\[key\]=value/);
+  assert.match(x,/const DATASETS=/);
 }
 
 console.log('remaining26-30: 5/5 OK');

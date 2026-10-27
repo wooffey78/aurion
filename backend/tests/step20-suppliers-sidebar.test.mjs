@@ -12,8 +12,8 @@ const suppliers = fs.readFileSync(path.join(root, 'assets/js/pages/dash/supplier
 test('Etape 20: la sidebar expose un accès direct et fiable à Fournisseurs', () => {
   assert.match(dashboard, /\['suppliers','Fournisseurs','▱'\]/);
   assert.match(dashboard, /VIEWS\s*=\s*\{[^}]*suppliers/s);
-  assert.match(dashboard, /if\(b\.dataset\.view==='suppliers'\)/);
-  assert.match(dashboard, /hooks\.refresh\('suppliers'\)\.catch/);
+  assert.match(dashboard, /hooks\.refresh\(b\.dataset\.view\)\.catch/);
+  assert.match(dashboard, /suppliers:\['suppliers','parts'\]/);
   assert.doesNotMatch(dashboard, /const supplierNav=/);
   assert.match(suppliers, /export const suppliers\s*=\s*\{/);
 });

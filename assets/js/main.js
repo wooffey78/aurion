@@ -46,6 +46,37 @@ async function render(){
   document.querySelector('#app').innerHTML='<main class="center"><div class="glass"><h1>Page introuvable</h1><a class="btn primary" href="#/">Retour</a></div></main>';
 }
 
+// Mobile keyboard/viewport management: keep focused fields and form actions visible on iOS/Android.
+const editableTarget = el => el instanceof HTMLElement && el.matches('input:not([type="hidden"]),textarea,select,[contenteditable="true"]');
+let viewportRaf = 0;
+function syncVisualViewport() {
+  if (viewportRaf) cancelAnimationFrame(viewportRaf);
+  viewportRaf = requestAnimationFrame(() => {
+    const vv = window.visualViewport;
+    const height = Math.max(240, vv?.height || window.innerHeight);
+    const inset = Math.max(0, window.innerHeight - height - (vv?.offsetTop || 0));
+    document.documentElement.style.setProperty('--aurion-viewport-height', `${height}px`);
+    document.documentElement.style.setProperty('--aurion-keyboard-inset', `${inset}px`);
+    const keyboardOpen = matchMedia('(max-width: 900px)').matches && editableTarget(document.activeElement) && inset > 100;
+    document.body.classList.toggle('keyboard-open', Boolean(keyboardOpen));
+  });
+}
+window.addEventListener('resize', syncVisualViewport, { passive: true });
+window.visualViewport?.addEventListener('resize', syncVisualViewport, { passive: true });
+window.visualViewport?.addEventListener('scroll', syncVisualViewport, { passive: true });
+document.addEventListener('focusin', event => {
+  syncVisualViewport();
+  const el = event.target;
+  if (!editableTarget(el) || !matchMedia('(max-width: 900px)').matches) return;
+  window.setTimeout(() => {
+    if (document.activeElement === el) el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+    syncVisualViewport();
+  }, 180);
+});
+document.addEventListener('focusout', () => window.setTimeout(syncVisualViewport, 220));
+window.addEventListener('orientationchange', () => window.setTimeout(syncVisualViewport, 250));
+syncVisualViewport();
+
 const formObserver=new MutationObserver(()=>enhanceFormFields(document));
 formObserver.observe(document.body,{childList:true,subtree:true});
 listen(()=>render().then(()=>enhanceFormFields(document)).catch(showError));
