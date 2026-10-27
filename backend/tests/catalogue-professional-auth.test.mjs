@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -55,4 +56,12 @@ test('gestion des clés d’accès : chaque liste et suppression est limitée à
   assert.match(account, /api\.webauthnRegisterVerify/);
   assert.match(account, /api\.deleteWebauthnCredential/);
   assert.match(api, /deleteWebauthnCredential:id=>request/);
+});
+
+test('fichiers JavaScript refondus passent l’analyse syntaxique ES module', () => {
+  for (const file of ['../../assets/js/pages/dash/catalog.js','../../assets/js/pages/auth.js','../../assets/js/pages/dash/account.js']) {
+    const source=read(file);
+    const result=spawnSync(process.execPath,['--input-type=module','--check'],{input:source,encoding:'utf8'});
+    assert.equal(result.status,0,`Erreur de syntaxe dans ${file}: ${result.stderr||result.stdout}`);
+  }
 });
