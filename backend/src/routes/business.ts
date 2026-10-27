@@ -1101,14 +1101,18 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
   app.patch('/sav/:id',async(r,reply)=>{const b:any=r.body||{},id=String((r.params as any).id),org=r.auth!.organizationId;const current=(await query('select * from sav_cases where id=$1 and organization_id=$2',[id,org])).rows[0];if(!current)return reply.code(404).send({error:'NOT_FOUND'});const savType=b.savType==='free_intervention'?'free_intervention':(current.sav_type||'financial');const items=Array.isArray(b.items)?b.items.map((x:any)=>({label:String(x.label||'').trim(),quantity:Math.max(0,Number(x.quantity||0)),unitPrice:Math.max(0,Number(x.unitPrice||0))})).filter((x:any)=>x.label&&x.quantity>0):current.items||[];const amount=savType==='financial'?-Math.round(items.reduce((n:any,x:any)=>n+x.quantity*x.unitPrice,0)*100)/100:0;const interventionCostHt=savType==='free_intervention'?Math.max(0,Number(b.interventionCostHt??current.intervention_cost_ht??0)):0;if(amount>0.005)return reply.code(400).send({error:'INVALID_INPUT'});await query('update sav_cases set sav_type=$1,items=$2::jsonb,amount_ttc=$3::numeric,intervention_cost_ht=$4::numeric,note=$5,updated_at=now() where id=$6 and organization_id=$7',[savType,JSON.stringify(items),amount,interventionCostHt,b.note?String(b.note).slice(0,2000):null,id,org]);await query('update accounting_entries set amount=$1::numeric,label=$2::varchar(240) where source_id=$3 and organization_id=$4',[amount,`SAV facture ${current.invoice_id}`,id,org]);return {id,amountTtc:amount};});
   app.delete('/sav/:id',async(r,reply)=>{const id=String((r.params as any).id),org=r.auth!.organizationId;const x=await query('delete from sav_cases where id=$1 and organization_id=$2 returning id',[id,org]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});await query('delete from accounting_entries where source_id=$1 and organization_id=$2',[id,org]);return {ok:true};});
   app.get('/dashboard/summary',async r=>{
-    const org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));
-    const t=await query(`select count(*)::int n from support_tickets where organization_id=$1 and status not in ('resolved','duplicate','closed')`,[org]);
+    const org=r.auth!.organizationId;
+    const [aid,t]=await Promise.all([
+      ensureActivity(r,activityId(r)),
+      query(`select count(*)::int n from support_tickets where organization_id=$1 and status not in ('resolved','duplicate','closed')`,[org])
+    ]);
     if(!aid)return {tickets:Number(t.rows[0]?.n||0),unpaidCount:0,unpaidTotal:0,forecastEntries:0};
-    const u=await query(`select count(*)::int n,coalesce(sum(greatest(0,total_ttc-coalesce(amount_paid,0))),0)::numeric total,min(coalesce(due_at,created_at)) first_date from quotes where organization_id=$1 and activity_id=$2 and document_type='invoice' and payment_status<>'paid'`,[org,aid]);
-    const f=await query(`select coalesce(sum(total_ht),0)::numeric total from quotes where organization_id=$1 and activity_id=$2 and document_type='quote' and status<>'canceled'`,[org,aid]);
-    const r4=await query(`select count(*)::int n,min(coalesce(next_reminder_at,due_at,created_at)) first_date from quotes where organization_id=$1 and activity_id=$2 and document_type='invoice' and payment_status<>'paid' and reminder_count=3`,[org,aid]);
     const historyMonths=Math.min(120,Math.max(1,Number((r.query as any)?.forecastMonths||6)));
-    const historical=(await query(`
+    const [u,f,r4,historicalResult,warrResult,appointmentsResult,subResult]=await Promise.all([
+      query(`select count(*)::int n,coalesce(sum(greatest(0,total_ttc-coalesce(amount_paid,0))),0)::numeric total,min(coalesce(due_at,created_at)) first_date from quotes where organization_id=$1 and activity_id=$2 and document_type='invoice' and payment_status<>'paid'`,[org,aid]),
+      query(`select coalesce(sum(total_ht),0)::numeric total from quotes where organization_id=$1 and activity_id=$2 and document_type='quote' and status<>'canceled'`,[org,aid]),
+      query(`select count(*)::int n,min(coalesce(next_reminder_at,due_at,created_at)) first_date from quotes where organization_id=$1 and activity_id=$2 and document_type='invoice' and payment_status<>'paid' and reminder_count=3`,[org,aid]),
+      query(`
       select (
         coalesce((select sum(p.amount/nullif(1+q.vat_rate/100,0))
           from invoice_payments p join quotes q on q.id=p.quote_id
@@ -1117,7 +1121,12 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
         + coalesce((select sum(a.amount) from accounting_entries a
           where a.organization_id=$1 and a.activity_id=$2 and a.entry_type='sav'
             and a.entry_date>=current_date-($3||' months')::interval),0)
-      )::numeric total`,[org,aid,historyMonths])).rows[0];
+      )::numeric total`,[org,aid,historyMonths]),
+      query(`select count(*)::int n,min(ends_at) next_end from warranties where organization_id=$1 and ends_at>now()`,[org]),
+      query(`select title,starts_at,client_id from appointments where organization_id=$1 and activity_id=$2 and starts_at>now() order by starts_at asc limit 5`,[org,aid]),
+      query('select trial_ends_at,current_period_end from subscriptions where organization_id=$1',[org])
+    ]);
+    const historical=historicalResult.rows[0];
     const historicalAverage=Number(historical?.total||0)/Math.max(1,historyMonths);
     const open=Number(f.rows[0]?.total||0);
     const nextMonth=open;
@@ -1128,11 +1137,11 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     const yearToDateHt=yearAccounting.reduce((sum,m)=>sum+Number(m.revenueHt||0),0);
     const remainingMonths=Math.max(0,11-currentDate.getMonth());
     const forecast={month:monthHt,monthHt,month1:nextMonth,months3:monthHt+historicalAverage*2+open,months6:monthHt+historicalAverage*5+open,year:yearToDateHt+historicalAverage*remainingMonths+open,monthlyAverage:historicalAverage,historyMonths,method:`Prévision en HT : encaissements historiques HT moyens, devis ouverts HT et SAV financiers déduits. Les devis annulés sont exclus. L’année combine le réalisé depuis janvier et les mois restants estimés.`};
-    const warr=(await query(`select count(*)::int n,min(ends_at) next_end from warranties where organization_id=$1 and ends_at>now()`,[org])).rows[0];
-    const appointments=(await query(`select title,starts_at,client_id from appointments where organization_id=$1 and activity_id=$2 and starts_at>now() order by starts_at asc limit 5`,[org,aid])).rows;
+    const warr=warrResult.rows[0];
+    const appointments=appointmentsResult.rows;
+    const sub=subResult.rows[0]||null;
     const clientIds=appointments.map((a:any)=>a.client_id).filter(Boolean);
     const clientsById=new Map<string,string>();
-    const sub=(await query('select trial_ends_at,current_period_end from subscriptions where organization_id=$1',[org])).rows[0]||null;
     if(clientIds.length){
       const cr=await query(`select id,name from clients where organization_id=$1 and id=any($2::uuid[])`,[org,clientIds]);
       for(const c of cr.rows)clientsById.set(c.id,c.name);
