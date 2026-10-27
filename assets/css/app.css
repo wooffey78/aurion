@@ -483,3 +483,14 @@ button:focus:not(:focus-visible),a:focus:not(:focus-visible){outline:none}
 @media(max-width:1000px){.catalog-category-grid{grid-template-columns:1fr}.catalog-overview-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:700px){.catalog-page-head{display:grid;align-items:stretch}.catalog-header-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.catalog-header-actions>*{width:100%;text-align:center}.catalog-control-row{grid-template-columns:1fr}.catalog-overview-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.catalog-detail-list{grid-template-columns:1fr}.catalog-detail-row:nth-child(1){grid-column:auto}.catalog-category-header{padding:14px}.catalog-category-tools{padding:10px 14px}.catalog-items{padding:10px}.catalog-item-actions .btn{flex:1 1 auto}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+.auth-google-button,.auth-passkey-button{width:100%;justify-content:center}
+.auth-method-note{text-align:center;margin:-4px 0 0}
+.account-passkeys{border-top:1px solid var(--line);padding-top:16px}
+.account-passkeys h3{margin:0;font-size:1rem}
+.account-passkeys .section-title{align-items:flex-start;gap:14px}
+.passkey-list{display:grid;gap:8px}
+.passkey-row{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#1c2327}
+.passkey-row>div{display:grid;gap:3px;min-width:0}
+.passkey-row small{color:var(--muted);overflow-wrap:anywhere}
+@media(max-width:560px){.account-passkeys .section-title{display:grid}.passkey-row .btn{width:100%}}
