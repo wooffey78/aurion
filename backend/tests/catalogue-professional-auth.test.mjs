@@ -18,7 +18,7 @@ test('catalogue métier expose la consultation, la recherche et les opérations 
   assert.match(catalog, /known\[q\.type\]\.has\(key\)/);
   assert.match(css, /\.catalog-category-grid\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(css, /@media\(max-width:700px\).*catalog-control-row/s);
-  for (const legacyAccent of ['#31e6a1','#55cfff','#3a6fd8','#1a9fd0','#5b8cff','#7c3aed','#60a5fa']) assert.ok(!css.toLowerCase().includes(legacyAccent), `accent hérité trop saturé : ${legacyAccent}`);
+  for (const legacyAccent of ['#31e6a1','#55cfff','#3a6fd8','#1a9fd0','#5b8cff','#7c3aed','#60a5fa','rgba(70,180,255','rgba(164,92,255']) assert.ok(!css.toLowerCase().includes(legacyAccent), `accent hérité trop saturé : ${legacyAccent}`);
 });
 
 test('import catalogue est additif, borné, scoped activité et ne remplace pas les données par un fichier arbitraire', () => {
