@@ -9,11 +9,12 @@ const summary = routes.slice(routes.indexOf("app.get('/dashboard/summary'"), rou
 
 test('dashboard summary executes independent reads concurrently without changing response fields', () => {
   assert.match(summary, /const \[aid,t\]=await Promise\.all\(/);
-  assert.match(summary, /const \[u,f,r4,historicalResult,warrResult,appointmentsResult,subResult\]=await Promise\.all\(/);
+  assert.match(summary, /const \[u,f,r4,historicalResult,warrResult,appointmentsResult,subResult,yearAccounting\]=await Promise\.all\(/);
+  assert.match(summary, /monthlyAccounting\(org,aid,accountingYear\)/);
+  assert.doesNotMatch(summary, /const yearAccounting=await monthlyAccounting/);
   for (const field of ['tickets:', 'unpaidCount:', 'unpaidTotal:', 'forecastEntries:', 'fourthReminderCount:', 'forecast,', 'subscription:sub', 'warranty:', 'trialDaysLeft,journal']) {
     assert.ok(summary.includes(field), `dashboard summary response contract must retain ${field}`);
   }
-  assert.match(summary, /await monthlyAccounting\(org,aid,accountingYear\)/);
 });
 
 test('monthly accounting executes independent invoice and accounting-entry queries concurrently', () => {

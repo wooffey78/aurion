@@ -11,3 +11,5 @@
 - Relever au moins 20 échantillons par scénario de performance et comparer médiane/p95 avec la référence.
 - Vérifier le déploiement `aurion-web` sur le SHA final, le health check et les routes principales.
 - Réaliser les parcours navigateur, la recette finale de facturation/PDF, la vérification sauvegarde/restauration et la validation sécurité/juridique/accessibilité.
+
+- Inclure le calcul comptable mensuel dans le même groupe concurrent que les lectures indépendantes du résumé, afin d'éviter une attente séquentielle superflue.
