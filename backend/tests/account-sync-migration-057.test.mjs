@@ -53,6 +53,11 @@ test('057 : INSERT sur les tables user_id et DELETE organisation', { skip: !inte
     await c.query('INSERT INTO webauthn_credentials(id,user_id,credential_id,public_key) VALUES($1,$2,$3,$4)', [credential,user,Buffer.from('credential-057'),Buffer.from('public-key-057')]);
     await c.query('DELETE FROM organizations WHERE id=$1', [org]);
     assert.equal(Number((await c.query('SELECT count(*)::int n FROM organizations WHERE id=$1',[org])).rows[0].n), 0);
+    // RGPD/account deletion: clean explicit RESTRICT references, then delete the account.
+    await c.query('DELETE FROM vip_guest_accounts WHERE user_id=$1', [guest]);
+    await c.query('DELETE FROM admin_guest_invites WHERE id=$1', [invite]);
+    await c.query('DELETE FROM users WHERE id=$1', [user]);
+    assert.equal(Number((await c.query('SELECT count(*)::int n FROM users WHERE id=$1',[user])).rows[0].n), 0);
     await c.query('ROLLBACK');
   } catch (error) {
     await c.query('ROLLBACK').catch(()=>{});
