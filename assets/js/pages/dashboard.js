@@ -32,6 +32,11 @@ const EXTRAS={home:['accounting','timeMetrics','dashboardSummary'],settings:['co
 async function load(extras=null){
   const safe=(p,d)=>Promise.resolve(p).catch(x=>{if(x?.status===401)throw x;return d});
   const want=k=>extras===null||extras.includes(k);
+  const supplierRequest=api.suppliers().then(rows=>{S.suppliersError=null;return rows}).catch(x=>{
+    if(x?.status===401)throw x;
+    S.suppliersError=x?.message||'Impossible de charger les fournisseurs. Vérifiez la connexion puis réessayez.';
+    return [];
+  });
   // Toujours synchroniser l'organisation AVANT les activités : la détection et le remplissage
   // automatique de l'entreprise doivent être visibles immédiatement dans l'activité principale
   // et dans toutes les sections qui consomment ces données.
@@ -39,7 +44,7 @@ async function load(extras=null){
   const activities=await safe(api.activities(),[]);
   if((!getActiveActivity()||!activities.some(a=>a.id===getActiveActivity()))&&activities[0])setActiveActivity(activities[0].id);
   const [clients,quotes,appointments,suppliers,parts,interventions,supplies,warranties,policies,mail,templates,accounting,treasury,sav]=await Promise.all([
-    safe(api.clients(),[]),safe(api.quotes(),[]),safe(api.appointments(),[]),safe(api.suppliers(),[]),safe(api.parts(),[]),safe(api.interventions(),[]),safe(api.supplies(),[]),safe(api.warranties(),[]),safe(api.warrantyPolicies(),[]),safe(api.mailStatus(),{configured:false}),
+    safe(api.clients(),[]),safe(api.quotes(),[]),safe(api.appointments(),[]),supplierRequest,safe(api.parts(),[]),safe(api.interventions(),[]),safe(api.supplies(),[]),safe(api.warranties(),[]),safe(api.warrantyPolicies(),[]),safe(api.mailStatus(),{configured:false}),
     want('templates')?safe(api.documentTemplates(),[]):S.templates,want('accounting')?safe(api.accounting(S.accountingYear||new Date().getFullYear()),{}):S.accounting,want('treasury')?safe(api.treasury(),{}):S.treasury,safe(api.sav(),[])]);
   Object.assign(S,{company,activities,clients,quotes,appointments,templates,suppliers,parts,interventions,supplies,warranties,policies,accounting,treasury,mail,sav}); try{S.isPlatformAdmin=!!(await api.adminMe()).admin}catch{}
   if(want('timeMetrics')) S.timeMetrics=await safe(api.timeMetrics(),null);
@@ -63,9 +68,16 @@ function show(id){
   const nav=NAV.filter(([k])=>!hidden.has(k)).map(([k,l,i])=>`<button type="button" data-view="${k}" class="${k===id?'active':''}" title="${l}"><i>${i}</i>${k==='catalog'?'Catalogue métier':l}</button>`).join('');
   const navRoot=document.querySelector('.nav');
   navRoot.innerHTML=nav+(S.isPlatformAdmin?`<button type="button" data-view="admin" class="${id==='admin'?'active':''}" title="Administration" aria-label="Administration"><i>⚙</i>Administration</button>`:'');
-  navRoot.onclick=ev=>{const b=ev.target.closest('button[data-view]');if(!b||!navRoot.contains(b))return;if(b.dataset.view==='quote'){S.editing=null;S.quoteDraft=null;S.prefillClient=null;S.documentType='quote'}show(b.dataset.view)};
-  const supplierNav=navRoot.querySelector('button[data-view=\"suppliers\"]');
-  if(supplierNav){supplierNav.onclick=ev=>{ev.preventDefault();ev.stopPropagation();hooks.refresh('suppliers').catch(x=>toast(x.message,'error'))};}
+  navRoot.onclick=ev=>{
+    const b=ev.target.closest('button[data-view]');
+    if(!b||!navRoot.contains(b))return;
+    if(b.dataset.view==='quote'){S.editing=null;S.quoteDraft=null;S.prefillClient=null;S.documentType='quote'}
+    if(b.dataset.view==='suppliers'){
+      hooks.refresh('suppliers').catch(x=>toast(x.message,'error'));
+      return;
+    }
+    show(b.dataset.view);
+  };
   const view=document.querySelector('#view');
   view.innerHTML=VIEWS[id].view();
   VIEWS[id].bind?.();

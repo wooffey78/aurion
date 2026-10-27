@@ -3,7 +3,7 @@ import{api,getActiveActivity}from'../../core/api.js';
 import{escapeHtml as e,formatMoney as money,toast}from'../../core/ui.js';
 export{e,money,toast};
 
-export const S={view:'home',company:null,activities:[],modules:[],clients:[],quotes:[],appointments:[],documents:[],templates:[],suppliers:[],parts:[],sav:[],interventions:[],devices:[],warranties:[],policies:[],accounting:null,treasury:null,profile:null,mail:null,timeMetrics:null,dashboardCounters:{tickets:0,unpaidCount:0,unpaidTotal:0,forecastEntries:0},editing:null,documentType:'quote',docFilter:'all',isPlatformAdmin:false,quoteDraft:null};
+export const S={view:'home',company:null,activities:[],modules:[],clients:[],quotes:[],appointments:[],documents:[],templates:[],suppliers:[],suppliersError:null,parts:[],sav:[],interventions:[],devices:[],warranties:[],policies:[],accounting:null,treasury:null,profile:null,mail:null,timeMetrics:null,dashboardCounters:{tickets:0,unpaidCount:0,unpaidTotal:0,forecastEntries:0},editing:null,documentType:'quote',docFilter:'all',isPlatformAdmin:false,quoteDraft:null};
 export const hooks={refresh:async()=>{},show:()=>{}};
 export const active=()=>S.activities.find(a=>a.id===getActiveActivity())||S.activities[0];
 export const prof=()=>S.profile||{};

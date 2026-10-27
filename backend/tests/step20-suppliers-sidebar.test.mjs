@@ -9,10 +9,18 @@ const root = path.resolve(here, '..', '..');
 const dashboard = fs.readFileSync(path.join(root, 'assets/js/pages/dashboard.js'), 'utf8');
 const suppliers = fs.readFileSync(path.join(root, 'assets/js/pages/dash/suppliers.js'), 'utf8');
 
-test('Etape 20: la sidebar expose un accès direct à Fournisseurs', () => {
+test('Etape 20: la sidebar expose un accès direct et fiable à Fournisseurs', () => {
   assert.match(dashboard, /\['suppliers','Fournisseurs','▱'\]/);
-  assert.match(dashboard, /data-view=\\\"suppliers\\\"/);
-  assert.match(dashboard, /supplierNav\.onclick=ev=>\{ev\.preventDefault\(\);ev\.stopPropagation\(\);hooks\.refresh\('suppliers'\)/);
   assert.match(dashboard, /VIEWS\s*=\s*\{[^}]*suppliers/s);
+  assert.match(dashboard, /if\(b\.dataset\.view==='suppliers'\)/);
+  assert.match(dashboard, /hooks\.refresh\('suppliers'\)\.catch/);
+  assert.doesNotMatch(dashboard, /const supplierNav=/);
   assert.match(suppliers, /export const suppliers\s*=\s*\{/);
+});
+
+test('Fournisseurs affiche une erreur de chargement et permet de réessayer', () => {
+  assert.match(dashboard, /S\.suppliersError=x\?\.message/);
+  assert.match(suppliers, /class="error supplier-load-error" role="alert"/);
+  assert.match(suppliers, /id="retry-suppliers"/);
+  assert.match(suppliers, /hooks\.refresh\('suppliers'\)/);
 });
