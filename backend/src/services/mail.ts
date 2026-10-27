@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type SendMailOptions } from 'nodemailer';
 import { query } from '../db.js';
 import { AurionError } from './errors.js';
 import { encryptSecret, decryptSecret } from './secrets.js';
@@ -69,7 +69,7 @@ export async function verifySettings(s: MailSettings) {
   try { await t.verify(); } catch (e) { throw mapMailError(e, s); } finally { t.close(); }
 }
 
-export async function sendWithSettings(s: MailSettings, mail: nodemailer.SendMailOptions) {
+export async function sendWithSettings(s: MailSettings, mail: SendMailOptions) {
   const t = makeTransport(s);
   try {
     return await t.sendMail({ from: { name: s.fromName || '', address: s.email }, replyTo: s.email, ...mail });

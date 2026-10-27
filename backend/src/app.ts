@@ -38,9 +38,9 @@ export async function buildApp() {
     allowedPath: (p: string) => p === "/" || /^\/(index\.html|assets\/|branding\/)/.test(p) || /^\/(sw\.js|manifest\.webmanifest)$/.test(p),
     setHeaders: (res, filePath) => {
       if (/\.(?:html|js|mjs|css|webmanifest)$/i.test(filePath)) {
-        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-        res.setHeader("Pragma", "no-cache");
-        res.setHeader("Expires", "0");
+        res.header("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.header("Pragma", "no-cache");
+        res.header("Expires", "0");
       }
     },
   });
@@ -54,7 +54,7 @@ export async function buildApp() {
     request.log.error({ err: error }, "request failed");
     if (error instanceof AurionError) return reply.code(error.statusCode).send({ error: error.code, message: error.message });
     if ((error as any).statusCode === 413) return reply.code(413).send({ error: "FILE_TOO_LARGE" });
-    if (error.validation) {
+    if (error && typeof error === "object" && Boolean((error as { validation?: unknown }).validation)) {
       return reply.code(400).send({ error: "INVALID_REQUEST" });
     }
     return reply.code(500).send({ error: "INTERNAL_ERROR" });
