@@ -19,7 +19,7 @@ test('057 remplace les accès record.id fragiles et protège les suppressions en
   assert.match(whitelist, /DROP TRIGGER IF EXISTS/);
   assert.match(whitelist, /'quotes','sav_cases'/);
   assert.match(whitelist, /'organization_members','user_drafts'/);
-  assert.match(whitelist, /billing_webhook_events/);
+  assert.doesNotMatch(whitelist, /billing_webhook_events|subscription_events|notification_jobs/);
 });
 
 test('057 : INSERT sur les tables user_id et DELETE organisation', { skip: !integration }, async () => {
