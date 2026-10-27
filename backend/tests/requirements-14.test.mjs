@@ -10,8 +10,9 @@ test('biometric sign-in is offered only on supported devices and is user-initiat
   assert.doesNotMatch(auth, /setTimeout\(\(\)=>biometricLogin\(\)\.catch\(\(\)=>\{\}\)/);
 });
 
-test('iPad desktop user agent remains eligible when it exposes touch points', () => {
-  assert.match(auth, /maxTouchPoints/);
+test('passkeys are offered on secure desktop and mobile browsers supporting WebAuthn', () => {
+  assert.match(auth, /window\.isSecureContext&&window\.PublicKeyCredential&&navigator\.credentials\?\.get&&navigator\.credentials\?\.create/);
+  assert.doesNotMatch(auth, /Android|iPhone|iPad|iPod/);
 });
 
 test('biometric flow keeps password fallback and only registers after a deliberate choice', () => {
