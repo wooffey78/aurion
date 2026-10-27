@@ -394,6 +394,49 @@ if (!enabled) {
     });
     assert.equal(crossTenantActivity.statusCode, 400, crossTenantActivity.body);
 
+    const invalidIntervention = await app.inject({
+      method: 'POST', url: '/interventions', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: 'Prestation invalide', durationMinutes: 'longtemps' },
+    });
+    assert.equal(invalidIntervention.statusCode, 400, invalidIntervention.body);
+    const validIntervention = await app.inject({
+      method: 'POST', url: '/interventions', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: 'Prestation test', durationMinutes: '45', defaultPrice: '75.50' },
+    });
+    assert.equal(validIntervention.statusCode, 201, validIntervention.body);
+    const foreignClientForDevice = await app.inject({
+      method: 'POST', url: '/clients', headers: { authorization: `Bearer ${other.token}` },
+      payload: { name: 'Client étranger appareil' },
+    });
+    assert.equal(foreignClientForDevice.statusCode, 201, foreignClientForDevice.body);
+    const crossTenantDevice = await app.inject({
+      method: 'POST', url: '/devices', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { clientId: foreignClientForDevice.json().id, type: 'smartphone' },
+    });
+    assert.equal(crossTenantDevice.statusCode, 400, crossTenantDevice.body);
+
+    const invalidDevice = await app.inject({
+      method: 'POST', url: '/devices', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { clientId: 'not-a-uuid', type: 'smartphone' },
+    });
+    assert.equal(invalidDevice.statusCode, 400, invalidDevice.body);
+    const invalidWarranty = await app.inject({
+      method: 'POST', url: '/warranty-policies', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: 'Garantie invalide', durationMonths: 'beaucoup', scopeType: 'mauvais-scope' },
+    });
+    assert.equal(invalidWarranty.statusCode, 400, invalidWarranty.body);
+    const validWarranty = await app.inject({
+      method: 'POST', url: '/warranty-policies', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: 'Garantie test', durationMonths: '24', scopeType: 'parts' },
+    });
+    assert.equal(validWarranty.statusCode, 201, validWarranty.body);
+    const foreignWarrantyPatch = await app.inject({
+      method: 'PATCH', url: `/warranty-policies/${validWarranty.json().id}`,
+      headers: { authorization: `Bearer ${other.token}` },
+      payload: { durationMonths: '36' },
+    });
+    assert.equal(foreignWarrantyPatch.statusCode, 404, foreignWarrantyPatch.body);
+
     const invalidPart = await app.inject({
       method: 'POST', url: '/parts', headers: { authorization: `Bearer ${owner.token}` },
       payload: { name: 'Pièce invalide', stock: 'beaucoup' },

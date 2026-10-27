@@ -136,6 +136,35 @@ const activityCreateInputSchema = z.object({
 }).passthrough();
 const activityPatchInputSchema = activityCreateInputSchema.partial();
 const activityParamsSchema = z.object({ id: z.string().uuid() });
+const interventionCreateInputSchema = z.object({
+  activityId: optionalUuid,
+  name: z.string().trim().min(1).max(240),
+  description: z.string().max(4000).nullable().optional(),
+  durationMinutes: numericInput,
+  defaultPrice: numericInput,
+}).passthrough();
+const interventionPatchInputSchema = interventionCreateInputSchema.partial();
+const deviceCreateInputSchema = z.object({
+  activityId: optionalUuid,
+  clientId: z.string().uuid(),
+  type: z.string().trim().min(1).max(80),
+  brand: z.string().max(160).nullable().optional(),
+  model: z.string().max(160).nullable().optional(),
+  imei: z.string().max(80).nullable().optional(),
+  serialNumber: z.string().max(160).nullable().optional(),
+  notes: z.string().max(4000).nullable().optional(),
+}).passthrough();
+const devicePatchInputSchema = deviceCreateInputSchema.omit({ activityId: true, clientId: true }).partial();
+const warrantyPolicyCreateInputSchema = z.object({
+  activityId: optionalUuid,
+  name: z.string().trim().min(1).max(240),
+  scopeType: z.enum(['parts','labor','both','activity']).optional(),
+  scopeKey: z.string().max(160).nullable().optional(),
+  durationMonths: numericInput,
+}).passthrough();
+const warrantyPolicyPatchInputSchema = warrantyPolicyCreateInputSchema.omit({ activityId: true }).partial();
+
+
 
 const quoteCreateInputSchema = z.object({
   clientId: optionalUuid, activityId: optionalUuid, intervention: z.string().max(240).optional(),
@@ -668,17 +697,75 @@ export async function businessRoutes(app:FastifyInstance){
   });
 
 app.get('/interventions',async r=>(await query('select * from interventions where organization_id=$1 and activity_id=$2 order by name',[r.auth!.organizationId,activityId(r)])).rows);
-  app.post('/interventions',async(r,reply)=>{const b:any=r.body,aid=await ensureActivity(r,activityId(r,b));if(!aid||!b?.name?.trim())return reply.code(400).send({error:'INVALID_INPUT'});const id=crypto.randomUUID();await query('insert into interventions(id,organization_id,activity_id,name,description,default_duration_minutes,default_price) values($1,$2,$3,$4,$5,$6,$7)',[id,r.auth!.organizationId,aid,b.name.trim(),b.description||null,b.durationMinutes?Number(b.durationMinutes):null,Number(b.defaultPrice||0)]);return reply.code(201).send({id})});
-  app.patch('/interventions/:id',async(r,reply)=>{const b:any=r.body;const x=await query('update interventions set name=coalesce($1,name),description=$2,default_duration_minutes=$3,default_price=$4,updated_at=now() where id=$5 and organization_id=$6 returning *',[b.name?.trim(),b.description||null,b.durationMinutes?Number(b.durationMinutes):null,Number(b.defaultPrice||0),((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return x.rows[0]});
+  app.post('/interventions',async(r,reply)=>{
+    const parsed=interventionCreateInputSchema.safeParse(r.body||{});
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const b:any=parsed.data,aid=await ensureActivity(r,activityId(r,b));
+    if(!aid)return reply.code(400).send({error:'INVALID_INPUT'});
+    let duration:number|null=null,price=0;
+    try{
+      if(b.durationMinutes!==undefined&&b.durationMinutes!==null&&b.durationMinutes!==''){
+        const n=optionalNumber(b.durationMinutes,'Durée',1,100000);
+        if(n===null||!Number.isInteger(n))return reply.code(400).send({error:'INVALID_INPUT'});
+        duration=n;
+      }
+      price=optionalNumber(b.defaultPrice,'Prix habituel',0,1e9)??0;
+    }catch{return reply.code(400).send({error:'INVALID_INPUT'})}
+    const id=crypto.randomUUID();
+    await query('insert into interventions(id,organization_id,activity_id,name,description,default_duration_minutes,default_price) values($1,$2,$3,$4,$5,$6,$7)',[id,r.auth!.organizationId,aid,b.name.trim(),b.description||null,duration,price]);
+    return reply.code(201).send({id});
+  });
+  app.patch('/interventions/:id',async(r,reply)=>{
+    const parsed=interventionPatchInputSchema.safeParse(r.body||{});
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const params=activityParamsSchema.safeParse(r.params);
+    if(!params.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const b:any=parsed.data;
+    let duration:number|null=null,price=0;
+    try{
+      if(b.durationMinutes!==undefined&&b.durationMinutes!==null&&b.durationMinutes!==''){
+        const n=optionalNumber(b.durationMinutes,'Durée',1,100000);
+        if(n===null||!Number.isInteger(n))return reply.code(400).send({error:'INVALID_INPUT'});
+        duration=n;
+      }
+      price=b.defaultPrice===undefined?0:(optionalNumber(b.defaultPrice,'Prix habituel',0,1e9)??0);
+    }catch{return reply.code(400).send({error:'INVALID_INPUT'})}
+    const x=await query('update interventions set name=coalesce($1,name),description=$2,default_duration_minutes=$3,default_price=$4,updated_at=now() where id=$5 and organization_id=$6 returning *',[b.name?.trim(),b.description||null,duration,price,params.data.id,r.auth!.organizationId]);
+    if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
+    return x.rows[0];
+  });
   app.delete('/interventions/:id',async(r,reply)=>{const x=await query('delete from interventions where id=$1 and organization_id=$2',[((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true}});
 
   app.get('/devices',async r=>(await query('select d.*,c.name client_name from devices d join clients c on c.id=d.client_id where d.organization_id=$1 and d.activity_id=$2 order by d.created_at desc',[r.auth!.organizationId,activityId(r)])).rows);
-  app.post('/devices',async(r,reply)=>{const b:any=r.body,aid=await ensureActivity(r,activityId(r,b));if(!aid||!b?.clientId||!b?.type)return reply.code(400).send({error:'INVALID_INPUT'});const c=await query('select id from clients where id=$1 and organization_id=$2 and activity_id=$3',[b.clientId,r.auth!.organizationId,aid]);if(!c.rowCount)return reply.code(400).send({error:'INVALID_INPUT'});const id=crypto.randomUUID();await query('insert into devices(id,organization_id,activity_id,client_id,type,brand,model,imei,serial_number,notes) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[id,r.auth!.organizationId,aid,b.clientId,b.type,b.brand||null,b.model||null,b.imei||null,b.serialNumber||null,b.notes||null]);return reply.code(201).send({id})});
+  app.post('/devices',async(r,reply)=>{
+    const parsed=deviceCreateInputSchema.safeParse(r.body||{});
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const b:any=parsed.data,aid=await ensureActivity(r,activityId(r,b));
+    if(!aid)return reply.code(400).send({error:'INVALID_INPUT'});
+    const client=await query('select id from clients where id=$1 and organization_id=$2 and activity_id=$3',[b.clientId,r.auth!.organizationId,aid]);
+    if(!client.rowCount)return reply.code(400).send({error:'INVALID_CLIENT'});
+    const id=crypto.randomUUID();
+    await query('insert into devices(id,organization_id,activity_id,client_id,type,brand,model,imei,serial_number,notes) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[id,r.auth!.organizationId,aid,b.clientId,b.type.trim(),b.brand||null,b.model||null,b.imei||null,b.serialNumber||null,b.notes||null]);
+    return reply.code(201).send({id});
+  });
   app.get('/devices/search',async r=>{const q=String((r.query as any)?.q||'').trim();return (await query(`select d.*,c.name client_name from devices d join clients c on c.id=d.client_id where d.organization_id=$1 and d.activity_id=$2 and ($3='' or d.imei ilike '%'||$3||'%' or c.name ilike '%'||$3||'%') order by d.created_at desc`,[r.auth!.organizationId,activityId(r),q])).rows});
 
   app.get('/warranties',async r=>(await query('select w.*,d.imei,c.name client_name from warranties w left join devices d on d.id=w.device_id left join clients c on c.id=w.client_id where w.organization_id=$1 and w.activity_id=$2 order by w.ends_at desc',[r.auth!.organizationId,activityId(r)])).rows);
   app.get('/warranty-policies',async r=>(await query('select * from warranty_policies where organization_id=$1 and activity_id=$2 order by name',[r.auth!.organizationId,activityId(r)])).rows);
-  app.post('/warranty-policies',async(r,reply)=>{const b:any=r.body,aid=await ensureActivity(r,activityId(r,b));if(!aid||!b?.name)return reply.code(400).send({error:'INVALID_INPUT'});const id=crypto.randomUUID();await query('insert into warranty_policies(id,organization_id,activity_id,name,scope_type,scope_key,duration_months) values($1,$2,$3,$4,$5,$6,$7)',[id,r.auth!.organizationId,aid,b.name,b.scopeType||'activity',b.scopeKey||null,Number(b.durationMonths||12)]);return reply.code(201).send({id})});
+  app.post('/warranty-policies',async(r,reply)=>{
+    const parsed=warrantyPolicyCreateInputSchema.safeParse(r.body||{});
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const b:any=parsed.data,aid=await ensureActivity(r,activityId(r,b));
+    if(!aid)return reply.code(400).send({error:'INVALID_INPUT'});
+    let duration=12;
+    try{
+      duration=optionalNumber(b.durationMonths,'Durée de garantie',1,1200)??12;
+      if(!Number.isInteger(duration))return reply.code(400).send({error:'INVALID_INPUT'});
+    }catch{return reply.code(400).send({error:'INVALID_INPUT'})}
+    const id=crypto.randomUUID();
+    await query('insert into warranty_policies(id,organization_id,activity_id,name,scope_type,scope_key,duration_months) values($1,$2,$3,$4,$5,$6,$7)',[id,r.auth!.organizationId,aid,b.name.trim(),b.scopeType||'activity',b.scopeKey||null,duration]);
+    return reply.code(201).send({id});
+  });
 
   app.post('/pricing/suggestions',async(r,reply)=>{const b:any=r.body||{},org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r,b));if(!aid)return {servicePrice:null,partPrices:{},recommendedPartSignatures:[],relevantParts:[]};const norm=(v:any)=>String(v||'').trim().toLowerCase().replace(/\s+/g,' ');const sig=norm(b.service||b.intervention);const service=(await query(`select price_ttc from document_price_memory where organization_id=$1 and activity_id=$2 and kind='service' and signature=$3 order by use_count desc,last_used_at desc limit 1`,[org,aid,sig])).rows[0];const partPrices:any={};for(const x of Array.isArray(b.parts)?b.parts:[]){const ps=norm([x.name,x.model,x.variant,x.color,x.quality,x.reference].join('|'));const row=(await query(`select price_ttc from document_price_memory where organization_id=$1 and activity_id=$2 and kind='part' and signature=$3 order by use_count desc,last_used_at desc limit 1`,[org,aid,ps])).rows[0];if(row)partPrices[x.id||ps]=Number(row.price_ttc)}const patterns=(await query(`select part_signature from recommendation_patterns where organization_id=$1 and service_signature=$2 and use_count>=2 order by use_count desc,last_used_at desc limit 30`,[org,sig])).rows.map(x=>x.part_signature);const relevantRows=(await query(`select p.*,coalesce((select max(rp.use_count) from recommendation_patterns rp where rp.organization_id=$1 and rp.service_signature=$2 and rp.part_signature=lower(regexp_replace(trim(concat_ws('|',p.name,p.model,p.variant,p.color,p.quality,p.reference)),'\\s+',' ','g'))),0) learned_count from parts p where p.organization_id=$1 and p.activity_id=$3 order by learned_count desc,p.updated_at desc limit 100`,[org,sig,aid])).rows;return {servicePrice:service?Number(service.price_ttc):null,partPrices,recommendedPartSignatures:patterns,relevantParts:relevantRows};});
   app.post('/pricing/learn',async(r,reply)=>{const b:any=r.body||{},org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r,b));if(!aid)return {ok:true};const norm=(v:any)=>String(v||'').trim().toLowerCase().replace(/\s+/g,' ');const service=norm(b.service||b.intervention);if(service&&Number(b.servicePrice)>=0)await query(`insert into document_price_memory(organization_id,activity_id,kind,signature,price_ttc) values($1,$2,'service',$3,$4) on conflict(organization_id,activity_id,kind,signature) do update set price_ttc=excluded.price_ttc,last_used_at=now(),use_count=document_price_memory.use_count+1`,[org,aid,service,Number(b.servicePrice||0)]);for(const x of Array.isArray(b.parts)?b.parts:[]){const ps=norm([x.name,x.model,x.variant,x.color,x.quality,x.reference].join('|'));if(!ps||Number(x.price)<0)continue;await query(`insert into document_price_memory(organization_id,activity_id,kind,signature,price_ttc) values($1,$2,'part',$3,$4) on conflict(organization_id,activity_id,kind,signature) do update set price_ttc=excluded.price_ttc,last_used_at=now(),use_count=document_price_memory.use_count+1`,[org,aid,ps,Number(x.price||0)]);if(service)await query(`insert into recommendation_patterns(organization_id,activity_id,service_signature,part_signature) values($1,$2,$3,$4) on conflict(organization_id,activity_id,service_signature,part_signature) do update set use_count=recommendation_patterns.use_count+1,last_used_at=now()`,[org,aid,service,ps]);}return {ok:true};});
@@ -970,9 +1057,32 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
   });
 
   app.delete('/parts/:id/prices/:supplierId',async(r,reply)=>{const p:any=r.params;const x=await query('delete from supplier_parts sp using parts pt where sp.part_id=pt.id and pt.organization_id=$1 and sp.part_id=$2 and sp.supplier_id=$3',[r.auth!.organizationId,p.id,p.supplierId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true}});
-  app.patch('/devices/:id',async(r,reply)=>{const b:any=r.body;const x=await query('update devices set type=coalesce($1,type),brand=$2,model=$3,imei=$4,serial_number=$5,notes=$6,updated_at=now() where id=$7 and organization_id=$8 returning *',[b.type||null,b.brand||null,b.model||null,b.imei||null,b.serialNumber||null,b.notes||null,((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return x.rows[0]});
+  app.patch('/devices/:id',async(r,reply)=>{
+    const parsed=devicePatchInputSchema.safeParse(r.body||{});
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const params=activityParamsSchema.safeParse(r.params);
+    if(!params.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const b:any=parsed.data;
+    const x=await query('update devices set type=coalesce($1,type),brand=$2,model=$3,imei=$4,serial_number=$5,notes=$6,updated_at=now() where id=$7 and organization_id=$8 returning *',[b.type?.trim()||null,b.brand||null,b.model||null,b.imei||null,b.serialNumber||null,b.notes||null,params.data.id,r.auth!.organizationId]);
+    if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
+    return x.rows[0];
+  });
   app.delete('/devices/:id',async(r,reply)=>{const x=await query('delete from devices where id=$1 and organization_id=$2',[((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true}});
-  app.patch('/warranty-policies/:id',async(r,reply)=>{const b:any=r.body;const x=await query('update warranty_policies set name=coalesce($1,name),duration_months=coalesce($2,duration_months),scope_type=coalesce($3,scope_type),updated_at=now() where id=$4 and organization_id=$5 returning *',[b.name?.trim()||null,b.durationMonths?Number(b.durationMonths):null,b.scopeType?String(b.scopeType):null,((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return x.rows[0]});
+  app.patch('/warranty-policies/:id',async(r,reply)=>{
+    const parsed=warrantyPolicyPatchInputSchema.safeParse(r.body||{});
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const params=activityParamsSchema.safeParse(r.params);
+    if(!params.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const b:any=parsed.data;
+    let duration:number|null=null;
+    try{
+      duration=b.durationMonths===undefined?null:(optionalNumber(b.durationMonths,'Durée de garantie',1,1200)??null);
+      if(duration!==null&&!Number.isInteger(duration))return reply.code(400).send({error:'INVALID_INPUT'});
+    }catch{return reply.code(400).send({error:'INVALID_INPUT'})}
+    const x=await query('update warranty_policies set name=coalesce($1,name),duration_months=coalesce($2,duration_months),scope_type=coalesce($3,scope_type),updated_at=now() where id=$4 and organization_id=$5 returning *',[b.name?.trim()||null,duration,b.scopeType||null,params.data.id,r.auth!.organizationId]);
+    if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
+    return x.rows[0];
+  });
   app.delete('/warranty-policies/:id',async(r,reply)=>{const x=await query('delete from warranty_policies where id=$1 and organization_id=$2',[((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true}});
   app.get('/sav',async r=>{const org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));if(!aid)return [];return (await query(`select s.*,c.name client_name,q.number invoice_number from sav_cases s left join clients c on c.id=s.client_id left join quotes q on q.id=s.invoice_id where s.organization_id=$1 and s.activity_id=$2 order by s.created_at desc`,[org,aid])).rows;});
   app.post('/sav',async(r,reply)=>{const b:any=r.body||{},org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));if(!aid||!b.clientId||!b.invoiceId)return reply.code(400).send({error:'INVALID_INPUT'});const inv=(await query("select id,client_id,activity_id,document_type,sent_at from quotes where id=$1 and organization_id=$2 and document_type='invoice'",[b.invoiceId,org])).rows[0];if(!inv||inv.client_id!==b.clientId||inv.activity_id!==aid||!inv.sent_at)return reply.code(400).send({error:'SAV_UNAVAILABLE',message:'Le SAV est disponible après l’envoi de la facture et pendant la garantie.'});const warranty=(await query("select id from warranties where quote_id=$1 and organization_id=$2 and ends_at>now() limit 1",[b.invoiceId,org])).rows[0];if(!warranty)return reply.code(400).send({error:'SAV_UNAVAILABLE',message:'La garantie associée à cette facture est terminée.'});const savType=b.savType==='free_intervention'?'free_intervention':'financial';const items=Array.isArray(b.items)?b.items.map((x:any)=>({label:String(x.label||'').trim(),quantity:Math.max(0,Number(x.quantity||0)),unitPrice:Math.max(0,Number(x.unitPrice||0))})).filter((x:any)=>x.label&&x.quantity>0):[];const positive=items.reduce((n:any,x:any)=>n+x.quantity*x.unitPrice,0);const amount=savType==='financial'?-Math.round(positive*100)/100:0;const interventionCostHt=savType==='free_intervention'?Math.max(0,Number(b.interventionCostHt||0)):0;if(amount>0.005)return reply.code(400).send({error:'INVALID_INPUT'});const id=crypto.randomUUID();await query('insert into sav_cases(id,organization_id,activity_id,client_id,invoice_id,amount_ttc,items,note,sav_type,intervention_cost_ht) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[id,org,aid,b.clientId,b.invoiceId,amount,JSON.stringify(items),b.note?String(b.note).slice(0,2000):null,savType,interventionCostHt]);await query('insert into accounting_entries(organization_id,activity_id,entry_type,amount,entry_date,source_id,label) values($1::uuid,$2::uuid,$3::varchar(30),$4::numeric,current_date,$5::uuid,$6::varchar(240))',[org,aid,'sav',amount,id,`SAV facture ${inv.id}`]);return reply.code(201).send({id,amountTtc:amount});});
