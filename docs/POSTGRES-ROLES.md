@@ -27,3 +27,19 @@ La migration 055 crée un index unique partiel. Si elle échoue avec des session
 2. Pour chaque groupe, comparer la session Stripe, l'organisation, le montant, la référence et le statut. Conserver la demande correspondant à la session réelle et déjà payée, s'il y en a une.
 3. Marquer les demandes obsolètes en `canceled` plutôt que de supprimer une trace comptable ; mettre `provider_session_id = NULL` uniquement sur les lignes confirmées comme orphelines et non payées.
 4. Vérifier que la requête de doublons ne retourne plus de ligne, puis relancer le migrateur. Ne jamais modifier le fichier de migration 055 déjà appliqué sur un autre environnement.
+
+## Rotation des secrets de messagerie
+
+Après avoir configuré la nouvelle clé comme clé principale et conservé l'ancienne dans `AURION_ENCRYPTION_KEY_PREVIOUS` (avec sa version), lancer d'abord une simulation :
+
+```sh
+npm --prefix backend run secrets:rotate
+```
+
+La simulation déchiffre chaque secret, vérifie qu'il est lisible et valide le nouveau ciphertext sans écrire en base. Si elle réussit, appliquer la rotation :
+
+```sh
+npm --prefix backend run secrets:rotate -- --apply
+```
+
+Le script verrouille les lignes, travaille dans une transaction et annule tout si un secret est illisible. Il ne journalise jamais les secrets en clair. Garder l'ancienne clé jusqu'à ce que la rotation soit appliquée et vérifiée sur tous les environnements.
