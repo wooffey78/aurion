@@ -10,6 +10,11 @@ const dir = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'migrations')
 const log = (m: string) => console.log(`[AURION MIGRATE] ${m}`);
 
 const migrationUrl = process.env.AURION_MIGRATION_DATABASE_URL?.trim();
+const runtimeRole = process.env.AURION_RUNTIME_DB_ROLE?.trim();
+const quoteIdentifier = (value: string) => `\"${value.replace(/\"/g, '\"\"')}\"`;
+if (process.env.NODE_ENV === 'production' && !runtimeRole) {
+  throw new Error('AURION_RUNTIME_DB_ROLE doit désigner le rôle SQL utilisé par DATABASE_URL.');
+}
 if (process.env.NODE_ENV === 'production' && !migrationUrl) {
   throw new Error('AURION_MIGRATION_DATABASE_URL doit être défini en production ; le rôle runtime ne doit jamais exécuter de DDL.');
 }
@@ -68,6 +73,23 @@ try {
     ['accounting_entries', 'select 1 from accounting_entries limit 1'],
   ] as const;
   for (const [name, sql] of checks) { await client.query(sql); log(`verifie ${name}`); }
+
+  // Le rôle de migration applique les droits du rôle runtime de façon idempotente.
+  // Ne pas donner au serveur applicatif la possibilité de modifier l'historique des migrations.
+  if (runtimeRole) {
+    const role = await client.query('select 1 from pg_roles where rolname=$1', [runtimeRole]);
+    if (!role.rowCount) throw new Error(`AURION_RUNTIME_DB_ROLE_INEXISTANT:${runtimeRole}`);
+    const roleIdent = quoteIdentifier(runtimeRole);
+    const owner = String((await client.query('select current_user')).rows[0]?.current_user || '');
+    if (!owner) throw new Error('MIGRATION_OWNER_UNAVAILABLE');
+    const ownerIdent = quoteIdentifier(owner);
+    await client.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${roleIdent}`);
+    await client.query(`REVOKE ALL ON TABLE public.schema_migrations FROM ${roleIdent}`);
+    await client.query(`GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO ${roleIdent}`);
+    await client.query(`ALTER DEFAULT PRIVILEGES FOR ROLE ${ownerIdent} IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${roleIdent}`);
+    await client.query(`ALTER DEFAULT PRIVILEGES FOR ROLE ${ownerIdent} IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO ${roleIdent}`);
+    log(`droits runtime appliques pour ${runtimeRole} (schema_migrations exclue)`);
+  }
 } catch (e: any) {
   failed = true;
   console.error('[AURION MIGRATE] ERREUR :', e?.message || e);
