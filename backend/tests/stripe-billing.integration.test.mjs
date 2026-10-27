@@ -220,6 +220,27 @@ if (!enabled) {
     }
   });
 
+  test('une session inconnue signée est acquittée en 200 et journalisée sans activation', async () => {
+    const account = await registerAccount();
+    const event = {
+      id: `evt_unmatched_${crypto.randomUUID().replaceAll('-', '')}`,
+      object: 'event',
+      type: 'checkout.session.completed',
+      data: { object: {
+        id: `cs_unmatched_${crypto.randomUUID().replaceAll('-', '')}`,
+        mode: 'payment', payment_status: 'paid', amount_total: 1200, currency: 'eur',
+        metadata: { organization_id: account.organizationId, plan_code: 'monthly', reference: 'AUR-NOT-FOUND' },
+      } },
+    };
+    const response = await postWebhook(event);
+    assert.equal(response.statusCode, 200, response.body);
+    assert.equal(response.json().status, 'unmatched');
+    const saved = await db.query("select processed_at,payload from billing_webhook_events where provider='stripe' and event_id=$1", [event.id]);
+    assert.equal(saved.rowCount, 1);
+    assert.ok(saved.rows[0].processed_at);
+    assert.equal((await db.query("select status from subscriptions where organization_id=$1",[account.organizationId])).rows[0].status,'trialing');
+  });
+
   test('une session payée d’une autre organisation ne peut pas être revendiquée au retour navigateur', async () => {
     const owner = await registerAccount();
     const attacker = await registerAccount();
