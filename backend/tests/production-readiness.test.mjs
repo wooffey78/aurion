@@ -26,7 +26,8 @@ test('Render blueprint is free-tier web only and requires an externally managed 
   assert.doesNotMatch(render, /type: pserv|type: postgres|type: keyvalue/);
   assert.match(render, /key: DATABASE_URL\s+sync: false/);
   assert.match(render, /key: HOST\s+value: 0\.0\.0\.0/);
-  assert.match(render, /healthCheckPath: \/health\/db/);
+  assert.match(render, /healthCheckPath: \/health/);
+  assert.match(read('backend/src/routes/health.ts'), /app.get\("\/health"/);
 });
 
 test('PWA cache is restricted to static assets and never stores business API responses', () => {
@@ -38,10 +39,14 @@ test('PWA cache is restricted to static assets and never stores business API res
   assert.doesNotMatch(sw, /caches\.open\(CACHE\)\.then\(c=>c\.put\(e\.request/);
 });
 
-test('production image CSP permits the known landing-card image hosts', () => {
+test('CSP keeps images local and blocks third-party image-host dependencies', () => {
   const security = read('backend/src/plugins/security.ts');
+  assert.match(security, /imgSrc:\[\"'self'\",\"data:\",\"blob:\"\]/);
   for (const host of ['https://www.apple.com','https://msftstories.thesourcemediaassets.com','https://storage.googleapis.com']) {
-    assert.ok(security.includes(host), `CSP image host missing: ${host}`);
+    assert.ok(!security.includes(host), `Unexpected third-party image host in CSP: ${host}`);
+  }
+  for (const asset of ['assets/platforms/ios.svg','assets/platforms/windows.svg','assets/platforms/android.svg','assets/platforms/macos.svg']) {
+    assert.ok(read(asset), `Expected local platform image: ${asset}`);
   }
 });
 

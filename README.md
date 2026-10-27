@@ -1,10 +1,10 @@
-# Aurion 15.2.31
+# Aurion 15.2.32
 
 Application de gestion pour indépendants et petites entreprises, avec interface web/PWA et API Node.js/Fastify/PostgreSQL.
 
 ## Développement local
 
-1. Installer Node.js 20 ou supérieur et PostgreSQL.
+1. Installer Node.js 22.16.0 ou supérieur et PostgreSQL.
 2. Copier `backend/.env.example` en `backend/.env` et configurer une base **réservée à Aurion**.
 3. Depuis la racine : `npm ci --prefix backend`, puis `npm run build`.
 4. Appliquer les migrations selon la procédure décrite dans `backend/package.json`, puis lancer `npm start`.

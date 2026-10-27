@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { config } from '../config.js';
-import { query } from '../db.js';
+import { db, query } from '../db.js';
 import { signAccessToken } from '../plugins/auth.js';
 import {
   requestPasswordReset, validateResetToken, resetPassword, changePassword, bumpSessions, currentLegalDocs,
@@ -13,9 +13,16 @@ import { revokeAllRefreshSessions } from '../services/native-sessions.js';
 import { savePrivateUpload, fileFromKey } from '../services/storage.js';
 import { readFile } from 'node:fs/promises';
 import { unlink } from 'node:fs/promises';
+import { activateStripeCheckout, verifyStripeWebhookSignature } from '../services/stripe-billing.js';
+import { calculateTtcCents } from '../services/money.js';
 
 const emailSchema = z.string().trim().email().max(254);
 const passwordSchema = z.string().min(12).max(256);
+const billingSubscribeSchema = z.object({
+  planCode: z.enum(['monthly', 'yearly']),
+  method: z.enum(['card', 'bank_transfer']),
+}).strict();
+const checkoutSessionQuerySchema = z.object({ session_id: z.string().trim().min(1).max(200) });
 const avatarTypes = new Set(['image/png','image/jpeg','image/webp']);
 
 /** URL publique utilisée dans les liens e-mail : jamais déduite d'un en-tête Host non fiable. */
@@ -52,6 +59,67 @@ export async function accountRoutes(app: FastifyInstance) {
     const r = await query('select kind,version,title,body,is_draft,published_at from legal_documents where kind=$1 and is_current=true', [(request.params as any).kind]);
     if (!r.rowCount) return reply.code(404).send({ error: 'NOT_FOUND' });
     return r.rows[0];
+  });
+
+  // Stripe appelle cette route serveur-à-serveur : aucune session utilisateur n'est requise.
+  // Le parseur local conserve les octets exacts nécessaires à Stripe-Signature.
+  app.register(async stripeApp => {
+    stripeApp.removeContentTypeParser('application/json');
+    stripeApp.addContentTypeParser('application/json', { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
+
+    stripeApp.post('/billing/stripe/webhook', async (request, reply) => {
+      if (!config.STRIPE_WEBHOOK_SECRET) return reply.code(503).send({ error: 'WEBHOOK_DISABLED' });
+      const rawBody = Buffer.isBuffer(request.body) ? request.body : Buffer.from(String(request.body ?? ''), 'utf8');
+      const signature = String(request.headers['stripe-signature'] || '');
+      if (!verifyStripeWebhookSignature(rawBody, signature, config.STRIPE_WEBHOOK_SECRET)) {
+        return reply.code(400).send({ error: 'INVALID_WEBHOOK_SIGNATURE' });
+      }
+
+      let event: any;
+      try { event = JSON.parse(rawBody.toString('utf8')); }
+      catch { return reply.code(400).send({ error: 'INVALID_WEBHOOK_PAYLOAD' }); }
+      if (typeof event?.id !== 'string' || !event.id || typeof event?.type !== 'string') {
+        return reply.code(400).send({ error: 'INVALID_WEBHOOK_PAYLOAD' });
+      }
+
+      const client = await db.connect();
+      try {
+        await client.query('begin');
+        const minimalPayload = JSON.stringify({ type: event.type, sessionId: event.data?.object?.id || null });
+        const inserted = await client.query(
+          `insert into billing_webhook_events(provider,event_id,payload)
+           values('stripe',$1,$2::jsonb) on conflict(provider,event_id) do nothing returning id`,
+          [event.id, minimalPayload],
+        );
+        if (inserted.rowCount !== 1) {
+          await client.query('commit');
+          return reply.code(200).send({ received: true, duplicate: true });
+        }
+
+        let activationStatus = 'ignored';
+        if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)) {
+          const result = await activateStripeCheckout(client, event.data?.object || {});
+          if (result.status === 'invalid' || result.status === 'unmatched') {
+            await client.query('rollback');
+            return reply.code(400).send({ error: 'PAYMENT_SESSION_NOT_RECOGNIZED' });
+          }
+          activationStatus = result.status;
+        }
+        await client.query(
+          `update billing_webhook_events set processed_at=now(),payload=$2::jsonb
+           where provider='stripe' and event_id=$1`,
+          [event.id, JSON.stringify({ type: event.type, sessionId: event.data?.object?.id || null, activationStatus })],
+        );
+        await client.query('commit');
+        return reply.code(200).send({ received: true, activated: activationStatus === 'activated', status: activationStatus });
+      } catch (e: any) {
+        await client.query('rollback').catch(() => {});
+        request.log.error({ code: typeof e?.code === 'string' ? e.code : 'STRIPE_WEBHOOK_FAILED' }, 'Stripe webhook processing failed');
+        return reply.code(500).send({ error: 'WEBHOOK_PROCESSING_FAILED' });
+      } finally {
+        client.release();
+      }
+    });
   });
 
   // ------------------------------------------------------------ authentifiées : compte, sécurité, abonnement
@@ -125,10 +193,14 @@ export async function accountRoutes(app: FastifyInstance) {
       return subscriptionState(org);
     });
     priv.post('/billing/subscribe', async (request,reply) => {
-      const b:any=request.body||{}, planCode=String(b.planCode||''), method=String(b.method||'');
+      const parsed = billingSubscribeSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: 'INVALID_INPUT' });
+      const { planCode, method } = parsed.data;
       const plan=(await query('select code,name,price_ht_cents,billing_interval from plans where code=$1 and active=true',[planCode])).rows[0];
-      if(!plan||!['monthly','yearly'].includes(planCode)||!['card','bank_transfer'].includes(method))return reply.code(400).send({error:'INVALID_INPUT'});
-      const amount=Math.round(Number(plan.price_ht_cents)*1.20);
+      if(!plan) return reply.code(400).send({error:'INVALID_INPUT'});
+      let amount: number;
+      try { amount = calculateTtcCents(Number(plan.price_ht_cents)); }
+      catch { return reply.code(400).send({ error: 'INVALID_INPUT' }); }
       const org=request.auth!.organizationId, ref=`AUR-${new Date().getFullYear()}-${randomBytes(4).toString('hex').toUpperCase()}`;
       if(method==='bank_transfer'){
         if(!config.BANK_TRANSFER_IBAN)return reply.code(503).send({error:'BILLING_DISABLED',message:'Le virement bancaire n’est pas encore configuré.'});
@@ -142,22 +214,59 @@ export async function accountRoutes(app: FastifyInstance) {
       form.set('mode','payment');form.set('success_url',`${base}/#/dashboard?billing=success&session_id={CHECKOUT_SESSION_ID}`);form.set('cancel_url',`${base}/#/dashboard?billing=cancelled`);form.set('payment_method_types[0]','card');
       form.set('line_items[0][price_data][currency]','eur');form.set('line_items[0][price_data][unit_amount]',String(amount));form.set('line_items[0][price_data][product_data][name]',String(plan.name));form.set('line_items[0][quantity]','1');
       form.set('metadata[organization_id]',org);form.set('metadata[plan_code]',planCode);form.set('metadata[reference]',ref);
-      const sr=await fetch('https://api.stripe.com/v1/checkout/sessions',{method:'POST',headers:{Authorization:`Bearer ${config.STRIPE_SECRET_KEY}`,'Content-Type':'application/x-www-form-urlencoded'},body:form});
-      const sd:any=await sr.json(); if(!sr.ok||!sd.url)return reply.code(502).send({error:'PAYMENT_PROVIDER_ERROR',message:'Le prestataire de paiement n’a pas pu créer la session sécurisée.'});
+      let sr: Response; let sd: any;
+      try {
+        sr=await fetch('https://api.stripe.com/v1/checkout/sessions',{method:'POST',headers:{Authorization:`Bearer ${config.STRIPE_SECRET_KEY}`,'Content-Type':'application/x-www-form-urlencoded'},body:form,signal:AbortSignal.timeout(10_000)});
+        sd=await sr.json();
+      } catch (e:any) {
+        request.log.warn({code:e?.name==='TimeoutError'?'STRIPE_TIMEOUT':'STRIPE_SESSION_CREATE_FAILED'},'Stripe checkout creation failed');
+        return reply.code(502).send({error:'PAYMENT_PROVIDER_UNAVAILABLE',message:'Le prestataire de paiement ne répond pas. Réessayez dans quelques instants.'});
+      }
+      if(!sr.ok||!sd?.url||typeof sd.id!=='string')return reply.code(502).send({error:'PAYMENT_PROVIDER_ERROR',message:'Le prestataire de paiement n’a pas pu créer la session sécurisée.'});
       await query(`insert into billing_payment_requests(organization_id,plan_code,method,reference,amount_ttc_cents,provider_session_id) values($1,$2,'card',$3,$4,$5)`,[org,planCode,ref,amount,sd.id]);
       await subscriptionEvent(org,'payment_requested',{method,planCode,reference:ref,amountTtcCents:amount});
       return {ok:true,method,planCode,reference:ref,checkoutUrl:sd.url};
     });
-    priv.get('/billing/checkout/complete',async(request,reply)=>{
-      const sessionId=String((request.query as any)?.session_id||''); if(!sessionId||!config.STRIPE_SECRET_KEY)return reply.code(400).send({error:'INVALID_INPUT'});
-      const sr=await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`,{headers:{Authorization:`Bearer ${config.STRIPE_SECRET_KEY}`}}); const sd:any=await sr.json();
-      if(!sr.ok||sd.payment_status!=='paid'||sd.metadata?.organization_id!==request.auth!.organizationId)return reply.code(400).send({error:'PAYMENT_NOT_CONFIRMED'});
-      const planCode=String(sd.metadata?.plan_code||''); const plan=(await query('select code,billing_interval from plans where code=$1',[planCode])).rows[0]; if(!plan)return reply.code(400).send({error:'INVALID_INPUT'});
-      const start=new Date(); const end=new Date(start); if(plan.billing_interval==='year')end.setFullYear(end.getFullYear()+1);else end.setMonth(end.getMonth()+1);
-      await query(`update subscriptions set status='active',plan_code=$2,current_period_start=$3,current_period_end=$4,cancel_at_period_end=false,canceled_at=null,data_read_only_until=$4+interval '60 days',payment_method='card',billing_reference=$5,updated_at=now() where organization_id=$1`,[request.auth!.organizationId,planCode,start,end,String(sd.metadata.reference||sessionId)]);
-      await query(`update billing_payment_requests set status='paid',paid_at=now() where provider_session_id=$1 and organization_id=$2`,[sessionId,request.auth!.organizationId]);
-      await subscriptionEvent(request.auth!.organizationId,'payment_succeeded',{method:'card',planCode,reference:String(sd.metadata.reference||sessionId)});
-      return subscriptionState(request.auth!.organizationId);
+    priv.get('/billing/checkout/complete', async (request, reply) => {
+      const parsedQuery = checkoutSessionQuerySchema.safeParse(request.query);
+      if (!parsedQuery.success || !config.STRIPE_SECRET_KEY) return reply.code(400).send({ error: 'INVALID_INPUT' });
+      const sessionId = parsedQuery.data.session_id;
+
+      let stripeResponse: Response;
+      let session: any;
+      try {
+        stripeResponse = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {
+          headers: { Authorization: `Bearer ${config.STRIPE_SECRET_KEY}` },
+          signal: AbortSignal.timeout(10_000),
+        });
+        session = await stripeResponse.json();
+      } catch (e: any) {
+        request.log.warn({ code: e?.name === 'TimeoutError' ? 'STRIPE_TIMEOUT' : 'STRIPE_LOOKUP_FAILED' }, 'Stripe checkout session lookup failed');
+        return reply.code(502).send({ error: 'PAYMENT_PROVIDER_UNAVAILABLE', message: 'Le statut du paiement n’a pas pu être vérifié. Réessayez dans quelques instants.' });
+      }
+      if (!stripeResponse.ok || session?.payment_status !== 'paid') {
+        return reply.code(400).send({ error: 'PAYMENT_NOT_CONFIRMED' });
+      }
+
+      const organizationId = request.auth!.organizationId;
+      const client = await db.connect();
+      try {
+        await client.query('begin');
+        const result = await activateStripeCheckout(client, session, organizationId);
+        if (!['activated', 'already_processed'].includes(result.status)) {
+          await client.query('rollback');
+          return reply.code(400).send({ error: 'PAYMENT_NOT_CONFIRMED' });
+        }
+        await client.query('commit');
+      } catch (e: any) {
+        await client.query('rollback').catch(() => {});
+        request.log.error({ code: typeof e?.code === 'string' ? e.code : 'BILLING_ACTIVATION_FAILED' }, 'Stripe checkout activation failed');
+        return reply.code(500).send({ error: 'PAYMENT_ACTIVATION_FAILED' });
+      } finally {
+        client.release();
+      }
+      // Le retour navigateur et le webhook utilisent le même verrou d'idempotence.
+      return subscriptionState(organizationId);
     });
   });
 

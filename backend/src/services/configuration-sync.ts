@@ -5,11 +5,16 @@ import { detectFiscalSettings, detectLegalFormFromProfile } from './fiscal-detec
 const clean = (v: unknown) => String(v ?? '').trim();
 const placeholderActivity = (a: any) => !a || a.code === 'principale' && ((!a.name || /^(activité principale|à configurer)$/i.test(clean(a.name))) || /^(à configurer)$/i.test(clean(a.description)) || a.configuration_defined === false);
 
-async function saveContributionPresets(activityId: string, contributions: any[]) {
-  await query('delete from activity_contributions where activity_id=$1',[activityId]);
+async function saveContributionPresets(orgId: string, activityId: string, contributions: any[]) {
+  const owned = await query('select 1 from activities where id=$1 and organization_id=$2', [activityId, orgId]);
+  if (!owned.rowCount) throw new Error('ACTIVITY_NOT_FOUND');
+  await query(`delete from activity_contributions c using activities a
+    where c.activity_id=a.id and a.id=$1 and a.organization_id=$2`, [activityId, orgId]);
   for (const [position,c] of contributions.entries()) {
-    await query(`insert into activity_contributions(activity_id,name,rate,basis,mandatory,variable,source,position) values($1,$2,$3,$4,$5,$6,$7,$8) on conflict(activity_id,name) do update set rate=excluded.rate,basis=excluded.basis,mandatory=excluded.mandatory,variable=excluded.variable,source=excluded.source,position=excluded.position,updated_at=now()`,[
-      activityId,clean(c.name),c.rate===null?null:Number(c.rate),clean(c.basis)||'chiffre d’affaires HT',Boolean(c.mandatory),Boolean(c.variable),clean(c.source)||null,position,
+    await query(`insert into activity_contributions(activity_id,name,rate,basis,mandatory,variable,source,position)
+      select $1,$3,$4,$5,$6,$7,$8,$9 where exists(select 1 from activities where id=$1 and organization_id=$2)
+      on conflict(activity_id,name) do update set rate=excluded.rate,basis=excluded.basis,mandatory=excluded.mandatory,variable=excluded.variable,source=excluded.source,position=excluded.position,updated_at=now()`,[
+      activityId, orgId, clean(c.name),c.rate===null?null:Number(c.rate),clean(c.basis)||'chiffre d’affaires HT',Boolean(c.mandatory),Boolean(c.variable),clean(c.source)||null,position,
     ]);
   }
 }
@@ -58,7 +63,7 @@ export async function syncPrimaryActivityFromOrganization(orgId: string, options
     const autoVat=!activity.configuration_defined||activity.vat_auto_detected===true||legalFormWasFilled;
     if(autoSocial){sets.push(`urssaf_rate=$${vals.length+1}`,`social_regime=$${vals.length+2}`,`social_auto_detected=true`);vals.push(detected.socialRate,detected.socialRegime)}
     if(autoVat){sets.push(`vat_rate=coalesce($${vals.length+1},vat_rate)`,`vat_regime=$${vals.length+2}`,`vat_auto_detected=true`);vals.push(detected.vatRate,detected.vatRegime)}
-    if(autoSocial||autoVat)await saveContributionPresets(activity.id,detected.contributions);
+    if(autoSocial||autoVat)await saveContributionPresets(orgId, activity.id, detected.contributions);
     const cgv=defaultCgvFor(p.code,p.title,nextLegalForm);
     sets.push(`cgv_text=coalesce(cgv_text,$${vals.length+1})`); vals.push(cgv);
   }

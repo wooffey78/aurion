@@ -1,3 +1,5 @@
+import { config } from '../config.js';
+import { calculateTtcCents } from './money.js';
 import type PDFKit from 'pdfkit';
 import crypto from 'node:crypto';
 import { query } from '../db.js';
@@ -12,7 +14,7 @@ export async function createSubscriptionInvoice(org:string,periodStart:Date,peri
  const s=(await query(`select s.*,p.name plan_name,p.price_ht_cents,p.billing_interval,o.name company_name,o.siret from subscriptions s join plans p on p.code=s.plan_code join organizations o on o.id=s.organization_id where s.organization_id=$1`,[org])).rows[0];
  if(!s)return null;
  const exists=(await query('select * from subscription_invoices where organization_id=$1 and period_start=$2',[org,periodStart])).rows[0];if(exists)return exists;
- const vat=20,total=Math.round(Number(s.price_ht_cents)*(1+vat/100)),number=await nextNumber(org),id=crypto.randomUUID();
+ const vat=config.BILLING_VAT_RATE_BPS/100,total=calculateTtcCents(Number(s.price_ht_cents)),number=await nextNumber(org),id=crypto.randomUUID();
  await query(`insert into subscription_invoices(id,organization_id,subscription_id,number,period_start,period_end,amount_ht_cents,vat_rate,total_ttc_cents) values($1,$2,$2,$3,$4,$5,$6,$7,$8)`,[id,org,number,periodStart,periodEnd,Number(s.price_ht_cents),vat,total]);
  const PDFDocument=await pdfkit();
  const buffer:Buffer=await new Promise((resolve,reject)=>{const doc=new PDFDocument({size:'A4',margin:56,info:{Title:`Facture abonnement ${number}`,Author:'Aurion'}});const chunks:Buffer[]=[];doc.on('data',(c:Buffer)=>chunks.push(c));doc.on('end',()=>resolve(Buffer.concat(chunks)));doc.on('error',reject);

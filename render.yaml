@@ -7,7 +7,7 @@ services:
     plan: free
     buildCommand: npm ci --prefix backend --include=dev --no-audit --no-fund && npm run build
     startCommand: npm --prefix backend start
-    healthCheckPath: /health/db
+    healthCheckPath: /health
     autoDeploy: true
     envVars:
       - key: NODE_ENV
@@ -18,11 +18,31 @@ services:
         value: "true"
       - key: DATABASE_URL
         sync: false
+      - key: AURION_MIGRATION_DATABASE_URL
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGIN
         sync: false
       - key: APP_BASE_URL
         sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: GOOGLE_TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: AURION_SUPPORT_EMAIL
+        sync: false
+      - key: AURION_ENCRYPTION_KEY_VERSION
+        value: k1
+      - key: AURION_ENCRYPTION_KEY_PREVIOUS
+        sync: false
+      - key: AURION_ENCRYPTION_KEY_PREVIOUS_VERSION
+        sync: false
+      - key: AURION_ENCRYPTION_LEGACY_JWT_KEY
+        sync: false
       - key: AURION_ENCRYPTION_KEY
         generateValue: true
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false

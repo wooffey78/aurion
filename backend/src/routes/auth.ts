@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import crypto from "node:crypto";
 import { query, db } from "../db.js";
+import { config } from "../config.js";
 import { hashPassword, verifyPassword } from "../services/passwords.js";
 import { registerSchema, loginSchema } from "../services/validation.js";
 import { signAccessToken } from "../plugins/auth.js";
@@ -8,7 +9,35 @@ import { recordAcceptances } from "../services/account.js";
 import { createRefreshSession, rotateRefreshSession, revokeRefreshSession, revokeAllRefreshSessions, REFRESH_SECONDS } from '../services/native-sessions.js';
 import { registrationOptions, verifyRegistration, authenticationOptions, verifyAuthentication, issueWebAuthnSession } from '../services/webauthn.js';
 
-function configOrigin(request:any){ const proto=String(request.headers['x-forwarded-proto']||'http').split(',')[0]; const host=String(request.headers.host||'localhost'); return `${proto}://${host}`; }
+function configuredWebAuthnOrigin(request:any): string | null {
+  const configured = [config.APP_BASE_URL, ...config.CORS_ORIGIN.split(',')].map((value:string) => value.trim()).filter(Boolean);
+  const allowed = new Set<string>();
+  for (const value of configured) { try { allowed.add(new URL(value).origin); } catch { /* configuration validation handles production values */ } }
+  if (config.NODE_ENV !== 'production') {
+    allowed.add('http://127.0.0.1:4000'); allowed.add('http://localhost:4000');
+    allowed.add('http://127.0.0.1:5500'); allowed.add('http://localhost:5500');
+  }
+  const header = String(request.headers.origin || '').trim();
+  // Les navigateurs n'envoient pas systématiquement Origin sur un GET same-origin.
+  // En l'absence de cet en-tête, on n'accepte que l'hôte Host exact d'une origine
+  // déjà autorisée par configuration — jamais une origine fabriquée depuis X-Forwarded-*.
+  if (!header) {
+    const requestHost = String(request.headers.host || '').trim().toLowerCase();
+    for (const value of allowed) {
+      try {
+        const candidate = new URL(value);
+        if (candidate.host.toLowerCase() === requestHost && (config.NODE_ENV !== 'production' || candidate.protocol === 'https:')) return candidate.origin;
+      } catch { /* origine invalide ignorée */ }
+    }
+    return null;
+  }
+  try {
+    const parsed = new URL(header);
+    if (parsed.origin !== header || !allowed.has(parsed.origin)) return null;
+    if (config.NODE_ENV === 'production' && parsed.protocol !== 'https:') return null;
+    return parsed.origin;
+  } catch { return null; }
+}
 
 export async function authRoutes(app: FastifyInstance) {
   app.get('/auth/vip-invite/validate', { config: { rateLimit: { max: 30, timeWindow: '15 minutes' } } }, async (request, reply) => {
@@ -191,15 +220,27 @@ export async function authRoutes(app: FastifyInstance) {
     },
   );
 
-  app.get('/auth/webauthn/register/options', { preHandler: app.requireAuth }, async (request) => registrationOptions(request.auth!.userId, String(request.headers.origin || configOrigin(request))))
-  app.post('/auth/webauthn/register/verify', { preHandler: app.requireAuth }, async (request, reply) => {
-    try { return await verifyRegistration(request.auth!.userId, request.body, String(request.headers.origin || configOrigin(request))); }
-    catch(e:any){ return reply.code(400).send({error:'WEBAUTHN_REGISTRATION_FAILED',message:String(e?.message||e)}); }
+  app.get('/auth/webauthn/register/options', { preHandler: app.requireAuth }, async (request, reply) => {
+    const origin = configuredWebAuthnOrigin(request);
+    if (!origin) return reply.code(403).send({ error: 'ORIGIN_NOT_ALLOWED' });
+    return registrationOptions(request.auth!.userId, origin);
   });
-  app.get('/auth/webauthn/authenticate/options', { config: { rateLimit: { max: 8, timeWindow: '15 minutes' } } }, async (request) => authenticationOptions(String(request.headers.origin || configOrigin(request))));
+  app.post('/auth/webauthn/register/verify', { preHandler: app.requireAuth }, async (request, reply) => {
+    const origin = configuredWebAuthnOrigin(request);
+    if (!origin) return reply.code(403).send({ error: 'ORIGIN_NOT_ALLOWED' });
+    try { return await verifyRegistration(request.auth!.userId, request.body, origin); }
+    catch { return reply.code(400).send({ error: 'WEBAUTHN_REGISTRATION_FAILED', message: 'L’enregistrement biométrique n’a pas pu être validé. Réessayez ou utilisez votre mot de passe.' }); }
+  });
+  app.get('/auth/webauthn/authenticate/options', { config: { rateLimit: { max: 8, timeWindow: '15 minutes' } } }, async (request, reply) => {
+    const origin = configuredWebAuthnOrigin(request);
+    if (!origin) return reply.code(403).send({ error: 'ORIGIN_NOT_ALLOWED' });
+    return authenticationOptions(origin);
+  });
   app.post('/auth/webauthn/authenticate/verify', async (request, reply) => {
-    try { const identity=await verifyAuthentication(request.body, String(request.headers.origin || configOrigin(request))); return await issueWebAuthnSession(app,reply,request,identity); }
-    catch(e:any){ return reply.code(401).send({error:'WEBAUTHN_AUTHENTICATION_FAILED',message:'La connexion biométrique n’a pas pu être validée.'}); }
+    const origin = configuredWebAuthnOrigin(request);
+    if (!origin) return reply.code(403).send({ error: 'ORIGIN_NOT_ALLOWED' });
+    try { const identity=await verifyAuthentication(request.body, origin); return await issueWebAuthnSession(app,reply,request,identity); }
+    catch { return reply.code(401).send({error:'WEBAUTHN_AUTHENTICATION_FAILED',message:'La connexion biométrique n’a pas pu être validée.'}); }
   });
 
   app.post('/auth/refresh', async (request, reply) => {

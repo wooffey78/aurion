@@ -39,7 +39,7 @@ export function bind(){
     const x=by(S.parts,b.dataset.id);
     if(!x)return;
     const suppliers=(x.suppliers||[]).map(s=>[s.supplier,s.supplierReference,s.purchasePrice!=null?money(s.purchasePrice):''].filter(Boolean).join(' · ')).join(' | ')||'—';
-    const photo=x.photo_key?`<div class="field"><span>Photo</span><img src="${api.partPhotoUrl(x.id)}" alt="${e(x.name)}" style="max-width:100%;max-height:280px;object-fit:contain;border-radius:12px" onerror="this.hidden=true"></div>`:'';
+    const photo=x.photo_key?`<div class="field"><span>Photo</span><img src="${api.partPhotoUrl(x.id)}" alt="${e(x.name)}" class="part-photo-image" data-hide-on-error></div>`:'';
     viewCatalogItem(x.name,viewField('Nom',x.name)+viewField('Description',[x.model,x.variant,x.color,x.quality,x.reference].filter(Boolean).join(' · '))+viewField('Prix de vente HT',Number(x.selling_price)?money(x.selling_price):'—')+viewField('Fournisseurs',suppliers)+photo);
   });
 

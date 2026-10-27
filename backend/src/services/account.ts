@@ -7,6 +7,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { BACKEND_ROOT } from './storage.js';
 
+import { calculateTtcCents } from './money.js';
 export const sha256 = (s: string) => crypto.createHash('sha256').update(s).digest('hex');
 export const ipHash = (ip?: string) => sha256('aurion-ip:' + (ip || ''));
 const RESET_MINUTES = 30;
@@ -122,7 +123,7 @@ export async function subscriptionState(orgId: string) {
   const end=status==='active'&&periodEnd?periodEnd:trialEnd;
   const daysLeft=(status==='trialing'||status==='active')?Math.max(0,Math.ceil((end-now)/86400000)):0;
   const readOnly=status==='expired';
-  const plans=(await query('select code,name,price_ht_cents,billing_interval,trial_days from plans where active=true order by price_ht_cents')).rows;
+  const plans=(await query('select code,name,price_ht_cents,billing_interval,trial_days from plans where active=true order by price_ht_cents')).rows.map((plan:any)=>({...plan,price_ttc_cents:calculateTtcCents(Number(plan.price_ht_cents))}));
   const paymentMethods={card:!!process.env.STRIPE_SECRET_KEY,bankTransfer:!!process.env.BANK_TRANSFER_IBAN};
   return {status,planCode:s.plan_code,trialStartedAt:s.trial_started_at,trialEndsAt:s.trial_ends_at,daysLeft,cancelAtPeriodEnd:s.cancel_at_period_end,canceledAt:s.canceled_at,currentPeriodEnd:s.current_period_end,paymentEnabled:paymentMethods.card||paymentMethods.bankTransfer,requiresCard:paymentMethods.card,autoChargeAfterTrial:false,readOnly,dataReadOnlyUntil:s.data_read_only_until||null,plans,paymentMethods};
 }

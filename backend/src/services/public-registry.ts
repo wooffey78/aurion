@@ -68,7 +68,7 @@ export async function searchFrenchCompanies(name: string): Promise<RegistryCompa
   const q = String(name ?? '').trim();
   if (q.length < 2) throw new Error('Nom de fournisseur trop court.');
   const url = `https://recherche-entreprises.api.gouv.fr/search?q=${encodeURIComponent(q)}&per_page=10`;
-  const response = await fetch(url, { headers: { accept: 'application/json' } });
+  const response = await fetch(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(8_000) });
   if (!response.ok) throw new Error(`REGISTRY_HTTP_${response.status}`);
   const data: any = await response.json();
   return (data.results || []).map((hit:any) => {

@@ -1,4 +1,4 @@
-# Aurion 15.2.31
+# Aurion 15.2.32
 
 ## Pour vos clients : un seul fichier
 Envoyez **Aurion-Setup.bat** (il contient l'intégralité d'Aurion). Le client double-clique dessus :
@@ -31,6 +31,24 @@ La messagerie et l'agenda se configurent **dans Aurion** (Paramètres → Messag
 ## Documents légaux Aurion (version 1.0)
 Les textes CGV, confidentialité, cookies, mentions légales et accessibilité sont rédigés dans `docs/` et synchronisés à la base au démarrage. Les documents ne sont déclarés définitifs que lorsque les paramètres juridiques requis sont renseignés dans l’environnement du service : `AURION_LEGAL_PUBLISHER_NAME`, `AURION_LEGAL_PUBLISHER_FORM`, `AURION_LEGAL_PUBLISHER_SIREN`, `AURION_LEGAL_PUBLISHER_SIRET`, `AURION_LEGAL_PUBLISHER_ADDRESS`, `AURION_LEGAL_PUBLISHER_VAT`, `AURION_LEGAL_DIRECTOR`, `AURION_LEGAL_PUBLISHER_EMAIL`, `AURION_PRIVACY_CONTACT_EMAIL`, `AURION_HOST_NAME`, `AURION_HOST_ADDRESS`, `AURION_HOST_CONTACT`, `AURION_SUBPROCESSORS`, `AURION_ACCESSIBILITY_CONTACT_EMAIL`, `AURION_ACCESSIBILITY_AUDIT_DATE`, `AURION_ACCESSIBILITY_AUDIT_RESULT`. Les valeurs doivent être réelles et vérifiées pour l’entité éditrice et l’hébergement contractuel utilisés.
 
+
+## Tests d’intégration PostgreSQL portables
+
+Les tests HTTP utilisent `Fastify.inject` et une base PostgreSQL dédiée, notamment pour vérifier l’idempotence Stripe et l’isolation entre organisations. Docker Desktop (Windows/macOS) ou Docker Engine (Linux) suffit :
+
+```powershell
+# Depuis la racine du dépôt
+npm --prefix backend run db:test:up
+$env:DATABASE_URL = "postgresql://aurion_test:aurion_test_local_only@localhost:54329/aurion_test"
+$env:NODE_ENV = "test"
+$env:JWT_SECRET = "local-integration-secret-at-least-32-characters"
+npm run migrate
+$env:AURION_INTEGRATION_TESTS = "1"
+npm test
+npm --prefix backend run db:test:down
+```
+
+La suite utilise exclusivement le conteneur de test. Le script `db:reset:test` refuse les environnements `production` et toute base dont le nom ne contient pas `test`, `ci` ou `integration`, et demande `AURION_ALLOW_DATA_RESET=true` avant toute remise à zéro. Ne pointez jamais ces commandes vers la base de production.
 
 ## Déploiement web sur Render
 

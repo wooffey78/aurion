@@ -379,3 +379,8 @@ body.keyboard-open .toast-region{display:none}
   .modal{border-radius:16px;padding:16px 13px calc(22px + env(safe-area-inset-bottom))}
   .button-row .btn{flex:1 1 auto}
 }
+
+/* Images et contrôles sans styles inline : compatibilité CSP stricte. */
+.supplier-logo-image{width:42px;height:42px;object-fit:contain;border-radius:8px;margin-right:12px}
+.part-photo-image{max-width:100%;max-height:280px;object-fit:contain;border-radius:12px}
+.support-edit-form-select{-webkit-appearance:auto;appearance:auto;background-image:none;padding-right:13px}
