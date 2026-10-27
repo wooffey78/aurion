@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const root = new URL('../../', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8');
 const main = read('assets/js/main.js');
+const router = read('assets/js/core/router.js');
 const shell = read('index.html');
 const docs = read('assets/js/pages/dash/docs.js');
 const dashboard = read('assets/js/pages/dashboard.js');
@@ -12,13 +13,17 @@ const css = read('assets/css/app.css');
 const sw = read('sw.js');
 const manifest = read('manifest.webmanifest');
 
-test('les boutons Commencer et Se connecter de l’accueil déclenchent explicitement leur route', () => {
-  assert.match(main, /bindLandingNavigation/);
-  assert.match(main, /bindLandingNavigation\('\.landing-hero \.button-row a\[href="#\/auth"\]'\s*,?\s*'\/auth'\)/);
-  assert.match(main, /bindLandingNavigation\('\.landing-hero \.button-row a\[href="#\/login"\]'\s*,?\s*'\/login'\)/);
-  assert.match(shell, /main\.js\?v=15\.2\.42-r1/);
-  assert.match(shell, /app\.css\?v=15\.2\.42-r1/);
-  assert.match(sw, /aurion-shell-v15\.2\.42-r1/);
+test('les boutons d’accueil gardent les ancres natives et le routeur traite le hashchange', () => {
+  assert.ok(shell.includes('href="#/auth"'));
+  assert.ok(shell.includes('href="#/login"'));
+  assert.ok(main.includes("if(r==='/auth')return renderAuth('register')"));
+  assert.ok(main.includes("if(r==='/login')return renderAuth('login')"));
+  assert.ok(router.includes('location.hash=path'));
+  assert.ok(router.includes("addEventListener('hashchange',fn)"));
+  assert.ok(!main.includes('bindLandingNavigation'));
+  assert.ok(shell.includes('main.js?v=15.2.43-r1'));
+  assert.ok(shell.includes('app.css?v=15.2.43-r1'));
+  assert.ok(sw.includes('aurion-shell-v15.2.43-r1'));
 });
 
 test('la suppression de facture reste disponible même si elle est déjà réglée', () => {

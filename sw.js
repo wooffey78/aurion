@@ -1,4 +1,4 @@
-const CACHE='aurion-shell-v15.2.42-r1';
+const CACHE='aurion-shell-v15.2.43-r1';
 const SCOPE=self.registration.scope;
 const ASSETS=[
   './','./index.html','./assets/css/app.css','./assets/js/config.js','./assets/js/main.js',
