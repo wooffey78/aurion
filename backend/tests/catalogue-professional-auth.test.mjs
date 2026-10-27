@@ -35,14 +35,14 @@ test('connexion Google exige état CSRF, PKCE, jeton vérifié et compte Aurion 
   const api = read('../../assets/js/core/api.js');
   const auth = read('../../assets/js/pages/auth.js');
   assert.match(route, /aurion_google_login/);
-  assert.match(route, /code_challenge_method:'S256'/);
+  assert.match(route, /code_challenge_method:CodeChallengeMethod\.S256/);
   assert.match(route, /state!==transaction\.state/);
   assert.match(route, /verifyIdToken\(\{idToken,audience:config\.GOOGLE_CLIENT_ID\}\)/);
   assert.match(route, /identity\.email_verified!==true/);
   assert.match(route, /if\(!user\)return fail\(\)/);
   assert.match(route, /GOOGLE_LOGIN_NOT_CONFIGURED/);
   assert.match(api, /googleAuthStatus:.*auth\/google\/status/);
-  assert.match(auth, /google\.hidden=mode!=='login'\|\|result\?\.configured!==true/);
+  assert.match(auth, /googleConfigured=result\?\.configured===true;google\.hidden=mode!=='login'\|\|!googleConfigured/);
 });
 
 test('gestion des clés d’accès : chaque liste et suppression est limitée à l’utilisateur authentifié', () => {
