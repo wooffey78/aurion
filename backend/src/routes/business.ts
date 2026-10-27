@@ -54,7 +54,7 @@ const clientPatchInputSchema = z.object({
 
 const stockInput = z.union([
   z.number().int().min(0).max(10_000_000),
-  z.string().regex(/^\\d{1,8}$/),
+  z.string().regex(/^[0-9]{1,8}$/),
   z.literal(''),
   z.null(),
 ]).optional();
