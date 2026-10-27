@@ -39,5 +39,5 @@ test('contrat persistant — final_price_ttc conserve le TTC de base et total_tt
 
 test('édition partielle — les lignes déjà enregistrées sont rechargées avant recalcul',()=>{
   assert.match(route,/currentItems= b\.items===undefined/);
-  assert.match(route,/select label,quantity,unit_cost unitCost,part_id partId,sale_coefficient_percent saleCoefficientPercent from quote_items/);
+  assert.match(route,/select label,quantity,unit_cost unitCost,unit_price unitPrice,part_id partId,sale_coefficient_percent saleCoefficientPercent from quote_items/);
 });

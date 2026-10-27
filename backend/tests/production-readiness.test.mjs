@@ -26,6 +26,7 @@ test('Render blueprint is free-tier web only and requires an externally managed 
   assert.doesNotMatch(render, /type: pserv|type: postgres|type: keyvalue/);
   assert.match(render, /key: DATABASE_URL\s+sync: false/);
   assert.match(render, /key: HOST\s+value: 0\.0\.0\.0/);
+  assert.match(render, /healthCheckPath: \/health\/db/);
 });
 
 test('PWA cache is restricted to static assets and never stores business API responses', () => {
