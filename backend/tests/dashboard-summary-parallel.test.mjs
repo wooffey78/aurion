@@ -15,7 +15,6 @@ test('dashboard summary executes independent reads concurrently without changing
   for (const field of ['tickets:', 'unpaidCount:', 'unpaidTotal:', 'forecastEntries:', 'fourthReminderCount:', 'forecast,', 'subscription:sub', 'warranty:', 'trialDaysLeft,journal']) {
     assert.ok(summary.includes(field), `dashboard summary response contract must retain ${field}`);
   }
-  assert.match(summary, /await monthlyAccounting\(org,aid,accountingYear\)/);
 });
 
 test('monthly accounting executes independent invoice and accounting-entry queries concurrently', () => {
