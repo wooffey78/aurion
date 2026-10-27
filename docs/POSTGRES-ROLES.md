@@ -17,3 +17,13 @@ GRANT USAGE ON SCHEMA public TO aurion_runtime;
 ```
 
 Ne pas réutiliser le rôle runtime comme propriétaire de migration. Définir les trois variables sur Render avant le déploiement. Le démarrage échoue volontairement en production si l’URL migrateur ou le nom du rôle runtime manque.
+
+## Migration 055 : doublons de provider_session_id
+
+La migration 055 crée un index unique partiel. Si elle échoue avec des sessions dupliquées, ne pas supprimer les demandes au hasard :
+
+1. Faire une sauvegarde et lister les doublons :
+   `SELECT provider_session_id, array_agg(id ORDER BY created_at DESC) AS request_ids, count(*) FROM billing_payment_requests WHERE provider_session_id IS NOT NULL GROUP BY provider_session_id HAVING count(*) > 1;`
+2. Pour chaque groupe, comparer la session Stripe, l'organisation, le montant, la référence et le statut. Conserver la demande correspondant à la session réelle et déjà payée, s'il y en a une.
+3. Marquer les demandes obsolètes en `canceled` plutôt que de supprimer une trace comptable ; mettre `provider_session_id = NULL` uniquement sur les lignes confirmées comme orphelines et non payées.
+4. Vérifier que la requête de doublons ne retourne plus de ligne, puis relancer le migrateur. Ne jamais modifier le fichier de migration 055 déjà appliqué sur un autre environnement.
