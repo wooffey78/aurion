@@ -292,6 +292,19 @@ if (!enabled) {
     assert.equal(login.statusCode, 200, login.body);
     assert.equal(login.json().organizationId, owner.organizationId);
 
+    const ownerActivities = await app.inject({
+      method: 'GET', url: '/activities', headers: { authorization: `Bearer ${owner.token}` },
+    });
+    assert.equal(ownerActivities.statusCode, 200, ownerActivities.body);
+    const ownerActivityId = ownerActivities.json()[0]?.id;
+    assert.ok(ownerActivityId);
+    const invalidActivityPatch = await app.inject({
+      method: 'PATCH', url: `/activities/${ownerActivityId}`,
+      headers: { authorization: `Bearer ${owner.token}` },
+      payload: { vatRate: 'pas-un-taux' },
+    });
+    assert.equal(invalidActivityPatch.statusCode, 400, invalidActivityPatch.body);
+
     const invalidSupplier = await app.inject({
       method: 'POST', url: '/suppliers', headers: { authorization: `Bearer ${owner.token}` },
       payload: { name: 123, email: 'adresse-invalide' },
