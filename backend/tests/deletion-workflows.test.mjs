@@ -17,7 +17,7 @@ test('devis, factures, fiches clients et éléments catalogue sont supprimables 
   assert.match(catalog,/const legacyActions=\{interventions:\{[^}]*delete:'del-intervention'[^}]*\},parts:\{[^}]*delete:'del-part'[^}]*\},supplies:\{[^}]*delete:'del-supply'[^}]*\},policies:\{[^}]*delete:'del-policy'/);
   assert.match(catalog,/data-action="\$\{a\}"/);
   assert.match(catalog,/if\(a==='delete'\)\{await remove\(t,id\);return\}/);
-  assert.match(catalog,/const fn=\{interventions:api\.deleteIntervention,parts:api\.deletePart,supplies:api\.deleteSupply,policies:api\.deleteWarrantyPolicy\}\[t\]/);
+  assert.match(catalog,/fn=\{interventions:api\.deleteIntervention,parts:api\.deletePart,supplies:api\.deleteSupply,policies:api\.deleteWarrantyPolicy\}\[t\]/);
   assert.match(catalog,/await confirmDelete\(/);
 });
 
