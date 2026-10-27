@@ -5,10 +5,12 @@ import path from 'node:path';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 
+if(process.env.AURION_BROWSER_E2E!=='1'){
+  console.log('[frontend-e2e] Ignoré hors du contrôle navigateur explicite.');
+}else{
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 if(!process.env.DATABASE_URL){
-  console.warn('[frontend-e2e] Ignoré : DATABASE_URL doit pointer vers une base PostgreSQL de test migrée.');
-  process.exit(0);
+  throw new Error('AURION_BROWSER_E2E=1 exige DATABASE_URL vers une base PostgreSQL de test migrée.');
 }
 const require=createRequire(new URL('../package.json',import.meta.url));
 let chromium,SMTPServer;
@@ -128,4 +130,6 @@ try{
   app.kill('SIGTERM');
   await new Promise(resolve=>{if(app.exitCode!==null)return resolve();app.once('exit',resolve);const timer=setTimeout(()=>{if(app.exitCode===null)app.kill('SIGKILL');resolve()},3000);timer.unref()});
   await new Promise(resolve=>smtp.close(()=>resolve())).catch(()=>{});
+}
+
 }

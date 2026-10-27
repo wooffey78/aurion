@@ -101,11 +101,14 @@ async function issueEmailVerification(userId:string,email:string){
       const ticket=await oauth.verifyIdToken({idToken,audience:config.GOOGLE_CLIENT_ID});
       const identity=ticket.getPayload();
       if(!identity?.sub||!identity.email||identity.email_verified!==true)return fail();
-      const rows=await query<{id:string,email:string,session_version:number,email_verified_at:string|null,organization_id:string,role:string,membership_count:number}>(
-        `select u.id,u.email,u.session_version,u.email_verified_at,om.organization_id,om.role,
-                count(*) over(partition by u.id)::int as membership_count
-         from users u join organization_members om on om.user_id=u.id
-         where lower(u.email)=lower($1)
+      const rows=await query<{id:string,email:string,session_version:number,email_verified_at:string|null,organization_id:string,role:string,membership_count:number,matching_accounts:number}>(
+        `with matched_users as (
+           select u.id,u.email,u.session_version,u.email_verified_at,count(*) over()::int as matching_accounts
+           from users u where lower(u.email)=lower($1)
+         )
+         select u.id,u.email,u.session_version,u.email_verified_at,om.organization_id,om.role,
+                count(*) over(partition by u.id)::int as membership_count,u.matching_accounts
+         from matched_users u join organization_members om on om.user_id=u.id
          order by case when om.role='owner' then 0 else 1 end
          limit 2`,
         [identity.email]
@@ -113,6 +116,7 @@ async function issueEmailVerification(userId:string,email:string){
       const user=rows.rows[0];
       // Google authentication never creates an account or bypasses Aurion's legal acceptance flow.
       if(!user)return fail();
+      if(Number(user.matching_accounts)>1)return fail('Plusieurs comptes utilisent cette adresse. La connexion automatique est suspendue pour éviter tout accès au mauvais compte ; contactez le support.');
       let sessionVersion=Number(user.session_version||0);
       // A verified Google identity proves ownership of the e-mail. If the Aurion account
       // was created but never verified, invalidate the password and every existing session

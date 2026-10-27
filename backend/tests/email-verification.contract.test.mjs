@@ -30,6 +30,7 @@ test('registration n’ouvre aucune session avant la confirmation, et login bloq
 test('la connexion Google exige une adresse vérifiée et refuse le choix arbitraire d’organisation',()=>{
   const auth=read('backend/src/routes/auth.ts');
   assert.match(auth,/identity\.email_verified!==true/);
+  assert.match(auth,/matching_accounts\)>1/);
   assert.match(auth,/membership_count\)>1/);
   assert.match(auth,/disabledPasswordHash/);
   assert.ok(auth.indexOf('membership_count)>1')>auth.indexOf('disabledPasswordHash'),'Le mot de passe doit être invalidé avant le refus de l’espace multi-organisation.');
