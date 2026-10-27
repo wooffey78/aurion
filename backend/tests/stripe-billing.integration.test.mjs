@@ -213,7 +213,8 @@ if (!enabled) {
         data: { object: { ...payment.session, ...invalidFields } },
       };
       const response = await postWebhook(event);
-      assert.equal(response.statusCode, 400, response.body);
+      assert.equal(response.statusCode, 200, response.body);
+      assert.equal(response.json().status, 'invalid');
       assert.equal((await paymentState(account.organizationId, payment.id)).payment_status, 'pending');
       assert.equal((await paymentState(account.organizationId, payment.id)).subscription_status, 'trialing');
     }
@@ -241,7 +242,7 @@ if (!enabled) {
   });
 
 
-  test('Stripe checkout handles provider timeout and invalid JSON without persisting a payment request', async () => {
+  test('Stripe checkout persists pending requests before contacting the provider and expires failures', async () => {
     const account = await registerAccount();
     const originalFetch = globalThis.fetch;
     try {
@@ -272,7 +273,9 @@ if (!enabled) {
         "select count(*)::int n from billing_payment_requests where organization_id=$1 and method='card'",
         [account.organizationId],
       );
-      assert.equal(saved.rows[0].n, 0);
+      assert.equal(Number(saved.rows[0].n), 2);
+      const statuses = await db.query("select status,count(*)::int n from billing_payment_requests where organization_id=$1 and method='card' group by status", [account.organizationId]);
+      assert.deepEqual(Object.fromEntries(statuses.rows.map(row=>[row.status,Number(row.n)])), { pending: 1, canceled: 1 });
     } finally {
       globalThis.fetch = originalFetch;
     }
