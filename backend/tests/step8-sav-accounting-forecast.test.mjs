@@ -10,7 +10,7 @@ const accounting=fs.readFileSync(path.join(root,'backend/src/services/accounting
 const other=fs.readFileSync(path.join(root,'assets/js/pages/dash/other.js'),'utf8');
 
 test('les SAV financiers négatifs sont intégrés à la comptabilité et au prévisionnel de trésorerie, sans double comptage',()=>{
-  assert.match(business,/sum\(case when entry_type='sav' then amount else 0 end\)/);
+  assert.match(accounting,/sum\(case when entry_type='sav' then amount else 0 end\)/);
   assert.match(accounting,/cur\.revenueHt\+=n\(r\.sav\)/);
   assert.match(business,/const savTotal=Number\(\(await query/);
   assert.match(business,/forecastEntries:forecastIn\+savTotal/);

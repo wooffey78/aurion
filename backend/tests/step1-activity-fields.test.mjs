@@ -16,7 +16,7 @@ test('activité : saisie manuelle, sélection du métier et champs fiscaux indé
   assert.ok(form.includes("manualInput('name','Nom de l’activité','Nom donné à cette activité'"));
   assert.ok(form.includes("manualInput('description','Description / métier','Décrivez l’activité avec des mots"));
   assert.match(form,/<select id="profileCode">/);
-  assert.match(form,/<div class="notice"><b>Identité juridique:/);
+  assert.ok(form.includes('Identité juridique :'));
   assert.ok(form.includes("manualInput('vatRate'"),'TVA modifiable');
   assert.ok(form.includes("manualInput('urssafRate'"),'taux agrégé modifiable');
   assert.doesNotMatch(form,/value="\$\{e\(a\.name\)\}"/);

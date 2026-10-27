@@ -20,9 +20,9 @@ test('facture directe : le choix facture reste prioritaire au brouillon devis',(
 });
 
 test('pièces : coût interne uniquement, jamais ajouté au prix client',()=>{
-  assert.match(route,/const unitPrice=item\\.unitPrice!==null&&item\\.unitPrice!==undefined/);
+  assert.ok(route.includes('const unitPrice=item.unitPrice!==null&&item.unitPrice!==undefined'));
   assert.match(route,/const euroCoefficient=coefficientBasis==='purchase'&&coefficientUnit==='euro'/);
-  assert.match(route,/const total=Number\\(service\\?\\.default_price\\|\\|0\\)/);
+  assert.ok(route.includes('const total=Number(service?.default_price||0)'));
   const r=pricing({partCost:100,shippingCost:0,mileageKm:0,vatRate:20,targetTtc:240,driver:'ttc',coefficientValue:20,coefficientUnit:'percent',coefficientBasis:'purchase'});
   assert.equal(r.totalTtc,240);
   assert.equal(r.purchaseHt,100);

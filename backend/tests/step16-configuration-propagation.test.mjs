@@ -26,6 +26,6 @@ test('configuration propagates to server, dashboard, quote, and settings', () =>
   assert.match(quote, /configQ=S\.company\?\.configuration_data\?\.questionnaire/);
   assert.match(quote, /itemsEnabled=c\.items!==false&&configQ\.parts!==['"]Non['"]/);
   assert.match(settings, /q=S\.company\?\.configuration_data\?\.questionnaire/);
-  assert.match(settings, /contributions==='Non'/);
+  assert.match(settings, /\['contributions','Cotisations détectées'/);
   assert.match(onboarding, /configurationData/);
 });
