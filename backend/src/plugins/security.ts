@@ -10,7 +10,7 @@ export default fp(async app=>{
   await app.register(helmet,{
     // CSP stricte : uniquement des scripts / styles servis par Aurion ; blob: autorisé pour l'aperçu PDF ; jamais intégrable dans un iframe tiers.
     contentSecurityPolicy:{useDefaults:false,directives:{
-      defaultSrc:["'self'"],scriptSrc:["'self'"],styleSrc:["'self'","'unsafe-inline'"],imgSrc:["'self'","data:","blob:"],
+      defaultSrc:["'self'"],scriptSrc:["'self'"],styleSrc:["'self'","'unsafe-inline'"],imgSrc:["'self'","data:","blob:","https://www.apple.com","https://msftstories.thesourcemediaassets.com","https://storage.googleapis.com"],
       fontSrc:["'self'","data:"],connectSrc:["'self'"],objectSrc:["'self'","blob:"],frameSrc:["'self'","blob:"],
       frameAncestors:["'none'"],baseUri:["'self'"],formAction:["'self'"],
       ...(prod?{upgradeInsecureRequests:[]}:{})

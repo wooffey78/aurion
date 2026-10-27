@@ -28,6 +28,22 @@ test('Render blueprint is free-tier web only and requires an externally managed 
   assert.match(render, /key: HOST\s+value: 0\.0\.0\.0/);
 });
 
+test('PWA cache is restricted to static assets and never stores business API responses', () => {
+  const sw = read('sw.js');
+  assert.match(sw, /function shouldCacheStaticRequest/);
+  assert.match(sw, /if\(!shouldCacheStaticRequest\(event\.request\)\)return/);
+  assert.match(sw, /CACHEABLE_PREFIXES/);
+  assert.match(sw, /caches\.match\(event\.request,\{ignoreSearch:true\}\)/);
+  assert.doesNotMatch(sw, /caches\.open\(CACHE\)\.then\(c=>c\.put\(e\.request/);
+});
+
+test('production image CSP permits the known landing-card image hosts', () => {
+  const security = read('backend/src/plugins/security.ts');
+  for (const host of ['https://www.apple.com','https://msftstories.thesourcemediaassets.com','https://storage.googleapis.com']) {
+    assert.ok(security.includes(host), `CSP image host missing: ${host}`);
+  }
+});
+
 test('repository ignores local environment, uploads and generated dependencies', () => {
   const ignore = read('.gitignore');
   for (const entry of ['.env', 'backend/storage/', 'node_modules/', 'backend/dist/']) assert.ok(ignore.includes(entry), `missing ignore entry ${entry}`);

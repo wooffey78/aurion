@@ -22,6 +22,17 @@ jobs:
       - name: Build, type check and targeted smoke tests
         run: npm run check
 
+      - name: Run full legacy regression suite (diagnostic)
+        continue-on-error: true
+        run: |
+          mkdir -p dist-artifacts
+          set +e
+          npm test > dist-artifacts/full-regression.log 2>&1
+          result=$?
+          echo "exit_code=$result" >> dist-artifacts/full-regression.log
+          tail -n 80 dist-artifacts/full-regression.log
+          exit $result
+
       - name: Package complete source archive
         run: |
           mkdir -p dist-artifacts
@@ -32,6 +43,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: aurion-source-${{ github.sha }}
-          path: dist-artifacts/*.zip
+          path: |
+            dist-artifacts/*.zip
+            dist-artifacts/full-regression.log
           if-no-files-found: error
           retention-days: 14
