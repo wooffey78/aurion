@@ -13,6 +13,7 @@ const baseEnv = {
   COOKIE_SECURE: 'true',
   AURION_ENCRYPTION_KEY: 'explicit-config-test-encryption-key-at-least-32-chars',
   AURION_ENCRYPTION_KEY_VERSION: 'test-k1',
+  AURION_RUNTIME_DB_ROLE: 'aurion_runtime',
   APP_BASE_URL: 'https://aurion.example.test',
   CORS_ORIGIN: 'https://aurion.example.test',
   AURION_SUPPORT_EMAIL: 'support@example.test',
@@ -31,6 +32,16 @@ function loadConfig(overrides = {}) {
   });
   return result;
 }
+
+
+test('production requires Stripe secret and webhook signing key together', () => {
+  const secretOnly = loadConfig({ STRIPE_SECRET_KEY: 'sk_test_example', STRIPE_WEBHOOK_SECRET: '' });
+  assert.notEqual(secretOnly.status, 0);
+  assert.match(secretOnly.stderr, /STRIPE_SECRET_KEY et STRIPE_WEBHOOK_SECRET doivent être définis ensemble/);
+  const webhookOnly = loadConfig({ STRIPE_SECRET_KEY: '', STRIPE_WEBHOOK_SECRET: 'whsec_example' });
+  assert.notEqual(webhookOnly.status, 0);
+  assert.match(webhookOnly.stderr, /STRIPE_SECRET_KEY et STRIPE_WEBHOOK_SECRET doivent être définis ensemble/);
+});
 
 test('production refuses missing dedicated encryption key instead of using JWT_SECRET', () => {
   const result = loadConfig({ AURION_ENCRYPTION_KEY: '' });
