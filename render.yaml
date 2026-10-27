@@ -7,7 +7,7 @@ services:
     plan: free
     buildCommand: npm ci --prefix backend --include=dev --no-audit --no-fund && npm run build
     startCommand: npm --prefix backend start
-    healthCheckPath: /health
+    healthCheckPath: /health/db
     autoDeploy: true
     envVars:
       - key: NODE_ENV
@@ -19,6 +19,8 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: AURION_MIGRATION_DATABASE_URL
+        sync: false
+      - key: AURION_RUNTIME_DB_ROLE
         sync: false
       - key: JWT_SECRET
         generateValue: true
