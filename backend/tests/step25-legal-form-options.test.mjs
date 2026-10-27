@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { test } from 'node:test';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const onboarding = fs.readFileSync('assets/js/pages/onboarding.js', 'utf8');
-const settings = fs.readFileSync('assets/js/pages/dash/settings.js', 'utf8');
-const fiscal = fs.readFileSync('backend/src/services/fiscal-detection.ts', 'utf8');
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
+
+const onboarding = fs.readFileSync(path.join(root,'assets/js/pages/onboarding.js'), 'utf8');
+const settings = fs.readFileSync(path.join(root,'assets/js/pages/dash/settings.js'), 'utf8');
+const fiscal = fs.readFileSync(path.join(root,'backend/src/services/fiscal-detection.ts'), 'utf8');
 
 function legalFormOptionsCount() {
   const block = fiscal.match(/export const LEGAL_FORMS:LegalFormOption\[\]=\[(.*?)\];/s)?.[1] || '';

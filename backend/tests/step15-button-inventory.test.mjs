@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 function files(dir) {
   const out=[];
@@ -12,7 +13,8 @@ function files(dir) {
   }
   return out;
 }
-const jsFiles=files('assets/js');
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
+const jsFiles=files(path.join(root,'assets/js'));
 const sources=jsFiles.map(f=>[f,fs.readFileSync(f,'utf8')]);
 const all=sources.map(x=>x[1]).join('\n');
 

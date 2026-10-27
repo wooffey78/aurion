@@ -1,9 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const catalog = fs.readFileSync('assets/js/pages/dash/catalog.js', 'utf8');
-const docs = fs.readFileSync('assets/js/pages/dash/docs.js', 'utf8');
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
+
+const catalog = fs.readFileSync(path.join(root,'assets/js/pages/dash/catalog.js'), 'utf8');
+const docs = fs.readFileSync(path.join(root,'assets/js/pages/dash/docs.js'), 'utf8');
 
 test('Step 15: supply edit/delete buttons react only after click', () => {
   const edit = catalog.match(/all\('\.edit-supply'\)[\s\S]{0,260}/)?.[0] || '';

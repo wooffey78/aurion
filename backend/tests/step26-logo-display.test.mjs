@@ -1,6 +1,10 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 
 if(!globalThis.location) globalThis.location={hostname:'localhost'};
 if(!globalThis.window) globalThis.window={AURION_API_URL:'http://localhost:4000'};
@@ -26,8 +30,8 @@ test('step26: uploaded logo replaces the textual placeholder with a preview cont
 });
 
 test('step26: authenticated logo endpoint and frontend API helper exist',()=>{
-  const apiSource=fs.readFileSync('assets/js/core/api.js','utf8');
-  const routeSource=fs.readFileSync('backend/src/routes/documents.ts','utf8');
+  const apiSource=fs.readFileSync(path.join(root,'assets/js/core/api.js'),'utf8');
+  const routeSource=fs.readFileSync(path.join(root,'backend/src/routes/documents.ts'),'utf8');
   assert.match(apiSource,/companyLogo:\(\)=>api\.authFetch\('\/documents\/logo'\)/);
   assert.match(routeSource,/app\.get\('\/documents\/logo'/);
   assert.match(routeSource,/fileFromKey\(key\)/);
