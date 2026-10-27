@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import crypto from "node:crypto";
+import { CodeChallengeMethod } from 'google-auth-library';
 import { query, db } from "../db.js";
 import { config } from "../config.js";
 import { hashPassword, verifyPassword } from "../services/passwords.js";
@@ -40,6 +41,78 @@ function configuredWebAuthnOrigin(request:any): string | null {
 }
 
 export async function authRoutes(app: FastifyInstance) {
+
+const googleLoginConfigured=()=>Boolean(config.GOOGLE_CLIENT_ID&&config.GOOGLE_CLIENT_SECRET&&config.APP_BASE_URL);
+const googleLoginRedirect=()=>new URL('/auth/google/callback',config.APP_BASE_URL).toString();
+const googleLoginFailure=(reply:any)=>reply.code(401).type('text/html; charset=utf-8').send('<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connexion Google impossible · Aurion</title><body style="font:16px system-ui;max-width:620px;margin:12vh auto;padding:24px;color:#252d2a"><h1>Connexion Google impossible</h1><p>Votre compte n’a pas pu être authentifié. Réessayez ou utilisez votre mot de passe ou une clé d’accès.</p><p><a href="/#/login">Retour à la connexion Aurion</a></p></body></html>');
+async function googleLoginClient(){
+ const {google}=await import('googleapis');
+ return new google.auth.OAuth2(config.GOOGLE_CLIENT_ID,config.GOOGLE_CLIENT_SECRET,googleLoginRedirect());
+}
+
+  app.get('/auth/google/status', async () => ({ configured: googleLoginConfigured() }));
+
+  app.get('/auth/google/start', { config: { rateLimit: { max: 8, timeWindow: '15 minutes' } } }, async (request, reply) => {
+    if (!googleLoginConfigured()) return reply.code(503).send({ error: 'GOOGLE_LOGIN_NOT_CONFIGURED', message: 'La connexion Google n’est pas configurée.' });
+    const state=crypto.randomBytes(32).toString('base64url');
+    const codeVerifier=crypto.randomBytes(48).toString('base64url');
+    const codeChallenge=crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+    reply.setCookie('aurion_google_login', JSON.stringify({state,codeVerifier}), {
+      httpOnly:true, secure:config.COOKIE_SECURE, sameSite:'lax', path:'/auth/google/callback', maxAge:600
+    });
+    try {
+      const oauth=await googleLoginClient();
+      const url=oauth.generateAuthUrl({
+        access_type:'online', prompt:'select_account', state,
+        scope:['openid','email','profile'], code_challenge:codeChallenge, code_challenge_method:CodeChallengeMethod.S256
+      });
+      return reply.redirect(url);
+    } catch {
+      reply.clearCookie('aurion_google_login',{path:'/auth/google/callback'});
+      return reply.code(503).send({error:'GOOGLE_LOGIN_UNAVAILABLE',message:'La connexion Google est temporairement indisponible.'});
+    }
+  });
+
+  app.get('/auth/google/callback', { config: { rateLimit: { max: 12, timeWindow: '15 minutes' } } }, async (request, reply) => {
+    const fail=()=>{reply.clearCookie('aurion_google_login',{path:'/auth/google/callback'});return googleLoginFailure(reply)};
+    if (!googleLoginConfigured()) return fail();
+    const saved=request.cookies?.aurion_google_login;
+    let transaction:any=null;
+    try { transaction=saved?JSON.parse(saved):null; } catch { transaction=null; }
+    const queryArgs=request.query as any;
+    const state=String(queryArgs?.state||''),code=String(queryArgs?.code||'');
+    if(!transaction?.state||!transaction?.codeVerifier||!state||!code||state!==transaction.state||String(queryArgs?.error||''))return fail();
+    try {
+      const oauth=await googleLoginClient();
+      const tokenResult=await oauth.getToken({code,codeVerifier:transaction.codeVerifier});
+      const idToken=tokenResult.tokens?.id_token;
+      if(!idToken)return fail();
+      const ticket=await oauth.verifyIdToken({idToken,audience:config.GOOGLE_CLIENT_ID});
+      const identity=ticket.getPayload();
+      if(!identity?.sub||!identity.email||identity.email_verified!==true)return fail();
+      const rows=await query<{id:string,email:string,session_version:number,organization_id:string,role:string}>(
+        `select u.id,u.email,u.session_version,om.organization_id,om.role
+         from users u join organization_members om on om.user_id=u.id
+         where lower(u.email)=lower($1)
+         order by case when om.role='owner' then 0 else 1 end
+         limit 1`,
+        [identity.email]
+      );
+      const user=rows.rows[0];
+      // Google authentication never creates an account or bypasses Aurion's legal acceptance flow.
+      if(!user)return fail();
+      reply.clearCookie('aurion_google_login',{path:'/auth/google/callback'});
+      const sessionVersion=Number(user.session_version||0);
+      const accessToken=await signAccessToken({userId:user.id,organizationId:user.organization_id,role:user.role,sv:sessionVersion});
+      app.setSession(reply,accessToken);
+      const refresh=await createRefreshSession({userId:user.id,organizationId:user.organization_id,role:user.role,sessionVersion},request);
+      app.setRefreshSession(reply,refresh.token);
+      const origin=new URL(config.APP_BASE_URL).origin;
+      return reply.redirect(origin+'/#/dashboard');
+    } catch {
+      return fail();
+    }
+  });
   app.get('/auth/vip-invite/validate', { config: { rateLimit: { max: 30, timeWindow: '15 minutes' } } }, async (request, reply) => {
     const token=String((request.query as any)?.token||'');
     if(token.length<20)return reply.code(400).send({error:'INVITE_INVALID',message:'Invitation invalide.'});
@@ -219,6 +292,22 @@ export async function authRoutes(app: FastifyInstance) {
       return { user:{id:row.id,email:row.email}, organizationId:row.organization_id, accessToken:token, expiresIn:30*60 }; 
     },
   );
+
+  app.get('/auth/webauthn/credentials', { preHandler: app.requireAuth }, async (request) => {
+    const rows=await query<{id:string,created_at:string,last_used_at:string|null,transports:string[]}>(
+      'select id,created_at,last_used_at,transports from webauthn_credentials where user_id=$1 order by created_at desc',
+      [request.auth!.userId]
+    );
+    return { credentials: rows.rows.map(row=>({id:row.id,createdAt:row.created_at,lastUsedAt:row.last_used_at,transports:row.transports||[]})) };
+  });
+
+  app.delete('/auth/webauthn/credentials/:id', { preHandler: app.requireAuth }, async (request, reply) => {
+    const id=String((request.params as any)?.id||'');
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))return reply.code(400).send({error:'INVALID_CREDENTIAL_ID'});
+    const removed=await query('delete from webauthn_credentials where id=$1 and user_id=$2 returning id',[id,request.auth!.userId]);
+    if(!removed.rowCount)return reply.code(404).send({error:'PASSKEY_NOT_FOUND',message:'Cette clé d’accès est introuvable ou appartient à un autre compte.'});
+    return {ok:true};
+  });
 
   app.get('/auth/webauthn/register/options', { preHandler: app.requireAuth }, async (request, reply) => {
     const origin = configuredWebAuthnOrigin(request);

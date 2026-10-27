@@ -33,6 +33,11 @@ test('biométrie : bouton accessible sans connexion automatique silencieuse', ()
   assert.match(auth, /biometric.hidden=r\|\|!biometricAllowed\(\)/);
   assert.doesNotMatch(auth, /setTimeout\(\(\)=>biometricLogin\(\)\.catch\(\(\)=>\{\}\)/);
   assert.match(auth, /biometric.onclick=async/);
+  assert.match(auth, /window\.isSecureContext&&window\.PublicKeyCredential&&navigator\.credentials\?\.get&&navigator\.credentials\?\.create/);
+  assert.doesNotMatch(auth, /Android\|iPhone\|iPad\|iPod/);
+  const account=read('../../assets/js/pages/dash/account.js');
+  assert.match(account, /webauthnCredentials\(\)/);
+  assert.match(account, /deleteWebauthnCredential/);
 });
 
 

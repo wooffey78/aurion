@@ -17,7 +17,8 @@ assert.match(dashboard,/\['suppliers','Fournisseurs'/,'Étape 31: fournisseurs d
 assert.match(dashboard,/S\.isPlatformAdmin\?`<button[^`]*data-view="admin"/s,'Étape 31: administration conditionnée au rôle');
 assert.match(catalog,/api\.createSupply\(/,'Étape 32: création fourniture');
 assert.match(catalog,/api\.updateSupply\(/,'Étape 32: modification fourniture');
-assert.match(catalog,/api\.deleteSupply\(/,'Étape 32: suppression fourniture');
+assert.match(catalog,/supplies:api\.deleteSupply/,'Étape 32: suppression fourniture via le dispatcher de catégorie');
+assert.match(catalog,/await confirmDelete\([\s\S]*?fn\(id\)/,'Étape 32: suppression confirmée avant appel API');
 assert.match(settings,/api\.updateOrganization\(/,'Étape 33: paramètres persistés');
 assert.match(settings,/api\.supplierLookup\(/,'Étape 33: auto-détection entreprise');
 assert.match(docs,/api\.createSav\(/,'Étape 34: création SAV');

@@ -14,7 +14,11 @@ test('devis, factures, fiches clients et éléments catalogue sont supprimables 
   assert.match(docs,/api\.deleteQuote\(q\.id\)/);
   assert.match(other,/api\.deleteClient\(c\.id\)/);
   assert.match(clients,/#sh-del/);
-  for(const selector of ['.del-part','.del-supply','.del-intervention','.del-policy']) assert.ok(catalog.includes(selector), 'bouton de suppression absent: '+selector);
+  assert.match(catalog,/const legacyActions=\{interventions:\{[^}]*delete:'del-intervention'[^}]*\},parts:\{[^}]*delete:'del-part'[^}]*\},supplies:\{[^}]*delete:'del-supply'[^}]*\},policies:\{[^}]*delete:'del-policy'/);
+  assert.match(catalog,/data-action="\$\{a\}"/);
+  assert.match(catalog,/if\(a==='delete'\)\{await remove\(t,id\);return\}/);
+  assert.match(catalog,/fn=\{interventions:api\.deleteIntervention,parts:api\.deletePart,supplies:api\.deleteSupply,policies:api\.deleteWarrantyPolicy\}\[t\]/);
+  assert.match(catalog,/await confirmDelete\(/);
 });
 
 test('suppression des documents supprime aussi les métadonnées des fichiers dans une transaction', () => {
