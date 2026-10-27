@@ -22,9 +22,9 @@ test('les boutons d’accueil ouvrent les pages d’authentification par navigat
   assert.ok(router.includes("if(entry==='register')return '/auth'"));
   assert.ok(router.includes("if(entry==='login')return '/login'"));
   assert.ok(!main.includes("document.addEventListener('click', event =>"));
-  assert.ok(shell.includes('main.js?v=15.2.48-r1'));
-  assert.ok(shell.includes('app.css?v=15.2.48-r1'));
-  assert.ok(sw.includes('aurion-shell-v15.2.48-r1'));
+  assert.ok(shell.includes('main.js?v=15.2.47-r1'));
+  assert.ok(shell.includes('app.css?v=15.2.47-r1'));
+  assert.ok(sw.includes('aurion-shell-v15.2.47-r1'));
 });
 
 test('la suppression de facture reste disponible même si elle est déjà réglée', () => {
@@ -56,5 +56,5 @@ test('le build racine installe les dépendances backend absentes avant TypeScrip
   assert.equal(rootPackage.scripts.build, 'node tools/ensure-backend-deps.mjs && npm --prefix backend run build');
   assert.match(bootstrap, /backend\/node_modules\/fastify\/package\.json/);
   assert.match(bootstrap, /backend\/node_modules\/typescript\/package\.json/);
-  assert.match(bootstrap, /'ci'/);
+  assert.match(bootstrap, /\[\s*'ci'/);
 });

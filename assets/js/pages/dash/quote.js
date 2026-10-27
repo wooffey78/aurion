@@ -66,7 +66,7 @@ export async function bind(){
   const documentType=editing?(q?.document_type==='invoice'?'invoice':'quote'):(S.documentType==='invoice'?'invoice':(q?.documentType==='invoice'?'invoice':'quote'));
   S.documentType=documentType;
   if(q?.documentType&&!editing)S.documentType=q.documentType==='invoice'?'invoice':'quote';
-  driver=q?(q.driver==='net'?'net':'ttc'):'net';const catalogPricing=q?((q.catalogPricing??q.catalog_pricing)!==false):true;
+  driver=q?(q.driver==='net'?'net':'ttc'):'net';catalogPricing=q?((q.catalogPricing??q.catalog_pricing)!==false):true;
   if(!q&&S.prefillClient){$('#qclient').value=S.prefillClient;S.prefillClient=null}
   lines=q?(q.items||[]).map(i=>({label:i.label,quantity:Number(i.quantity),unitCost:Number(i.unitCost),unitPrice:i.unitPrice==null?'':Number(i.unitPrice),partId:i.partId,saleCoefficientPercent:Number(i.saleCoefficientPercent??0)})):[];
   if(q&&!lines.length&&q.product)lines=[{label:q.product,quantity:1,unitCost:Number(q.part_cost)||0,unitPrice:'',partId:null}];
