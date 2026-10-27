@@ -28,6 +28,18 @@ services:
         sync: false
       - key: APP_BASE_URL
         sync: false
+      - key: PLATFORM_SMTP_HOST
+        sync: false
+      - key: PLATFORM_SMTP_PORT
+        value: "465"
+      - key: PLATFORM_SMTP_SECURITY
+        value: ssl
+      - key: PLATFORM_SMTP_USER
+        sync: false
+      - key: PLATFORM_SMTP_PASS
+        sync: false
+      - key: PLATFORM_SMTP_FROM
+        sync: false
       - key: GOOGLE_REDIRECT_URI
         sync: false
       - key: GOOGLE_TOKEN_ENCRYPTION_KEY
