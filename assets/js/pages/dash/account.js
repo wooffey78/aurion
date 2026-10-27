@@ -29,6 +29,11 @@ export async function bind(){
      <label class="field"><span>Nouveau mot de passe</span><div class="password-input"><input id="new" type="password" minlength="12" autocomplete="new-password" required><button type="button" id="eye" class="icon-btn" aria-label="Afficher le mot de passe">◉</button></div><div class="password-meter"><i id="meter"></i></div><div class="password-actions"><button type="button" id="suggest" class="link-btn">Suggérer un mot de passe</button><span id="score" class="help">12 caractères minimum</span></div></label>
      <button class="btn primary" type="submit">Changer le mot de passe</button><p id="pw-err" class="error" hidden></p></form>
     <p class="help">${u.passwordChangedAt?`Dernier changement : ${fdate(u.passwordChangedAt)}.`:'Mot de passe jamais modifié depuis la création du compte.'} Un changement déconnecte vos autres appareils.</p>
+    <section class="account-passkeys stack" aria-labelledby="passkeys-title">
+     <div class="section-title"><div><h3 id="passkeys-title">Clés d’accès</h3><p class="help">Connexion sans mot de passe, avec l’authentificateur de l’appareil ou une clé de sécurité compatible.</p></div><button class="btn secondary small" id="passkey-add" type="button">Ajouter une clé</button></div>
+     <div id="passkey-list" class="passkey-list" aria-live="polite"><p class="muted">Chargement des clés d’accès…</p></div>
+     <p class="help">La vérification locale peut utiliser une empreinte, la reconnaissance faciale ou le code de l’appareil selon le système configuré. Votre authentifiant n’envoie pas vos données biométriques à Aurion.</p>
+    </section>
     <div class="button-row"><button class="btn danger" id="logout-all">Me déconnecter de tous les appareils</button></div>
    </section>
    <section class="panel stack wide-panel"><div class="section-title"><h2>Abonnement</h2><span class="chip ${tone}">${e(label)}</span></div>
@@ -41,6 +46,39 @@ export async function bind(){
    <section class="panel wide-panel"><div class="section-title"><h2>Mes données</h2><button class="btn primary" id="download-all">Télécharger toutes mes données (.zip)</button></div><p class="muted">Aurion génère un dossier compressé contenant les fiches clients, devis, factures et le document comptable en PDF séparés.</p></section><section class="panel wide-panel"><h2>Documents légaux acceptés</h2>${acc.legalAcceptances.map(a=>`<div class="list-row"><div><b>${e(a.title)}</b><small>Version ${e(a.version)}${a.is_draft?' (brouillon)':''} · acceptée le ${fdate(a.accepted_at)}</small></div><a class="link-btn" href="#/legal/${e(a.kind)}" target="_blank" rel="noopener">Consulter</a></div>`).join('')||'<p class="muted">Aucune acceptation enregistrée.</p>'}</section>`;
 
   const $=s=>root.querySelector(s);
+  const b64u=x=>{const bytes=new Uint8Array(x);let out='';for(const b of bytes)out+=String.fromCharCode(b);return btoa(out).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')};
+  const dec=x=>{const text=String(x).replace(/-/g,'+').replace(/_/g,'/');return Uint8Array.from(atob(text),c=>c.charCodeAt(0))};
+  const passkeyAllowed=()=>Boolean(window.isSecureContext&&window.PublicKeyCredential&&navigator.credentials?.create&&navigator.credentials?.get);
+  const passkeyDate=value=>value?new Date(value).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'}):'Jamais utilisée';
+  const loadPasskeys=async()=>{
+    const list=$('#passkey-list'),button=$('#passkey-add');if(!list)return;
+    button.disabled=!passkeyAllowed();
+    if(!passkeyAllowed()){list.innerHTML='<p class="muted">Les clés d’accès nécessitent un navigateur compatible et une connexion sécurisée (HTTPS).</p>';return}
+    try{
+      const result=await api.webauthnCredentials(),items=Array.isArray(result.credentials)?result.credentials:[];
+      list.innerHTML=items.length?items.map(item=>`<article class="passkey-row"><div><strong>Clé d’accès</strong><small>Ajoutée le ${e(passkeyDate(item.createdAt))} · Dernière utilisation : ${e(passkeyDate(item.lastUsedAt))}</small><small>Type : ${e((item.transports||[]).join(', ')||'Authentificateur de l’appareil ou synchronisé')}</small></div><button class="btn danger small" type="button" data-passkey-delete="${e(item.id)}">Retirer</button></article>`).join(''):'<p class="muted">Aucune clé d’accès n’est enregistrée pour ce compte.</p>';
+      list.querySelectorAll('[data-passkey-delete]').forEach(button=>button.addEventListener('click',async()=>{
+        const id=button.dataset.passkeyDelete;
+        if(!await askConfirm({title:'Retirer cette clé d’accès ?',message:'Cette clé ne permettra plus de se connecter à Aurion. Les autres méthodes de connexion et les autres clés restent disponibles.',confirmLabel:'Retirer la clé',danger:true}))return;
+        button.disabled=true;
+        try{await api.deleteWebauthnCredential(id);toast('Clé d’accès retirée.','success');await loadPasskeys()}
+        catch(error){toast(error.message||'Impossible de retirer cette clé.','error');button.disabled=false}
+      }));
+    }catch(error){list.innerHTML='<p class="error">Impossible de charger les clés d’accès. Réessayez plus tard.</p>'}
+  };
+  $('#passkey-add')?.addEventListener('click',async()=>{
+    const button=$('#passkey-add');if(!passkeyAllowed())return toast('Votre navigateur ne prend pas en charge les clés d’accès sur cette connexion.','error');
+    button.disabled=true;
+    try{
+      const options=await api.webauthnRegisterOptions();
+      const credential=await navigator.credentials.create({publicKey:{challenge:dec(options.challenge),rp:options.rp,user:{id:dec(options.user.id),name:options.user.name,displayName:options.user.displayName},pubKeyCredParams:options.pubKeyCredParams,authenticatorSelection:options.authenticatorSelection,timeout:options.timeout,attestation:options.attestation}});
+      if(!credential)throw new Error('Création de clé d’accès annulée.');
+      await api.webauthnRegisterVerify({response:{clientDataJSON:b64u(credential.response.clientDataJSON),attestationObject:b64u(credential.response.attestationObject),transports:credential.response.getTransports?.()||[]}});
+      toast('Clé d’accès enregistrée.','success');await loadPasskeys();
+    }catch(error){toast(error?.message||'Impossible d’enregistrer la clé d’accès.','error')}
+    finally{button.disabled=false}
+  });
+  void loadPasskeys();
   if(avatarObjectUrl){URL.revokeObjectURL(avatarObjectUrl);avatarObjectUrl='';}
   if(u.avatarUrl){try{const response=await api.accountAvatar();if(response.ok){const blob=await response.blob();avatarObjectUrl=URL.createObjectURL(blob);const img=$('#avatar-preview');if(img)img.src=avatarObjectUrl;}}catch{}}
   $('#download-all').onclick=()=>api.downloadAll();
