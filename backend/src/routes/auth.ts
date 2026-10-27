@@ -289,7 +289,7 @@ async function issueEmailVerification(userId:string,email:string){
     config: { rateLimit: { max: 3, timeWindow: '15 minutes' } },
     schema: { body: { type: 'object', required: ['email'], additionalProperties: false, properties: { email: { type: 'string', maxLength: 254 } } } }
   }, async (request, reply) => {
-    if(!emailVerificationAvailable())return reply.code(503).send({error:'EMAIL_VERIFICATION_UNAVAILABLE',message:'La vérification par e-mail n’est pas configurée. Réessayez plus tard ou contactez le support.'});
+    if(!config.APP_BASE_URL)return reply.code(503).send({error:'EMAIL_VERIFICATION_UNAVAILABLE',message:'La vérification par e-mail est temporairement indisponible. Contactez le support.'});
     const email=String((request.body as any)?.email||'').trim().toLowerCase();
     if(!email||!email.includes('@'))return reply.code(400).send({error:'INVALID_INPUT'});
     const user=(await query<{id:string,email:string,email_verified_at:string|null}>('select id,email,email_verified_at from users where lower(email)=lower($1) limit 1',[email])).rows[0];
