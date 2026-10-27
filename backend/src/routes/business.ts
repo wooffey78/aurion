@@ -1104,16 +1104,29 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     const t=await query(`select count(*)::int n from support_tickets where organization_id=$1 and status not in ('resolved','duplicate','closed')`,[org]);
     if(!aid)return {tickets:Number(t.rows[0]?.n||0),unpaidCount:0,unpaidTotal:0,forecastEntries:0};
     const u=await query(`select count(*)::int n,coalesce(sum(greatest(0,total_ttc-coalesce(amount_paid,0))),0)::numeric total,min(coalesce(due_at,created_at)) first_date from quotes where organization_id=$1 and activity_id=$2 and document_type='invoice' and payment_status<>'paid'`,[org,aid]);
-    const f=await query(`select coalesce(sum(total_ttc),0)::numeric total from quotes where organization_id=$1 and activity_id=$2 and document_type='quote' and status<>'canceled'`,[org,aid]);
+    const f=await query(`select coalesce(sum(total_ht),0)::numeric total from quotes where organization_id=$1 and activity_id=$2 and document_type='quote' and status<>'canceled'`,[org,aid]);
     const r4=await query(`select count(*)::int n,min(coalesce(next_reminder_at,due_at,created_at)) first_date from quotes where organization_id=$1 and activity_id=$2 and document_type='invoice' and payment_status<>'paid' and reminder_count=3`,[org,aid]);
     const historyMonths=Math.min(120,Math.max(1,Number((r.query as any)?.forecastMonths||6)));
-    const paid=(await query(`select coalesce(sum(p.amount),0)::numeric total from invoice_payments p join quotes q on q.id=p.quote_id where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice' and p.paid_at>=now()-($3||' months')::interval`,[org,aid,historyMonths])).rows[0];
-    const historicalAverage=Number(paid?.total||0)/Math.max(1,historyMonths);
+    const historical=(await query(`
+      select (
+        coalesce((select sum(p.amount/nullif(1+q.vat_rate/100,0))
+          from invoice_payments p join quotes q on q.id=p.quote_id
+          where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice'
+            and p.paid_at>=now()-($3||' months')::interval),0)
+        + coalesce((select sum(a.amount) from accounting_entries a
+          where a.organization_id=$1 and a.activity_id=$2 and a.entry_type='sav'
+            and a.entry_date>=current_date-($3||' months')::interval),0)
+      )::numeric total`,[org,aid,historyMonths])).rows[0];
+    const historicalAverage=Number(historical?.total||0)/Math.max(1,historyMonths);
     const open=Number(f.rows[0]?.total||0);
     const nextMonth=open;
-    const currentMonthPaid=Number((await query(`select coalesce(sum(p.amount),0)::numeric total from invoice_payments p join quotes q on q.id=p.quote_id where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice' and p.paid_at>=date_trunc('month',now())`,[org,aid])).rows[0]?.total||0);
-    const accountingYear=new Date().getFullYear();const yearAccounting=await monthlyAccounting(org,aid,accountingYear);const monthHt=Number(yearAccounting.find(m=>{const d=new Date(m.month);return d.getFullYear()===accountingYear&&d.getMonth()===new Date().getMonth()})?.revenueHt||0);
-    const forecast={month:currentMonthPaid,monthHt,month1:nextMonth,months3:nextMonth+historicalAverage*2,months6:nextMonth+historicalAverage*5,year:currentMonthPaid+nextMonth+historicalAverage*10,monthlyAverage:historicalAverage,historyMonths,method:`Prévision = devis ouverts + tendance moyenne des encaissements sur ${historyMonths} mois. Les devis annulés sont exclus; les SAV financiers sont comptabilisés séparément.`};
+    const accountingYear=new Date().getFullYear();
+    const yearAccounting=await monthlyAccounting(org,aid,accountingYear);
+    const currentDate=new Date();
+    const monthHt=Number(yearAccounting.find(m=>{const d=new Date(m.month);return d.getFullYear()===accountingYear&&d.getMonth()===currentDate.getMonth()})?.revenueHt||0);
+    const yearToDateHt=yearAccounting.reduce((sum,m)=>sum+Number(m.revenueHt||0),0);
+    const remainingMonths=Math.max(0,11-currentDate.getMonth());
+    const forecast={month:monthHt,monthHt,month1:nextMonth,months3:monthHt+historicalAverage*2+open,months6:monthHt+historicalAverage*5+open,year:yearToDateHt+historicalAverage*remainingMonths+open,monthlyAverage:historicalAverage,historyMonths,method:`Prévision en HT : encaissements historiques HT moyens, devis ouverts HT et SAV financiers déduits. Les devis annulés sont exclus. L’année combine le réalisé depuis janvier et les mois restants estimés.`};
     const warr=(await query(`select count(*)::int n,min(ends_at) next_end from warranties where organization_id=$1 and ends_at>now()`,[org])).rows[0];
     const appointments=(await query(`select title,starts_at,client_id from appointments where organization_id=$1 and activity_id=$2 and starts_at>now() order by starts_at asc limit 5`,[org,aid])).rows;
     const clientIds=appointments.map((a:any)=>a.client_id).filter(Boolean);
