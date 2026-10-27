@@ -36,10 +36,17 @@ jobs:
       - name: Build, type check and targeted smoke tests
         run: npm run check
 
-      - name: Apply migrations to disposable PostgreSQL 17
+      - name: Create separate runtime role
+        env:
+          PGPASSWORD: aurion_test_ci_only
+        run: psql -h localhost -U aurion_test -d aurion_test -v ON_ERROR_STOP=1 -c "CREATE ROLE aurion_runtime LOGIN PASSWORD 'aurion_runtime_ci_only';"
+
+      - name: Apply migrations to disposable PostgreSQL 17 with migration owner
         env:
           NODE_ENV: test
-          DATABASE_URL: postgresql://aurion_test:aurion_test_ci_only@localhost:5432/aurion_test
+          DATABASE_URL: postgresql://aurion_runtime:aurion_runtime_ci_only@localhost:5432/aurion_test
+          AURION_MIGRATION_DATABASE_URL: postgresql://aurion_test:aurion_test_ci_only@localhost:5432/aurion_test
+          AURION_RUNTIME_DB_ROLE: aurion_runtime
           JWT_SECRET: aurion-ci-only-jwt-secret-never-use-in-production-2026
           COOKIE_SECURE: "false"
           APP_BASE_URL: http://localhost:4000
@@ -48,7 +55,9 @@ jobs:
       - name: Run full regression and PostgreSQL integration suite (blocking)
         env:
           NODE_ENV: test
-          DATABASE_URL: postgresql://aurion_test:aurion_test_ci_only@localhost:5432/aurion_test
+          DATABASE_URL: postgresql://aurion_runtime:aurion_runtime_ci_only@localhost:5432/aurion_test
+          AURION_MIGRATION_DATABASE_URL: postgresql://aurion_test:aurion_test_ci_only@localhost:5432/aurion_test
+          AURION_RUNTIME_DB_ROLE: aurion_runtime
           AURION_INTEGRATION_TESTS: "1"
           JWT_SECRET: aurion-ci-only-jwt-secret-never-use-in-production-2026
           COOKIE_SECURE: "false"
@@ -63,7 +72,8 @@ jobs:
       - name: Package complete source archive
         run: |
           mkdir -p dist-artifacts
-          git archive --format=zip --prefix=Aurion-15.2.32/ -o "dist-artifacts/Aurion-15.2.32-source-${GITHUB_SHA:0:7}.zip" HEAD
+          VERSION="$(tr -d '\r\n' < VERSION.txt)"
+          git archive --format=zip --prefix="Aurion-${VERSION}/" -o "dist-artifacts/Aurion-${VERSION}-source-${GITHUB_SHA:0:7}.zip" HEAD
           sha256sum dist-artifacts/*.zip
 
       - name: Upload complete source archive
