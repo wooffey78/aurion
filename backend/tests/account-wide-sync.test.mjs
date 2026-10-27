@@ -12,7 +12,10 @@ test('synchronisation globale du compte : toutes les tables organisationnelles f
   assert.match(migration,/organization_id/);
   assert.match(route,/app\.get\('\/sync\/version'/);
   assert.match(sync,/\/sync\/version/);
-  assert.match(sync,/aurion\.accountSyncRevision/);
+  assert.match(sync,/aurion\.accountSyncRevision:/);
+  assert.match(sync,/window\.aurionSyncAcknowledge/);
+  assert.match(route,/organizationId: r\.auth!\.organizationId, userId: r\.auth!\.userId/);
+  assert.match(read('../../assets/js/core/api.js'),/window\.aurionSyncAcknowledge/);
   assert.match(sync,/aurion:account-sync-changed/);
   assert.doesNotMatch(sync,/location\.reload\(\)/);
   assert.doesNotMatch(sync,/window\.fetch=async/);
