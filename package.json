@@ -1,6 +1,6 @@
 {
   "name": "aurion",
-  "version": "15.2.43",
+  "version": "15.2.44",
   "private": true,
   "scripts": {
     "dev": "npm --prefix backend run dev",

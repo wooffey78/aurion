@@ -48,6 +48,18 @@ async function render(){
   document.querySelector('#app').innerHTML='<main class="center"><div class="glass"><h1>Page introuvable</h1><a class="btn primary" href="#/">Retour</a></div></main>';
 }
 
+// Les liens d’accueil sont rendus directement, sans dépendre uniquement de hashchange.
+document.addEventListener('click', event => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const link = target.closest('.landing-hero .button-row a[href="#/auth"], .landing-hero .button-row a[href="#/login"]');
+  if (!link) return;
+  event.preventDefault();
+  const destination = link.getAttribute('href') === '#/login' ? '/login' : '/auth';
+  if (route() !== destination) location.hash = destination;
+  renderAuth(destination === '/login' ? 'login' : 'register');
+});
+
 // Mobile keyboard/viewport management: keep focused fields and form actions visible on iOS/Android.
 const editableTarget = el => el instanceof HTMLElement && el.matches('input:not([type="hidden"]),textarea,select,[contenteditable="true"]');
 let viewportRaf = 0;

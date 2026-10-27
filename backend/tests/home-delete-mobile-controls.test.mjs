@@ -13,17 +13,20 @@ const css = read('assets/css/app.css');
 const sw = read('sw.js');
 const manifest = read('manifest.webmanifest');
 
-test('les boutons d’accueil gardent les ancres natives et le routeur traite le hashchange', () => {
+test('les boutons d’accueil déclenchent directement le mode attendu et gardent les routes natives', () => {
   assert.ok(shell.includes('href="#/auth"'));
   assert.ok(shell.includes('href="#/login"'));
+  assert.ok(main.includes("target.closest('.landing-hero .button-row a[href=\"#/auth\"], .landing-hero .button-row a[href=\"#/login\"]')"));
+  assert.ok(main.includes("if (route() !== destination) location.hash = destination;"));
+  assert.ok(main.includes("renderAuth(destination === '/login' ? 'login' : 'register')"));
   assert.ok(main.includes("if(r==='/auth')return renderAuth('register')"));
   assert.ok(main.includes("if(r==='/login')return renderAuth('login')"));
   assert.ok(router.includes('location.hash=path'));
   assert.ok(router.includes("addEventListener('hashchange',fn)"));
   assert.ok(!main.includes('bindLandingNavigation'));
-  assert.ok(shell.includes('main.js?v=15.2.43-r1'));
-  assert.ok(shell.includes('app.css?v=15.2.43-r1'));
-  assert.ok(sw.includes('aurion-shell-v15.2.43-r1'));
+  assert.ok(shell.includes('main.js?v=15.2.44-r1'));
+  assert.ok(shell.includes('app.css?v=15.2.44-r1'));
+  assert.ok(sw.includes('aurion-shell-v15.2.44-r1'));
 });
 
 test('la suppression de facture reste disponible même si elle est déjà réglée', () => {
