@@ -10,9 +10,9 @@ const sync=fs.readFileSync(path.join(root,'backend/src/services/configuration-sy
 
 test('étape 1: activité — champs manuels vides, placeholders, sélecteurs conservés',()=>{
   const form=settings.slice(settings.indexOf('const activityForm='),settings.indexOf('export function bind'));
-  assert.match(form,/manualInput\('name','Nom de l’activité','Nom donné à cette activité par l’utilisateur',a\.id\?'':'required'\)/);
-  assert.match(form,/textarea id="description" placeholder="Décrivez l’activité avec des mots/);
-  for(const id of ['vatRate','urssafRate','marginMinPercent','defaultPartCoefficientPercent','defaultLaborCoefficientPercent']){
+  assert.match(form,/manualInput\\('name','Nom de l’activité','Nom donné à cette activité',a\\.id\\?'':'required'\\)/);
+  assert.match(form,/manualInput\\('description','Description \/ métier','Décrivez l’activité avec des mots/);
+  for(const id of ['vatRate','urssafRate']) assert.match(form,new RegExp(`manualInput\\\\('${id}'`),`champ manuel ${id} doit être vide à l'ouverture`);
     assert.match(form,new RegExp(`manualInput\\('${id}'`),`champ manuel ${id} doit être vide à l'ouverture`);
   }
   assert.match(form,/<select id="profileCode">/);

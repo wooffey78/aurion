@@ -34,6 +34,6 @@ assertOrder(suppliers, 'id="lookup-supplier"', 'id="lookup-supplier-name"', 'Sup
 assertOrder(clients, '<span>SIRET</span><input id="siret"', 'id="lookup-client-siret"', 'Client SIRET detection placement');
 
 // Legal-form detection button must be anchored under the activity name rather than beside the legal-form field.
-assertOrder(settings, "F('name','Nom de l’activité'", 'id="detect-legal-form"', 'Activity legal-form detection placement');
+assertOrder(settings, "manualInput('name','Nom de l’activité'", 'id="detect-legal-form"', 'Activity legal-form detection placement');
 
 console.log('step18 detection button layout: OK');

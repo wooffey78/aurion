@@ -22,7 +22,7 @@ test('configuration propagates to server, dashboard, quote, and settings', () =>
   assert.match(sync, /stock:\s*'stock'/);
   assert.match(org, /applyConfigurationQuestionnaire\(/);
   assert.doesNotMatch(dash, /renderOnboarding\([^;]*onClose:\(\)=>refresh\(S\.view\)/s);
-  assert.match(settings, /Configuration d’Aurion[\s\S]*Mes activités/);
+  assert.match(settings, /3 · Configuration fonctionnelle[\\s\\S]*4 · Activités et calculs métier/);
   assert.match(quote, /configQ=S\.company\?\.configuration_data\?\.questionnaire/);
   assert.match(quote, /itemsEnabled=c\.items!==false&&configQ\.parts!==['"]Non['"]/);
   assert.match(settings, /q=S\.company\?\.configuration_data\?\.questionnaire/);
