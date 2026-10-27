@@ -494,3 +494,7 @@ button:focus:not(:focus-visible),a:focus:not(:focus-visible){outline:none}
 .passkey-row>div{display:grid;gap:3px;min-width:0}
 .passkey-row small{color:var(--muted);overflow-wrap:anywhere}
 @media(max-width:560px){.account-passkeys .section-title{display:grid}.passkey-row .btn{width:100%}}
+
+.catalog-part-photo{display:grid;justify-items:start;gap:10px;padding-top:12px}
+.catalog-part-photo img{width:min(100%,360px);max-height:320px;object-fit:contain;background:#171d21;border:1px solid var(--line);border-radius:10px}
+.catalog-part-photo a{min-height:40px;display:inline-flex;align-items:center}
