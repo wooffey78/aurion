@@ -1,10 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const business=fs.readFileSync('backend/src/routes/business.ts','utf8');
-const accounting=fs.readFileSync('backend/src/services/accounting.ts','utf8');
-const other=fs.readFileSync('assets/js/pages/dash/other.js','utf8');
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
+
+const business=fs.readFileSync(path.join(root,'backend/src/routes/business.ts'),'utf8');
+const accounting=fs.readFileSync(path.join(root,'backend/src/services/accounting.ts'),'utf8');
+const other=fs.readFileSync(path.join(root,'assets/js/pages/dash/other.js'),'utf8');
 
 test('étape 8 — les SAV négatifs sont déduits de la comptabilité et des prévisionnels',()=>{
   assert.match(business,/sum\(amount_ttc\).*sav_cases/);

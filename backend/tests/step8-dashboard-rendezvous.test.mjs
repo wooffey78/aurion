@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const other = fs.readFileSync('assets/js/pages/dash/other.js','utf8');
-const business = fs.readFileSync('backend/src/routes/business.ts','utf8');
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
+
+const other = fs.readFileSync(path.join(root,'assets/js/pages/dash/other.js'),'utf8');
+const business = fs.readFileSync(path.join(root,'backend/src/routes/business.ts'),'utf8');
 
 assert.doesNotMatch(other, /<[^>]*(?:h1|h2|h3|span|small)[^>]*>\s*Prochain rendez-vous\s*<\//i);
 assert.doesNotMatch(other, /Prochain rendez-vous/i);

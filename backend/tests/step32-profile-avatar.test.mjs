@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root=process.env.AURION_TEST_ROOT||process.cwd();
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const account=fs.readFileSync(path.join(root,'assets/js/pages/dash/account.js'),'utf8');
 const api=fs.readFileSync(path.join(root,'assets/js/core/api.js'),'utf8');
 const route=fs.readFileSync(path.join(root,'backend/src/routes/account.ts'),'utf8');
