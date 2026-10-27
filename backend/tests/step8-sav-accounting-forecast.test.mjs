@@ -16,7 +16,8 @@ test('les SAV financiers négatifs sont intégrés à la comptabilité et au pr�
   assert.match(business,/forecastEntries:forecastIn\+savTotal/);
   assert.match(business,/forecastNet:forecastIn\+savTotal-forecastOut/);
   assert.match(business,/savDeduction:savTotal/);
-  assert.match(business,/SAV financiers sont comptabilisés séparément/);
+  assert.match(business,/entry_type='sav'/);
+  assert.match(business,/amount_ttc/);
   assert.match(other,/savTotal=\(S\.sav\|\|\[\]\)\.filter/);
   assert.match(other,/S\.treasury\?\.forecastEntries/);
 });
