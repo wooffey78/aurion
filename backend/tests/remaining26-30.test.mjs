@@ -1,8 +1,9 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const root=path.resolve(new URL('../..',import.meta.url).pathname);
+const root=path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const read=f=>fs.readFileSync(path.join(root,f),'utf8');
 
 // Étape 26 — Fournitures : les contrôles visibles sont reliés au CRUD existant.

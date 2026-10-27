@@ -1,9 +1,10 @@
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const root = process.env.AURION_TEST_ROOT || path.resolve(new URL('../..', import.meta.url).pathname);
+const root = process.env.AURION_TEST_ROOT || path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 
 const migration = fs.readFileSync(path.join(root, 'backend/migrations/042_profile_pricing_7_70.sql'), 'utf8');
 const schema = fs.readFileSync(path.join(root, 'backend/migrations/009_accounts_legal_billing.sql'), 'utf8');

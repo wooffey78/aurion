@@ -1,9 +1,10 @@
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const ROOT = path.resolve(new URL('../..', import.meta.url).pathname);
+const ROOT = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const main = fs.readFileSync(path.join(ROOT, 'assets/js/main.js'), 'utf8');
 const css = fs.readFileSync(path.join(ROOT, 'assets/css/app.css'), 'utf8');
 

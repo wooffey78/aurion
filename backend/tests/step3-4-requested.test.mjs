@@ -1,9 +1,10 @@
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const root=path.resolve(new URL('../..',import.meta.url).pathname);
+const root=path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const quote=fs.readFileSync(path.join(root,'assets/js/pages/dash/quote.js'),'utf8');
 const business=fs.readFileSync(path.join(root,'backend/src/routes/business.ts'),'utf8');
 const clients=fs.readFileSync(path.join(root,'backend/src/services/clients.ts'),'utf8');

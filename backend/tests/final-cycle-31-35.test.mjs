@@ -1,8 +1,9 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,statSync} from 'node:fs';
 import {join,relative} from 'node:path';
 
-const root=new URL('../../',import.meta.url).pathname;
+const root=fileURLToPath(new URL('../../', import.meta.url));
 const read=p=>readFileSync(join(root,p),'utf8');
 
 const dashboard=read('assets/js/pages/dashboard.js');

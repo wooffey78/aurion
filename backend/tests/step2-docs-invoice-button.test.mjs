@@ -1,10 +1,11 @@
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-const root=path.resolve(new URL('../..',import.meta.url).pathname);
+const root=path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const docs=fs.readFileSync(path.join(root,'assets/js/pages/dash/docs.js'),'utf8');
 const quote=fs.readFileSync(path.join(root,'assets/js/pages/dash/quote.js'),'utf8');
 const support=fs.readFileSync(path.join(root,'assets/js/pages/dash/other.js'),'utf8');

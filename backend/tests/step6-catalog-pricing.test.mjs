@@ -7,8 +7,10 @@ const quote = fs.readFileSync(new URL('../../assets/js/pages/dash/quote.js', imp
 const catalog = fs.readFileSync(new URL('../../assets/js/pages/dash/catalog.js', import.meta.url), 'utf8');
 
 test('étape 6 : le backend applique le prix catalogue même lorsque le coefficient porte sur la marge', () => {
-  assert.match(business, /if\(b\.catalogPricing===true\)\{const catalogTarget=await catalogQuoteTarget/);
-  assert.match(business, /if\(\(b\.catalogPricing\?\?cur\.catalog_pricing\)===true\)\{const catalogTarget=await catalogQuoteTarget/);
+  assert.match(business, /const\s+catalogPricing=Boolean\(firstDefined\(body,'catalogPricing','catalog_pricing'\)\?\?false\);/);
+  assert.match(business, /if\(catalogPricing===true\)\{\s*const\s+catalogTarget=await\s+catalogQuoteTarget/);
+  assert.match(business, /catalogPricing:b\.catalogPricing\?\?cur\.catalog_pricing,currentItems/);
+  assert.match(business, /prepareQuoteCalculation\(org,cur\.activity_id,calculationBody,cur\)/);
 });
 
 test('étape 6 : le prix catalogue de prestation est un TTC fixe et les pièces restent internes', () => {

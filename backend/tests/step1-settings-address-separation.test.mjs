@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeStreetAddress } from '../../assets/js/core/registry-fill.js';
@@ -11,7 +12,7 @@ test('étape 1: la détection sépare rue, code postal et ville',()=>{
 });
 
 test('étape 1: les paramètres utilisent cette normalisation pour la détection registre',()=>{
-  const root=path.resolve(new URL('../..',import.meta.url).pathname);
+  const root=path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
   const source=fs.readFileSync(path.join(root,'assets/js/pages/dash/settings.js'),'utf8');
   assert.match(source,/import\{mergeRegistryFields\}from/);
   assert.match(fs.readFileSync(path.join(root,'assets/js/core/registry-fill.js'),'utf8'),/address: normalizeStreetAddress\(/);

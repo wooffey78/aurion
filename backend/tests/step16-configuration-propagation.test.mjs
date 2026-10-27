@@ -1,8 +1,9 @@
+import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const root = new URL('../..', import.meta.url).pathname.replace(/\/$/,'');
+const root = fileURLToPath(new URL('../..', import.meta.url)).replace(/\/$/,'');
 const read = p => readFileSync(`${root}/${p}`,'utf8');
 
 test('configuration propagates to server, dashboard, quote, and settings', () => {

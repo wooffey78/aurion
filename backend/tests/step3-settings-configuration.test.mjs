@@ -1,9 +1,10 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const root=path.resolve(new URL('../..',import.meta.url).pathname);
+const root=path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const dashboard=fs.readFileSync(path.join(root,'assets/js/pages/dashboard.js'),'utf8');
 const settings=fs.readFileSync(path.join(root,'assets/js/pages/dash/settings.js'),'utf8');
 const onboarding=fs.readFileSync(path.join(root,'assets/js/pages/onboarding.js'),'utf8');
