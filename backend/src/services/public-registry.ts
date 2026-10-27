@@ -57,7 +57,7 @@ export async function lookupFrenchCompany(identifier: string): Promise<RegistryC
       address,
       postalCode: normalize(siege.code_postal),
       city: normalize(siege.libelle_commune || siege.commune),
-      source: 'recherche-entreprises.api.gouv.fr', legalForm: normalize(hit.nature_juridique||hit.nature_juridique_libelle), website: normalize(hit.site_internet||hit.website), activity: normalize(hit.activite_principale_libelle||hit.activite_principale||hit.section_activite_principale), legalActivityCode: normalize(hit.activite_principale), logoUrl: normalize(hit.logo_url||hit.logo||'') || (normalize(hit.site_internet||hit.website) ? companyLogoUrl(normalize(hit.site_internet||hit.website)) || undefined : undefined),
+      source: 'recherche-entreprises.api.gouv.fr', legalForm: normalize(hit.nature_juridique||hit.nature_juridique_libelle), website: normalize(hit.site_internet||hit.website), activity: normalize(hit.activite_principale_libelle||hit.activite_principale||hit.section_activite_principale), legalActivityCode: normalize(hit.activite_principale),
     };
   } finally {
     clearTimeout(timer);
@@ -73,8 +73,9 @@ export async function searchFrenchCompanies(name: string): Promise<RegistryCompa
   const data: any = await response.json();
   return (data.results || []).map((hit:any) => {
     const siege=hit.siege||{};
-    return {siren:normalize(hit.siren||siege.siren),siret:normalize(siege.siret),legalName:normalize(hit.nom_complet||hit.nom_raison_sociale||hit.denomination),address:[siege.adresse,siege.complement_adresse].filter(Boolean).map(normalize).join('\n'),postalCode:normalize(siege.code_postal),city:normalize(siege.libelle_commune||siege.commune),source:'recherche-entreprises.api.gouv.fr',activity:normalize(hit.activite_principale_libelle||hit.activite_principale||''),legalActivityCode:normalize(hit.activite_principale),website:normalize(hit.site_internet||hit.website),logoUrl:(normalize(hit.site_internet||hit.website)?companyLogoUrl(normalize(hit.site_internet||hit.website))||undefined:undefined)};
+    return {siren:normalize(hit.siren||siege.siren),siret:normalize(siege.siret),legalName:normalize(hit.nom_complet||hit.nom_raison_sociale||hit.denomination),address:[siege.adresse,siege.complement_adresse].filter(Boolean).map(normalize).join('\n'),postalCode:normalize(siege.code_postal),city:normalize(siege.libelle_commune||siege.commune),source:'recherche-entreprises.api.gouv.fr',activity:normalize(hit.activite_principale_libelle||hit.activite_principale||''),legalActivityCode:normalize(hit.activite_principale),website:normalize(hit.site_internet||hit.website)};
   }).filter((x:RegistryCompany)=>x.legalName||x.siret);
 }
 
-export function companyLogoUrl(website:string|null|undefined){if(!website)return null;try{return `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(new URL(/^https?:\/\//i.test(website)?website:'https://'+website).hostname)}`}catch{return null}}
+/** Les logos d'entreprises ne sont pas téléchargés depuis un tiers : les fournisseurs peuvent charger une image locale depuis leur fiche. */
+export function companyLogoUrl(_website:string|null|undefined){return null}
