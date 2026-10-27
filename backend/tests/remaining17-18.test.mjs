@@ -12,9 +12,12 @@ test('étape 17: détecte la prestation et classe les pièces pertinentes', () =
   assert.equal(rankRelevantParts(detected,parts,["écran iphone 13|||||ip13-scr"])[0]?.id,'1');
 });
 
-test('étape 18: sépare le coefficient pièce du coefficient main-d’œuvre', () => {
-  const r=computePricing({partCost:100,shippingCost:0,mileageKm:0,mileageRate:0,vatRate:0,urssafRate:0,partCoefficientPercent:10,laborCoefficientPercent:20,targetTtc:200,driver:'ttc'});
-  assert.equal(r.purchaseHt,110);
-  assert.equal(r.laborHt,108);
-  assert.equal(r.netMargin,108);
+test('étape 18: le coefficient pièces majore le coût calculé sans changer le coût fournisseur ni le TTC fixé', () => {
+  const r=computePricing({partCost:100,shippingCost:0,mileageKm:0,mileageRate:0,vatRate:0,urssafRate:0,coefficientValue:10,coefficientUnit:'percent',coefficientBasis:'purchase',targetTtc:200,driver:'ttc'});
+  assert.equal(r.purchaseHt,100);
+  assert.equal(r.coefficientMarkupHt,10);
+  assert.equal(r.minimumSellingHt,110);
+  assert.equal(r.totalTtc,200);
+  assert.equal(r.laborHt,90);
+  assert.equal(r.netMargin,90);
 });

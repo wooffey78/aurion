@@ -20,23 +20,29 @@ test('étape 5 : la persistance du devis transporte l’unité et la valeur du c
   assert.match(route, /coefficientUnit/);
 });
 
-test('étape 5 : le devis expose un coefficient en pourcentage ou en euros appliqué aux pièces ou à la marge', () => {
+test('étape 5 : le devis expose un coefficient au coût des pièces en pourcentage ou en euros', () => {
   const quote = fs.readFileSync(new URL('../../assets/js/pages/dash/quote.js', import.meta.url), 'utf8');
   assert.match(quote, /id="coefficientBasis"/);
-  assert.match(quote, /value="purchase"/);
-  assert.match(quote, /value="margin"/);
+  assert.match(quote, /id="coefficientBasis" type="hidden" value="purchase"/);
+  assert.doesNotMatch(quote, /default_labor_coefficient_percent/);
   assert.match(quote, /id="coefficientUnit"/);
   assert.match(quote, /value="percent"/);
   assert.match(quote, /value="euro"/);
 });
 
-test('étape 5 : un coefficient en euros appliqué aux pièces augmente le coût d’achat du nombre de pièces', () => {
+test('étape 5 : le coefficient en euros majore le coût de calcul sans falsifier le coût fournisseur', () => {
   const r = pricing({ ...base, partCost: 100, partQuantity: 2, coefficientValue: 5, coefficientUnit: 'euro', coefficientBasis: 'purchase' });
-  assert.equal(r.purchaseHt, 110);
+  assert.equal(r.purchaseHt, 100);
+  assert.equal(r.coefficientMarkupHt, 10);
+  assert.equal(r.minimumSellingHt, 110);
+  assert.equal(r.totalTtc, 110);
+  assert.equal(r.grossMargin, 0);
 });
 
-test('étape 5 : un coefficient en euros appliqué à la marge augmente la marge sans modifier les achats', () => {
+test('étape 5 : un ancien coefficient sur la marge ne se transforme pas en coût pièce', () => {
   const r = pricing({ ...base, partCost: 100, coefficientValue: 7, coefficientUnit: 'euro', coefficientBasis: 'margin' });
   assert.equal(r.purchaseHt, 100);
-  assert.equal(r.laborHt, 17);
+  assert.equal(r.coefficientMarkupHt, 0);
+  assert.equal(r.totalTtc, 110);
+  assert.equal(r.laborHt, 10);
 });

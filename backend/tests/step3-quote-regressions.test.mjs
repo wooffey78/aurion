@@ -13,11 +13,11 @@ const pricing=fs.readFileSync(path.join(root,'assets/js/core/pricing.js'),'utf8'
   assert.doesNotMatch(quote,/id="minimumProfit"[^>]*value="1"/);
   assert.doesNotMatch(quote,/id="targetNet"[^>]*value="1"/);
   assert.match(quote,/targetNet:num\('#minimumProfit'\)/);
-  assert.match(pricing,/num\(input\.targetNet, 'marge nette', 0, 1e9\)/);
+  assert.match(pricing,/num\(input\.targetNet, 'résultat net', 0, 1e9\)/);
  });
 
 test('étape 3 : le type de document est toujours défini avant enregistrement',()=>{
-  assert.match(quote,/const documentType=q\?\.document_type==='invoice'\?'invoice':/);
+  assert.match(quote,/documentKind=editing\?/);
   assert.match(quote,/body=\{documentType/);
   assert.doesNotMatch(quote,/toast\(documentType===/);
 });
@@ -27,7 +27,7 @@ test('étape 3 : édition conserve les coefficients configurés déjà enregistr
   assert.match(quote,/q\?\.coefficient_unit/);
   assert.match(quote,/q\?\.coefficient_basis/);
   assert.match(quote,/a\.default_part_coefficient_percent/);
-  assert.match(quote,/a\.default_labor_coefficient_percent/);
+  assert.doesNotMatch(quote,/default_labor_coefficient_percent/);
   assert.match(business,/coefficientValue/);
 });
 

@@ -17,7 +17,7 @@ test('paramètres : la configuration fonctionnelle est organisée en une source 
   assert.match(settings,/configurationData/);
   assert.match(settings,/questionnaire/);
   assert.match(settings,/configurationIncomplete:false/);
-  assert.match(settings,/Configuration fonctionnelle[\s\S]*3 · Activités et calculs métier/);
+  assert.match(settings,/3 · Configuration fonctionnelle[\s\S]*4 · Activités et calculs métier/);
   assert.match(settings,/Entreprise[\s\S]*Messagerie & agenda/);
   assert.match(settings,/company-registry-preview/);
   assert.match(settings,/Appliquer la détection/);

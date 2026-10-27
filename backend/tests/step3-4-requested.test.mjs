@@ -19,9 +19,11 @@ test('étape 3 : le choix intervention utilise l’adresse d’intervention de l
 });
 
 test('étape 4 : le changement de base de coefficient répercute le coefficient configuré correspondant',()=>{
-  assert.match(quote,/id="coefficientBasis"/);
-  assert.match(quote,/default_labor_coefficient_percent/);
+  assert.match(quote,/id="coefficientBasis" type="hidden" value="purchase"/);
   assert.match(quote,/default_part_coefficient_percent/);
-  assert.match(quote,/s==='#coefficientBasis'/);
+  assert.match(quote,/default_part_coefficient_percent/);
+  assert.match(quote,/coefficientBasis='purchase'/);
+  assert.match(quote,/coefficientValue=q\?\.coefficient_basis!=='margin'/);
+  assert.doesNotMatch(quote,/default_labor_coefficient_percent/);
   assert.match(quote,/\$\('#coefficientValue'\)\.value=String\(configured\)/);
 });
