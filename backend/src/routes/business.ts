@@ -52,6 +52,34 @@ const clientPatchInputSchema = z.object({
   activityId: optionalUuid,
 }).passthrough();
 
+const stockInput = z.union([
+  z.number().int().min(0).max(10_000_000),
+  z.string().regex(/^[0-9]{1,8}$/),
+  z.literal(''),
+  z.null(),
+]).optional();
+const partCreateInputSchema = z.object({
+  name: z.string().trim().min(1).max(240),
+  activityId: optionalUuid,
+  category: z.string().max(160).nullable().optional(),
+  model: z.string().max(160).nullable().optional(),
+  variant: z.string().max(160).nullable().optional(),
+  color: z.string().max(100).nullable().optional(),
+  quality: z.string().max(100).nullable().optional(),
+  reference: z.string().max(160).nullable().optional(),
+  stock: stockInput,
+  sellingPrice: numericInput,
+  saleCoefficientPercent: numericInput,
+  notes: z.string().max(4000).nullable().optional(),
+}).passthrough();
+const partPatchInputSchema = partCreateInputSchema.partial();
+const partPriceInputSchema = z.object({
+  supplierId: z.string().uuid(),
+  supplierReference: z.string().max(160).nullable().optional(),
+  purchasePrice: numericInput,
+  available: z.boolean().optional(),
+}).passthrough();
+
 const supplyCreateInputSchema = z.object({
   name: z.string().trim().min(1).max(240),
   activityId: optionalUuid,
@@ -418,13 +446,54 @@ export async function businessRoutes(app:FastifyInstance){
   app.delete('/supplies/:id',async(r,reply)=>{const x=await query('delete from supplies where id=$1 and organization_id=$2',[String((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true}});
   app.get('/search/all',async r=>{const q=String((r.query as any)?.q||'').trim();const org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));if(!aid)return {clients:[],suppliers:[],quotes:[],invoices:[],sav:[]};const like=`%${q}%`;const [clients,suppliers,docs,sav]=await Promise.all([query(`select id,name,email,phone,siret from clients where organization_id=$1 and activity_id=$2 and ($3='' or name ilike $3 or email ilike $3 or siret ilike $3) order by name limit 50`,[org,aid,like]),query(`select id,name,siret,legal_name from suppliers where organization_id=$1 and activity_id=$2 and ($3='' or name ilike $3 or legal_name ilike $3 or siret ilike $3) order by name limit 50`,[org,aid,like]),query(`select id,number,document_type,client_name,total_ttc,created_at from quotes where organization_id=$1 and activity_id=$2 and ($3='' or client_name ilike $3 or number ilike $3 or cast(total_ttc as text) ilike $3 or cast(created_at as text) ilike $3) order by created_at desc limit 100`,[org,aid,like]),query(`select s.id,s.invoice_id quote_id,s.amount_ttc amount,s.created_at,c.name client_name from sav_cases s left join clients c on c.id=s.client_id where s.organization_id=$1 and s.activity_id=$2 and ($3='' or c.name ilike $3 or cast(s.amount_ttc as text) ilike $3 or cast(s.created_at as text) ilike $3) order by s.created_at desc limit 50`,[org,aid,like]).catch(()=>({rows:[]}))]);return {clients:clients.rows,suppliers:suppliers.rows,quotes:docs.rows.filter(x=>x.document_type==='quote'),invoices:docs.rows.filter(x=>x.document_type==='invoice'),sav:sav.rows};});
   app.get('/parts',async r=>(await query(`select p.*,coalesce(json_agg(json_build_object('supplierId',s.id,'supplier',s.name,'supplierReference',sp.supplier_reference,'purchasePrice',sp.purchase_price,'available',sp.available) order by sp.purchase_price) filter(where s.id is not null),'[]') suppliers from parts p left join supplier_parts sp on sp.part_id=p.id left join suppliers s on s.id=sp.supplier_id where p.organization_id=$1 and p.activity_id=$2 group by p.id order by p.name`,[r.auth!.organizationId,activityId(r)])).rows);
-  app.post('/parts',async(r,reply)=>{const b:any=r.body,aid=await ensureActivity(r,activityId(r,b));if(!aid||!b?.name?.trim())return reply.code(400).send({error:'INVALID_INPUT'});const id=crypto.randomUUID();const activity=(await query('select margin_min_percent from activities where id=$1 and organization_id=$2',[aid,r.auth!.organizationId])).rows[0];const coefficient=Math.max(Number(activity?.margin_min_percent??0),Number(b.saleCoefficientPercent??0));await query(`insert into parts(id,organization_id,activity_id,name,category,model,variant,color,quality,reference,stock,selling_price,sale_coefficient_percent,notes) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,[id,r.auth!.organizationId,aid,b.name.trim(),b.category||null,b.model||null,b.variant||null,b.color||null,b.quality||null,b.reference||null,Number(b.stock||0),Number(b.sellingPrice||0),coefficient,b.notes||null]);return reply.code(201).send({id})});
-  app.get('/parts/:id/photo',async(r,reply)=>{const id=String((r.params as any).id),org=r.auth!.organizationId;const x=(await query('select photo_key from parts where id=$1 and organization_id=$2',[id,org])).rows[0];if(!x||!x.photo_key)return reply.code(404).send({error:'NOT_FOUND'});try{const buf=await readFile(fileFromKey(x.photo_key));const ext=String(x.photo_key).toLowerCase();const type=ext.endsWith('.png')?'image/png':ext.endsWith('.webp')?'image/webp':'image/jpeg';return reply.header('Content-Type',type).header('Cache-Control','private, max-age=3600').send(buf)}catch{return reply.code(404).send({error:'NOT_FOUND'})}});
-  app.post('/parts/:id/photo',async(request,reply)=>{const part=await request.file();if(!part||!['image/png','image/jpeg','image/webp'].includes(part.mimetype))return reply.code(400).send({error:'INVALID_IMAGE'});const id=String((request.params as any).id),org=request.auth!.organizationId;const ok=await query('select id from parts where id=$1 and organization_id=$2',[id,org]);if(!ok.rowCount)return reply.code(404).send({error:'NOT_FOUND'});const saved=await savePrivateUpload(org,part,5*1024*1024);await query('update parts set photo_key=$1,updated_at=now() where id=$2 and organization_id=$3',[`private/${org}/${saved.safe}`,id,org]);return {ok:true,photoKey:`private/${org}/${saved.safe}`};});  app.patch('/parts/:id',async(r,reply)=>{const b:any=r.body,id=String((r.params as any).id),org=r.auth!.organizationId;const x=await query(`update parts p set name=coalesce($1,p.name),category=$2,model=$3,variant=$4,color=$5,quality=$6,reference=$7,stock=$8,selling_price=$9,sale_coefficient_percent=greatest(0,coalesce($10,p.sale_coefficient_percent)),notes=$11,updated_at=now() where p.id=$12 and p.organization_id=$13 returning p.*`,[b.name?.trim(),b.category||null,b.model||null,b.variant||null,b.color||null,b.quality||null,b.reference||null,Number(b.stock||0),Number(b.sellingPrice||0),Number(b.saleCoefficientPercent??0),b.notes||null,id,org]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return x.rows[0]});
-  app.delete('/parts/:id',async(r,reply)=>{const x=await query('delete from parts where id=$1 and organization_id=$2',[((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true}});
-  app.post('/parts/:id/prices',async(r,reply)=>{const b:any=r.body;const part=await query('select id,activity_id from parts where id=$1 and organization_id=$2',[((r.params as any).id),r.auth!.organizationId]);if(!part.rowCount)return reply.code(404).send({error:'NOT_FOUND'});const s=await query('select id from suppliers where id=$1 and organization_id=$2 and activity_id=$3',[b.supplierId,r.auth!.organizationId,part.rows[0].activity_id]);if(!s.rowCount)return reply.code(400).send({error:'INVALID_INPUT'});await query(`insert into supplier_parts(supplier_id,part_id,supplier_reference,purchase_price,available,updated_at) values($1,$2,$3,$4,$5,now()) on conflict(supplier_id,part_id) do update set supplier_reference=excluded.supplier_reference,purchase_price=excluded.purchase_price,available=excluded.available,updated_at=now()`,[b.supplierId,part.rows[0].id,b.supplierReference||null,Number(b.purchasePrice||0),b.available!==false]);return {ok:true}});
+  app.post('/parts',async(r,reply)=>{
+    const parsed=partCreateInputSchema.safeParse(r.body);
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const b:any=parsed.data,aid=await ensureActivity(r,activityId(r,b));
+    if(!aid)return reply.code(400).send({error:'INVALID_INPUT'});
+    let stock=0,sellingPrice=0,saleCoefficient=0;
+    try{
+      stock=optionalNumber(b.stock,'Stock',0,10_000_000)??0;
+      if(!Number.isInteger(stock))return reply.code(400).send({error:'INVALID_INPUT'});
+      sellingPrice=optionalNumber(b.sellingPrice,'Prix de vente',0,1e9)??0;
+      saleCoefficient=optionalNumber(b.saleCoefficientPercent,'Coefficient de vente',0,1e6)??0;
+    }catch{return reply.code(400).send({error:'INVALID_INPUT'})}
+    const id=crypto.randomUUID();
+    const activity=(await query('select margin_min_percent from activities where id=$1 and organization_id=$2',[aid,r.auth!.organizationId])).rows[0];
+    const coefficient=Math.max(Number(activity?.margin_min_percent??0),saleCoefficient);
+    await query(`insert into parts(id,organization_id,activity_id,name,category,model,variant,color,quality,reference,stock,selling_price,sale_coefficient_percent,notes) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,[id,r.auth!.organizationId,aid,b.name.trim(),b.category||null,b.model||null,b.variant||null,b.color||null,b.quality||null,b.reference||null,stock,sellingPrice,coefficient,b.notes||null]);
+    return reply.code(201).send({id});
+  });app.get('/parts/:id/photo',async(r,reply)=>{const id=String((r.params as any).id),org=r.auth!.organizationId;const x=(await query('select photo_key from parts where id=$1 and organization_id=$2',[id,org])).rows[0];if(!x||!x.photo_key)return reply.code(404).send({error:'NOT_FOUND'});try{const buf=await readFile(fileFromKey(x.photo_key));const ext=String(x.photo_key).toLowerCase();const type=ext.endsWith('.png')?'image/png':ext.endsWith('.webp')?'image/webp':'image/jpeg';return reply.header('Content-Type',type).header('Cache-Control','private, max-age=3600').send(buf)}catch{return reply.code(404).send({error:'NOT_FOUND'})}});
+  app.post('/parts/:id/photo',async(request,reply)=>{const part=await request.file();if(!part||!['image/png','image/jpeg','image/webp'].includes(part.mimetype))return reply.code(400).send({error:'INVALID_IMAGE'});const id=String((request.params as any).id),org=request.auth!.organizationId;const ok=await query('select id from parts where id=$1 and organization_id=$2',[id,org]);if(!ok.rowCount)return reply.code(404).send({error:'NOT_FOUND'});const saved=await savePrivateUpload(org,part,5*1024*1024);await query('update parts set photo_key=$1,updated_at=now() where id=$2 and organization_id=$3',[`private/${org}/${saved.safe}`,id,org]);return {ok:true,photoKey:`private/${org}/${saved.safe}`};});  app.patch('/parts/:id',async(r,reply)=>{
+    const parsed=partPatchInputSchema.safeParse(r.body||{});
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const b:any=parsed.data,id=String((r.params as any).id),org=r.auth!.organizationId;
+    let stock=0,sellingPrice=0,saleCoefficient=0;
+    try{
+      stock=optionalNumber(b.stock,'Stock',0,10_000_000)??0;
+      if(!Number.isInteger(stock))return reply.code(400).send({error:'INVALID_INPUT'});
+      sellingPrice=optionalNumber(b.sellingPrice,'Prix de vente',0,1e9)??0;
+      saleCoefficient=optionalNumber(b.saleCoefficientPercent,'Coefficient de vente',0,1e6)??0;
+    }catch{return reply.code(400).send({error:'INVALID_INPUT'})}
+    const x=await query(`update parts p set name=coalesce($1,p.name),category=$2,model=$3,variant=$4,color=$5,quality=$6,reference=$7,stock=$8,selling_price=$9,sale_coefficient_percent=greatest(0,coalesce($10,p.sale_coefficient_percent)),notes=$11,updated_at=now() where p.id=$12 and p.organization_id=$13 returning p.*`,[b.name?.trim(),b.category||null,b.model||null,b.variant||null,b.color||null,b.quality||null,b.reference||null,stock,sellingPrice,saleCoefficient,b.notes||null,id,org]);
+    if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
+    return x.rows[0];
+  });app.delete('/parts/:id',async(r,reply)=>{const x=await query('delete from parts where id=$1 and organization_id=$2',[((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true}});
+  app.post('/parts/:id/prices',async(r,reply)=>{
+    const parsed=partPriceInputSchema.safeParse(r.body||{});
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const b:any=parsed.data;
+    let purchasePrice=0;
+    try{purchasePrice=optionalNumber(b.purchasePrice,'Prix d’achat',0,1e9)??0}catch{return reply.code(400).send({error:'INVALID_INPUT'})}
+    const part=await query('select id,activity_id from parts where id=$1 and organization_id=$2',[String((r.params as any).id),r.auth!.organizationId]);
+    if(!part.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
+    const supplier=await query('select id from suppliers where id=$1 and organization_id=$2 and activity_id=$3',[b.supplierId,r.auth!.organizationId,part.rows[0].activity_id]);
+    if(!supplier.rowCount)return reply.code(400).send({error:'INVALID_INPUT'});
+    await query(`insert into supplier_parts(supplier_id,part_id,supplier_reference,purchase_price,available,updated_at) values($1,$2,$3,$4,$5,now()) on conflict(supplier_id,part_id) do update set supplier_reference=excluded.supplier_reference,purchase_price=excluded.purchase_price,available=excluded.available,updated_at=now()`,[b.supplierId,part.rows[0].id,b.supplierReference||null,purchasePrice,b.available!==false]);
+    return {ok:true};
+  });
 
-  app.get('/interventions',async r=>(await query('select * from interventions where organization_id=$1 and activity_id=$2 order by name',[r.auth!.organizationId,activityId(r)])).rows);
+app.get('/interventions',async r=>(await query('select * from interventions where organization_id=$1 and activity_id=$2 order by name',[r.auth!.organizationId,activityId(r)])).rows);
   app.post('/interventions',async(r,reply)=>{const b:any=r.body,aid=await ensureActivity(r,activityId(r,b));if(!aid||!b?.name?.trim())return reply.code(400).send({error:'INVALID_INPUT'});const id=crypto.randomUUID();await query('insert into interventions(id,organization_id,activity_id,name,description,default_duration_minutes,default_price) values($1,$2,$3,$4,$5,$6,$7)',[id,r.auth!.organizationId,aid,b.name.trim(),b.description||null,b.durationMinutes?Number(b.durationMinutes):null,Number(b.defaultPrice||0)]);return reply.code(201).send({id})});
   app.patch('/interventions/:id',async(r,reply)=>{const b:any=r.body;const x=await query('update interventions set name=coalesce($1,name),description=$2,default_duration_minutes=$3,default_price=$4,updated_at=now() where id=$5 and organization_id=$6 returning *',[b.name?.trim(),b.description||null,b.durationMinutes?Number(b.durationMinutes):null,Number(b.defaultPrice||0),((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return x.rows[0]});
   app.delete('/interventions/:id',async(r,reply)=>{const x=await query('delete from interventions where id=$1 and organization_id=$2',[((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true}});

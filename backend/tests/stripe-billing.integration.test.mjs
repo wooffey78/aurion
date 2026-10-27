@@ -241,6 +241,43 @@ if (!enabled) {
   });
 
 
+  test('Stripe checkout handles provider timeout and invalid JSON without persisting a payment request', async () => {
+    const account = await registerAccount();
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = async (_url, options) => {
+        assert.ok(options?.signal instanceof AbortSignal, 'a bounded request signal is required');
+        const timeout = new Error('simulated provider timeout');
+        timeout.name = 'TimeoutError';
+        throw timeout;
+      };
+      const timedOut = await app.inject({
+        method: 'POST', url: '/billing/subscribe',
+        headers: { authorization: `Bearer ${account.token}` },
+        payload: { planCode: 'monthly', method: 'card' },
+      });
+      assert.equal(timedOut.statusCode, 502, timedOut.body);
+
+      globalThis.fetch = async (_url, options) => {
+        assert.ok(options?.signal instanceof AbortSignal, 'a bounded request signal is required');
+        return new Response('not-json', { status: 200, headers: { 'content-type': 'application/json' } });
+      };
+      const malformed = await app.inject({
+        method: 'POST', url: '/billing/subscribe',
+        headers: { authorization: `Bearer ${account.token}` },
+        payload: { planCode: 'monthly', method: 'card' },
+      });
+      assert.equal(malformed.statusCode, 502, malformed.body);
+      const saved = await db.query(
+        "select count(*)::int n from billing_payment_requests where organization_id=$1 and method='card'",
+        [account.organizationId],
+      );
+      assert.equal(saved.rows[0].n, 0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test('Fastify inject: inscription/connexion, isolation inter-organisation et devis converti en facture', async () => {
     const owner = await registerAccount();
     const other = await registerAccount();
@@ -325,6 +362,23 @@ if (!enabled) {
       payload: { activityId: foreignActivityId },
     });
     assert.equal(crossTenantActivity.statusCode, 400, crossTenantActivity.body);
+
+    const invalidPart = await app.inject({
+      method: 'POST', url: '/parts', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: 'Pièce invalide', stock: 'beaucoup' },
+    });
+    assert.equal(invalidPart.statusCode, 400, invalidPart.body);
+    const validPart = await app.inject({
+      method: 'POST', url: '/parts', headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: 'Pièce test intégration', stock: '2', sellingPrice: '12.50', saleCoefficientPercent: '0' },
+    });
+    assert.equal(validPart.statusCode, 201, validPart.body);
+    const invalidPartPrice = await app.inject({
+      method: 'POST', url: `/parts/${validPart.json().id}/prices`,
+      headers: { authorization: `Bearer ${owner.token}` },
+      payload: { supplierId: 'not-a-uuid', purchasePrice: 'inconnu' },
+    });
+    assert.equal(invalidPartPrice.statusCode, 400, invalidPartPrice.body);
 
     const quoteResponse = await app.inject({
       method: 'POST', url: '/quotes', headers: { authorization: `Bearer ${owner.token}` },
