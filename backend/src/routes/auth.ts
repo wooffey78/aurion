@@ -105,8 +105,8 @@ async function googleLoginClient(){
       const user=rows.rows[0];
       // Refuse ambiguous account or organization matching rather than selecting one arbitrarily.
       if(!user)return fail();
-      if(Number(user.matching_accounts)>1)return fail('Plusieurs comptes utilisent cette adresse. La connexion automatique est suspendue pour éviter tout accès au mauvais compte ; contactez le support.');
-      if(Number(user.membership_count)>1)return fail('Ce compte appartient à plusieurs espaces Aurion. Pour éviter d’ouvrir un espace arbitraire, utilisez votre méthode de connexion habituelle ou contactez le support.');
+      if(Number(user.matching_accounts)>1)return fail();
+      if(Number(user.membership_count)>1)return fail();
       reply.clearCookie('aurion_google_login',{path:'/auth/google/callback'});
       const sessionVersion=Number(user.session_version||0);
       const accessToken=await signAccessToken({userId:user.id,organizationId:user.organization_id,role:user.role,sv:sessionVersion});
