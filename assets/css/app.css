@@ -887,3 +887,31 @@ input:-webkit-autofill,textarea:-webkit-autofill,select:-webkit-autofill{box-sha
     margin-bottom: 12px !important;
   }
 }
+
+
+/* Aurion — tutoriel guidé facultatif, disponible depuis l’accueil. */
+.aurion-tour-dialog{width:min(640px,calc(100vw - 32px))}
+.aurion-tour-progress{display:grid;gap:8px}
+.aurion-tour-progress-label{color:var(--muted);font-size:.85rem}
+.aurion-tour-track{height:6px;overflow:hidden;border-radius:999px;background:var(--line)}
+.aurion-tour-fill{display:block;height:100%;width:0;background:var(--blue);transition:width .18s ease}
+.aurion-tour-content{display:grid;align-content:start;gap:12px;min-height:144px;padding:6px 0}
+.aurion-tour-content h3{margin:0;font-size:clamp(1.15rem,2.8vw,1.5rem)}
+.aurion-tour-content p{margin:0}
+.aurion-tour-content .aurion-tour-tip{padding:10px 12px;border-left:3px solid var(--blue);border-radius:0 10px 10px 0;background:rgba(201,220,244,.04);color:var(--muted)}
+.aurion-tour-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.aurion-tour-footer .button-row{margin-left:auto}
+.aurion-tour-footer button:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+@media(max-width:760px){
+  .aurion-tour-dialog{width:100%!important;max-height:94dvh;overflow-y:auto}
+  .aurion-tour-content{min-height:0}
+  .aurion-tour-footer{align-items:stretch}
+  .aurion-tour-footer>.btn,.aurion-tour-footer>.link-btn{flex:1 1 100%}
+  .aurion-tour-footer>.button-row{width:100%;margin-left:0}
+  .aurion-tour-footer>.button-row>.btn{flex:1}
+}
+@media(max-height:520px) and (orientation:landscape){
+  .aurion-tour-dialog{max-height:100dvh}
+  .aurion-tour-content{min-height:0}
+}
+@media(prefers-reduced-motion:reduce){.aurion-tour-fill{transition:none}}
