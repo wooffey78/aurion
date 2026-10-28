@@ -2,7 +2,7 @@
 import{api}from'../../core/api.js';
 import{computePricing}from'../../core/pricing.js';
 import{S,e,money,toast,prof,active,hooks,emailToast,askConfirm}from'./core.js';
-import{attachSuggest}from'../../core/suggest.js';import{detectService,rankRelevantParts}from'../../core/recommendations.js';
+import{attachSuggest}from'../../core/suggest.js?v=mobile-scroll-2';import{detectService,rankRelevantParts}from'../../core/recommendations.js';
 
 let lines=[],driver='ttc',catalogPricing=true;
 let draftTimer=null,draftSequence=0;

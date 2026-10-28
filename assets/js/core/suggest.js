@@ -37,6 +37,22 @@ export function attachSuggest(input,getItems,{onPick,max=100,title='Votre choix'
     else if(ev.key==='Enter'&&idx>=0){ev.preventDefault();pick(idx)}
     else if(ev.key==='Escape'){box.hidden=true;toggle.setAttribute('aria-expanded','false')}
   });
-  box.addEventListener('pointerdown',ev=>{const n=ev.target.closest('.suggest-item');if(n){ev.preventDefault();pick(Number(n.dataset.i))}});
+  // Ne pas sélectionner au pointerdown : sur tactile, cela empêche le scroll de la liste.
+  // La sélection ne se fait qu'au relâchement si le geste n'était pas un défilement.
+  let gesture=null;
+  box.addEventListener('pointerdown',ev=>{
+    const n=ev.target.closest('.suggest-item');
+    gesture=n?{pointerId:ev.pointerId,item:n,startX:ev.clientX,startY:ev.clientY,moved:false}:null;
+  });
+  box.addEventListener('pointermove',ev=>{
+    if(!gesture||gesture.pointerId!==ev.pointerId)return;
+    if(Math.abs(ev.clientX-gesture.startX)>8||Math.abs(ev.clientY-gesture.startY)>8)gesture.moved=true;
+  },{passive:true});
+  box.addEventListener('pointerup',ev=>{
+    if(!gesture||gesture.pointerId!==ev.pointerId)return;
+    const g=gesture;gesture=null;
+    if(!g.moved&&g.item.isConnected){ev.preventDefault();pick(Number(g.item.dataset.i))}
+  });
+  box.addEventListener('pointercancel',()=>{gesture=null});
   return{destroy(){document.removeEventListener('pointerdown',outside);toggle.remove();box.remove()}};
 }
