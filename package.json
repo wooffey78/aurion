@@ -13,7 +13,7 @@
     "build-setup": "pwsh tools/Build-Setup.ps1",
     "typecheck": "npm --prefix backend run typecheck",
     "check": "npm run build && npm run typecheck && npm run test:frontend && npm run lint:frontend && npm run test:smoke && npm run test:browser",
-    "test:smoke": "node --test backend/tests/production-readiness.test.mjs backend/tests/routes.contract.test.mjs backend/tests/routes.duplicates.test.mjs backend/tests/requirements-14.test.mjs backend/tests/requirements-15.test.mjs backend/tests/requirements-16.test.mjs backend/tests/strict-requirements-1-15.test.mjs backend/tests/step20-suppliers-sidebar.test.mjs backend/tests/step4-suppliers-management.test.mjs backend/tests/service-worker-privacy.test.mjs backend/tests/email-verification.contract.test.mjs backend/tests/catalogue-collapse.test.mjs",
+    "test:smoke": "node --test backend/tests/production-readiness.test.mjs backend/tests/routes.contract.test.mjs backend/tests/routes.duplicates.test.mjs backend/tests/requirements-14.test.mjs backend/tests/requirements-15.test.mjs backend/tests/requirements-16.test.mjs backend/tests/strict-requirements-1-15.test.mjs backend/tests/step20-suppliers-sidebar.test.mjs backend/tests/step4-suppliers-management.test.mjs backend/tests/service-worker-privacy.test.mjs backend/tests/email-verification.contract.test.mjs backend/tests/catalogue-collapse.test.mjs backend/tests/tutorial.contract.test.mjs",
     "test:frontend": "node --experimental-vm-modules tools/check-frontend.mjs",
     "lint:frontend": "npx --yes eslint@8.57.1 assets/js",
     "test:browser": "node tools/run-browser-e2e.mjs"
