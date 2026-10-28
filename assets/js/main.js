@@ -4,7 +4,7 @@ import{renderForgot,renderReset}from'./pages/recovery.js';
 import{renderLegal}from'./pages/legal.js';
 import{api}from'./core/api.js';
 import{getCachedSession,setSession,invalidateSession}from'./core/session.js';
-import{renderAuth}from'./pages/auth.js';import{renderVipInvite}from'./pages/vip-invite.js';import{renderEmailVerification}from'./pages/email-verification.js';
+import{renderAuth}from'./pages/auth.js';import{renderVipInvite}from'./pages/vip-invite.js';
 import{renderDashboard}from'./pages/dashboard.js';
 
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});window.__aurionDeferredInstall=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();window.__aurionDeferredInstall=e});
@@ -34,7 +34,6 @@ async function render(){
   if(r==='/forgot')return renderForgot();
   if(r==='/reset')return renderReset();
   if(r==='/invite'){return renderVipInvite(routeQuery().get('token')||'');}
-  if(r==='/verify-email')return renderEmailVerification(routeQuery().get('token')||'');
   if(r==='/legal'||r.startsWith('/legal/'))return renderLegal(r.split('/')[2]||'');
   if(r==='/dashboard'){if(!await getSession())return go('/auth');const q=routeQuery();if(q.get('billing')==='success'&&q.get('session_id')){try{await api.completeCheckout(q.get('session_id'));toast('Paiement confirmé. Votre abonnement est actif.','success')}catch(x){toast(x.message,'error')}location.hash='#/dashboard';return}return renderDashboard()}
   if(r==='/'){
