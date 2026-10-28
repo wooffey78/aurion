@@ -110,7 +110,7 @@ export async function mailStatus(orgId: string) {
 
 export async function mailConfigured(orgId: string) { return (await mailStatus(orgId)).configured; }
 
-export interface OrgMail { to: string; subject: string; text: string; attachments?: { filename: string; content: Buffer; contentType?: string }[]; icalEvent?: { method: string; content: string; filename?: string } }
+export interface OrgMail { to: string; subject: string; text: string; html?: string; attachments?: { filename: string; content: Buffer; contentType?: string; cid?: string }[]; icalEvent?: { method: string; content: string; filename?: string } }
 
 /** Envoi unique pour toute l'application : messagerie de l'entreprise, sinon compte Google OAuth. */
 export async function sendOrgMail(orgId: string, mail: OrgMail) {
@@ -118,7 +118,7 @@ export async function sendOrgMail(orgId: string, mail: OrgMail) {
   if (s) { await sendWithSettings({ ...s, fromName: s.fromName || await companyDisplayName(orgId) }, mail as any); return { via: 'smtp' as const }; }
   const g = await connection(orgId).catch(() => null);
   if (g && !mail.icalEvent) {
-    await gmailSend(orgId, mail.to, mail.subject, mail.text, mail.attachments?.[0]);
+    await gmailSend(orgId, mail.to, mail.subject, mail.text, mail.attachments, mail.html);
     return { via: 'google' as const };
   }
   throw new AurionError('MAIL_NOT_CONFIGURED', 'La messagerie n’est pas configurée. Ouvrez Paramètres → Messagerie & agenda pour renseigner votre adresse e-mail (une seule fois).');

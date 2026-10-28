@@ -20,11 +20,12 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
   app.put('/settings/email-signature', async (r, reply) => {
     if (!canEdit(r)) return reply.code(403).send({ error: 'FORBIDDEN' });
-    const p = z.object({ enabled: z.boolean().optional().default(true), firstName: short(120), lastName: short(120), jobTitle: short(160), company: short(200), phone: short(60), website: short(240), address: short(300), extra: short(600) }).safeParse(r.body);
+    const p = z.object({ enabled: z.boolean().optional().default(true), firstName: short(120), lastName: short(120), jobTitle: short(160), company: short(200), phone: short(60), website: short(240), address: short(300), extra: short(600), includeQuotes: z.boolean().optional().default(true), includeInvoices: z.boolean().optional().default(true), includeProfessional: z.boolean().optional().default(true) }).safeParse(r.body);
     if (!p.success) return reply.code(400).send({ error: 'INVALID_INPUT' });
     await saveSignature(r.auth!.organizationId, p.data);
     const org = r.auth!.organizationId;
-    return { ok: true, preview: renderSignature(await loadSignature(org), await companyDisplayName(org)).trim() };
+    const saved = await loadSignature(org);
+    return { ok: true, signature: saved, preview: renderSignature(saved, await companyDisplayName(org)).trim() };
   });
 
   // ---- thème visuel des documents (propre à chaque entreprise, modifiable)

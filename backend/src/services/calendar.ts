@@ -3,7 +3,7 @@ import { loadSettings, sendOrgMail } from './mail.js';
 import { buildIcs } from './ics.js';
 import { calendarCreate, calendarUpdate, calendarDelete, connection } from './google.js';
 import { companyDisplayName } from './company.js';
-import { signatureFor } from './signature.js';
+import { signatureForEmail, emailBodyHtml } from './signature.js';
 
 export type CalendarAction = 'create' | 'update' | 'cancel';
 export interface CalendarResult {
@@ -32,7 +32,7 @@ export async function syncAppointment(orgId: string, a: any, action: CalendarAct
   try {
     const start = new Date(a.starts_at), end = new Date(a.ends_at || new Date(start.getTime() + 3600000));
     const company = await companyDisplayName(orgId, a.activity_id);
-    const sig = await signatureFor(orgId, a.activity_id);
+    const sig = await signatureForEmail(orgId, a.activity_id, 'professional');
     const when = start.toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
     const s = await loadSettings(orgId);
     const google = await connection(orgId).catch(() => null);
@@ -56,8 +56,9 @@ export async function syncAppointment(orgId: string, a: any, action: CalendarAct
         const prefix = action === 'cancel' ? 'Annulé : ' : action === 'update' ? 'Modifié : ' : 'Rendez-vous : ';
         await sendOrgMail(orgId, {
           to: s.email, subject: `${prefix}${a.title}`,
-          text: `${prefix}${a.title}${a.client_name ? `\nClient : ${a.client_name}` : ''}\n${when}\n\nInvitation pour VOTRE agenda, envoyée par Aurion : ouvrez la pièce jointe ou cliquez sur « Ajouter à l’agenda » dans votre messagerie.${sig}`,
-          icalEvent: { method: action === 'cancel' ? 'CANCEL' : 'REQUEST', content: ics, filename: 'invitation.ics' },
+          text: `${prefix}${a.title}${a.client_name ? `\nClient : ${a.client_name}` : ''}\n${when}\n\nInvitation pour VOTRE agenda, envoyée par Aurion : ouvrez la pièce jointe ou cliquez sur « Ajouter à l’agenda » dans votre messagerie.${sig.text}`,
+          html: emailBodyHtml(`${prefix}${a.title}${a.client_name ? `\nClient : ${a.client_name}` : ''}\n${when}\n\nInvitation pour VOTRE agenda, envoyée par Aurion : ouvrez la pièce jointe ou cliquez sur « Ajouter à l’agenda » dans votre messagerie.`, sig.html),
+          attachments: sig.inlineAttachments, icalEvent: { method: action === 'cancel' ? 'CANCEL' : 'REQUEST', content: ics, filename: 'invitation.ics' },
         });
         await query('update appointments set ics_sequence=$1 where id=$2', [sequence, a.id]);
         return { ok: true, mode: 'invitation' };
@@ -74,8 +75,9 @@ export async function syncAppointment(orgId: string, a: any, action: CalendarAct
         const subject = `${action === 'cancel' ? 'Annulation' : action === 'update' ? 'Rendez-vous modifié' : 'Confirmation de rendez-vous'} : ${a.title}`;
         await sendOrgMail(orgId, {
           to: a.client_email, subject,
-          text: `Bonjour ${a.client_name || ''},\n\nVotre rendez-vous « ${a.title} » est ${VERB[action]}${action === 'cancel' ? '.' : ` : ${when}.`}\n${action === 'cancel' ? 'N’hésitez pas à nous contacter pour convenir d’un nouveau créneau.' : 'Un fichier « rendez-vous.ics » est joint : ouvrez-le pour l’ajouter à votre propre agenda si vous le souhaitez.'}${sig}`,
-          attachments,
+          text: `Bonjour ${a.client_name || ''},\n\nVotre rendez-vous « ${a.title} » est ${VERB[action]}${action === 'cancel' ? '.' : ` : ${when}.`}\n${action === 'cancel' ? 'N’hésitez pas à nous contacter pour convenir d’un nouveau créneau.' : 'Un fichier « rendez-vous.ics » est joint : ouvrez-le pour l’ajouter à votre propre agenda si vous le souhaitez.'}${sig.text}`,
+          html: emailBodyHtml(`Bonjour ${a.client_name || ''},\n\nVotre rendez-vous « ${a.title} » est ${VERB[action]}${action === 'cancel' ? '.' : ` : ${when}.`}\n${action === 'cancel' ? 'N’hésitez pas à nous contacter pour convenir d’un nouveau créneau.' : 'Un fichier « rendez-vous.ics » est joint : ouvrez-le pour l’ajouter à votre propre agenda si vous le souhaitez.'}`, sig.html),
+          attachments: [...(sig.inlineAttachments||[]),...attachments],
         });
         return { state: 'sent' };
       } catch (e: any) { return { state: 'failed', error: String(e?.message || e) }; }

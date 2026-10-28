@@ -19,6 +19,8 @@ import { accountRoutes } from "./routes/account.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { supportRoutes } from "./routes/support.js";
 import { adminRoutes } from "./routes/admin.js";
+import { journeyRoutes } from "./routes/journey.js";
+import { aiAssistanceRoutes } from "./routes/ai-assistance.js";
 import { AurionError } from "./services/errors.js";
 
 export async function buildApp() {
@@ -45,7 +47,7 @@ export async function buildApp() {
     },
   });
   await app.register(multipart, {
-    limits: { fileSize: 25 * 1024 * 1024, files: 1 },
+    limits: { fileSize: 25 * 1024 * 1024, files: 30, parts: 40 },
   });
   await app.register(security);
   await app.register(auth);
@@ -72,6 +74,8 @@ export async function buildApp() {
   await app.register(settingsRoutes);
   await app.register(supportRoutes);
   await app.register(adminRoutes);
+  await app.register(journeyRoutes);
+  await app.register(aiAssistanceRoutes);
 
   return app;
 }

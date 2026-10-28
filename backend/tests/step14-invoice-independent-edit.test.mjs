@@ -15,6 +15,6 @@ assert.match(docs, /<button class=\"btn secondary small edit-doc\" data-id=\"\$\
   'Le bouton Modifier doit être disponible pour tous les documents, y compris les factures.');
 assert.doesNotMatch(route, /if\(cur\.document_type==='invoice'\)return reply\.code\(409\)\.send\(\{error:'INVOICE_DOCUMENT_ONLY'/,
   'PATCH /quotes/:id ne doit plus refuser une facture existante.');
-assert.match(route, /select id,activity_id,client_id,margin_coefficient_percent,coefficient_value,coefficient_unit,coefficient_basis,payment_status,document_type,catalog_pricing/, 'Le patch doit identifier le type de document avant modification.');
+assert.match(route, /select id,activity_id,client_id,intervention_address_id,intervention_address_snapshot,margin_coefficient_percent,coefficient_value,coefficient_unit,coefficient_basis,payment_status,document_type,catalog_pricing/, 'Le patch doit identifier le type de document et conserver l’instantané de l’adresse avant modification.');
 assert.match(quote, /q\?\.document_type==='invoice'/, 'Le formulaire doit distinguer le contexte facture du devis.');
 console.log('step14 contract: OK');

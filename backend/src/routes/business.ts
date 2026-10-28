@@ -12,7 +12,7 @@ import { loadAppointment, syncAppointment } from '../services/calendar.js';
 import { clientSummary } from '../services/clients.js';
 import { monthlyAccounting } from '../services/accounting.js';
 import { accountingReportCsv } from '../services/accounting-report.js';
-import { signatureFor } from '../services/signature.js';
+import { signatureForEmail, emailBodyHtml } from '../services/signature.js';
 import { lookupFrenchCompany, searchFrenchCompanies, normalizeSiret, normalizeSiren } from '../services/public-registry.js';
 import { savePrivateUpload } from '../services/storage.js';
 import { buildStructuredInvoice } from '../services/electronic-invoice.js';
@@ -403,8 +403,8 @@ async function emailDocument(org:string,id:string,type:'quote'|'invoice',number:
   if(!c?.email)return 'client_email_missing';
   if(!(await mailConfigured(org)))return 'mail_not_configured';
   try{
-    const d=await renderDocument(org,id,type);const pdf=await readFile(fileFromKey(d.keys.pdf));const label=type==='invoice'?'facture':'devis';const sig=await signatureFor(org,d.row.activity_id);
-    await sendOrgMail(org,{to:c.email,subject:`${type==='invoice'?'Facture':'Devis'} ${number}`,text:`Bonjour ${c.name||''},\n\nVeuillez trouver votre ${label} ${number} en pièce jointe.${sig}`,attachments:[{filename:`${number}.pdf`,content:pdf}]});
+    const d=await renderDocument(org,id,type);const pdf=await readFile(fileFromKey(d.keys.pdf));const label=type==='invoice'?'facture':'devis';const body=`Bonjour ${c.name||''},\n\nVeuillez trouver votre ${label} ${number} en pièce jointe.`;const sig=await signatureForEmail(org,d.row.activity_id,type);
+    await sendOrgMail(org,{to:c.email,subject:`${type==='invoice'?'Facture':'Devis'} ${number}`,text:body+sig.text,html:emailBodyHtml(body,sig.html),attachments:[...(sig.inlineAttachments||[]),{filename:`${number}.pdf`,content:pdf}]});
     await query('update quotes set sent_at=now(),updated_at=now() where id=$1 and organization_id=$2',[id,org]);
     if(type==='invoice') await createInvoiceWarranty(org,id,d.row as any);
     return 'sent';
@@ -534,6 +534,7 @@ export async function businessRoutes(app:FastifyInstance){
     try{manual=optionalNumber(b.estimatedMinutes,'Temps manuel',0,1e7)??0}catch{return reply.code(400).send({error:'INVALID_INPUT'})}
     const id=crypto.randomUUID(),org=r.auth!.organizationId;
     await query('insert into clients(id,organization_id,activity_id,name,email,phone,address,intervention_address,siret,estimated_minutes) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[id,org,aid,b.name.trim(),b.email||null,b.phone||null,b.address||null,b.interventionAddress||null,(String(b.siret||'').replace(/\D/g,'')||null),manual]);
+    if(String(b.interventionAddress||'').trim())await query(`insert into client_intervention_addresses(id,organization_id,client_id,label,address,is_default) values($1,$2,$3,$4,$5,true)`,[crypto.randomUUID(),org,id,'Adresse principale',String(b.interventionAddress).trim()]);
     await query('insert into client_time_sessions(id,organization_id,user_id,client_id,activity_id,manual_minutes,started_at) values($1,$2,$3,$4,$5,$6,now())',[crypto.randomUUID(),org,r.auth!.userId,id,aid,manual]);
     return reply.code(201).send({id});
   });
@@ -548,6 +549,12 @@ export async function businessRoutes(app:FastifyInstance){
     try{manual=hasManual?(optionalNumber(b.estimatedMinutes,'Temps manuel',0,1e7)??0):null}catch{return reply.code(400).send({error:'INVALID_INPUT'})}
     const x=await query('update clients set name=coalesce($1,name),email=$2,phone=$3,address=$4,intervention_address=$5,siret=$6,activity_id=coalesce($7,activity_id),estimated_minutes=coalesce($8,estimated_minutes),updated_at=now() where id=$9 and organization_id=$10 returning id',[b.name?.trim(),b.email||null,b.phone||null,b.address||null,b.interventionAddress||null,(String(b.siret||'').replace(/\D/g,'')||null),requestedActivityId||null,manual,id,r.auth!.organizationId]);
     if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
+    if(b.interventionAddress!==undefined){
+      const addr=String(b.interventionAddress||'').trim();
+      const current=(await query(`select id from client_intervention_addresses where organization_id=$1 and client_id=$2 and is_active=true and is_default=true limit 1`,[r.auth!.organizationId,id])).rows[0];
+      if(addr){if(current)await query(`update client_intervention_addresses set address=$1,updated_at=now() where id=$2 and organization_id=$3 and client_id=$4`,[addr,current.id,r.auth!.organizationId,id]);else await query(`insert into client_intervention_addresses(id,organization_id,client_id,label,address,is_default) values($1,$2,$3,'Adresse principale',$4,true)`,[crypto.randomUUID(),r.auth!.organizationId,id,addr]);}
+      else if(current)await query(`update client_intervention_addresses set is_active=false,is_default=false,updated_at=now() where id=$1 and organization_id=$2 and client_id=$3`,[current.id,r.auth!.organizationId,id]);
+    }
     return x.rows[0];
   });
 
@@ -823,6 +830,15 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     const {items,basis,unit,selectedValue,partCoefficient,laborCoefficient,rawPart,shippingCost,mileageKm,mileageInternalRate,mileageClientRate,mileageTotal,mileageMode,laborSellingHt,laborInternalCostHt,contributions,targetTtc,catalogPricing,p}=prepared;
     const client=b.clientId?await query('select id from clients where id=$1 and organization_id=$2 and (activity_id=$3 or activity_id is null)',[b.clientId,org,aid]):{rowCount:1};
     if(!client.rowCount)return reply.code(400).send({error:'INVALID_INPUT',message:'Client invalide pour ce devis.'});
+    let interventionAddressId:string|null=null, interventionAddressSnapshot:string|null=null;
+    if(b.clientId){
+      const selected=String(b.interventionAddressId||'').trim();
+      let addressRow:any=null;
+      if(selected){addressRow=(await query(`select id,address from client_intervention_addresses where id=$1 and organization_id=$2 and client_id=$3 and is_active=true`,[selected,org,b.clientId])).rows[0];if(!addressRow)return reply.code(400).send({error:'INVALID_INTERVENTION_ADDRESS',message:'Choisissez une adresse d’intervention active appartenant à ce client.'});}
+      else addressRow=(await query(`select id,address from client_intervention_addresses where organization_id=$1 and client_id=$2 and is_active=true order by is_default desc,created_at,id limit 1`,[org,b.clientId])).rows[0];
+      if(addressRow){interventionAddressId=addressRow.id;interventionAddressSnapshot=String(addressRow.address||'');}
+      else interventionAddressSnapshot=(await query(`select intervention_address from clients where id=$1 and organization_id=$2`,[b.clientId,org])).rows[0]?.intervention_address||null;
+    }
     if(!b.allowLoss&&p.belowMinimumPrice)return reply.code(400).send({error:'MARGIN_GUARD',message:'Le prix est inférieur au minimum calculé à partir des coûts directs et du coefficient.',minimumTotalHt:p.minimumSellingHt});
 
     const documentType=b.documentType==='invoice'?'invoice':'quote';
@@ -872,6 +888,7 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
           (typeof b.imei==='string'?b.imei.trim().slice(0,80):'')||null,(typeof b.serialNumber==='string'?b.serialNumber.trim().slice(0,160):'')||null
         ]);
         await saveItems(clientDb,id,org,aid,items,partCoefficient,basis,unit,selectedValue);
+        await clientDb.query(`update quotes set intervention_address_id=$1::uuid,intervention_address_snapshot=$2 where id=$3 and organization_id=$4`,[interventionAddressId,interventionAddressSnapshot,id,org]);
       });
     }catch(e:any){r.log.error({err:e,quoteId:id,documentType},'quote/invoice creation failed');return reply.code(500).send({error:'QUOTE_SAVE_FAILED',message:String(e?.message||'Le devis ou la facture n’a pas pu être enregistré.')});}
     if(b.clientId){try{await pauseClientTimer(org,r.auth!.userId,b.clientId)}catch(error){r.log.warn({err:error,quoteId:id,clientId:b.clientId},'client timer pause skipped after document save')}}
@@ -897,7 +914,7 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
       if(b.laborInternalCostHt!==undefined)b.laborInternalCostHt=optionalNumber(b.laborInternalCostHt,'Coût interne main-d’œuvre',0,1e9)??0;
     }catch(e:any){return reply.code(400).send({error:'INVALID_INPUT',message:String(e?.message||e)})}
 
-    const cur=(await query('select id,activity_id,client_id,margin_coefficient_percent,coefficient_value,coefficient_unit,coefficient_basis,payment_status,document_type,catalog_pricing,mileage_mode,mileage_km,mileage_rate,mileage_total,mileage_internal_rate,mileage_client_rate,labor_internal_cost_ht,labor_selling_ht,vat_rate,urssaf_rate,shipping_cost,part_cost,final_price_ttc,total_ttc,warranty_text,due_at,purchase_vat_mode,purchase_vat_rate,contribution_snapshot from quotes where id=$1 and organization_id=$2',[id,org])).rows[0];
+    const cur=(await query('select id,activity_id,client_id,intervention_address_id,intervention_address_snapshot,margin_coefficient_percent,coefficient_value,coefficient_unit,coefficient_basis,payment_status,document_type,catalog_pricing,mileage_mode,mileage_km,mileage_rate,mileage_total,mileage_internal_rate,mileage_client_rate,labor_internal_cost_ht,labor_selling_ht,vat_rate,urssaf_rate,shipping_cost,part_cost,final_price_ttc,total_ttc,warranty_text,due_at,purchase_vat_mode,purchase_vat_rate,contribution_snapshot from quotes where id=$1 and organization_id=$2',[id,org])).rows[0];
     if(!cur)return reply.code(404).send({error:'NOT_FOUND'});
     if(!b.intervention&&b.intervention!==undefined)return reply.code(400).send({error:'INVALID_INPUT',message:'La prestation est obligatoire.'});
     const currentItems= b.items===undefined
@@ -919,6 +936,23 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     if(invoiceAddressSource==='free'&&!billingAddress)return reply.code(400).send({error:'INVALID_INPUT',message:'Saisissez une adresse de facturation libre.'});
     const purchaseVatMode=b.purchaseVatMode===undefined?(cur.purchase_vat_mode||'auto'):(['auto','manual','exempt'].includes(String(b.purchaseVatMode))?String(b.purchaseVatMode):'auto');
     const purchaseVatRate=b.purchaseVatRate===undefined?cur.purchase_vat_rate:(b.purchaseVatRate===''||b.purchaseVatRate===null?null:Number(b.purchaseVatRate));
+    let nextInterventionAddressId:string|null=cur.intervention_address_id||null,nextInterventionAddressSnapshot:string|null=cur.intervention_address_snapshot||null;
+    if(b.interventionAddressId!==undefined||b.clientId!==undefined){
+      nextInterventionAddressId=null;nextInterventionAddressSnapshot=null;
+      if(clientId){
+        const requested=String(b.interventionAddressId||'').trim();
+        if(requested){
+          const selected=(await query(`select id,address from client_intervention_addresses where id=$1 and organization_id=$2 and client_id=$3 and is_active=true`,[requested,org,clientId])).rows[0];
+          if(selected){nextInterventionAddressId=selected.id;nextInterventionAddressSnapshot=String(selected.address||'');}
+          else if(cur.client_id===clientId&&requested===String(cur.intervention_address_id||'')){nextInterventionAddressId=cur.intervention_address_id||null;nextInterventionAddressSnapshot=cur.intervention_address_snapshot||null;}
+          else return reply.code(400).send({error:'INVALID_INTERVENTION_ADDRESS',message:'Choisissez une adresse d’intervention active appartenant à ce client.'});
+        }else{
+          const chosen=(await query(`select id,address from client_intervention_addresses where organization_id=$1 and client_id=$2 and is_active=true order by is_default desc,created_at,id limit 1`,[org,clientId])).rows[0];
+          if(chosen){nextInterventionAddressId=chosen.id;nextInterventionAddressSnapshot=String(chosen.address||'');}
+          else nextInterventionAddressSnapshot=(await query('select intervention_address from clients where id=$1 and organization_id=$2',[clientId,org])).rows[0]?.intervention_address||null;
+        }
+      }
+    }
     const reminderInterval=b.reminderIntervalDays===undefined?null:Math.min(365,Math.max(0,Number(b.reminderIntervalDays||0)));
     const latePenaltyMode=b.latePenaltyMode===undefined?null:(['fixed','percent','none'].includes(String(b.latePenaltyMode))?String(b.latePenaltyMode):'none');
     const snapshot={version:2,vatRate:p.totalHt>0?p.vat/p.totalHt*100:Number(b.vatRate??cur.vat_rate??0),purchaseVatMode,purchaseVatRate,coefficient:{basis,unit,value:selectedValue},mileage:{mode:mileageMode,km:mileageKm,internalRate:mileageInternalRate,clientRate:mileageClientRate,total:mileageTotal},result:p};
@@ -955,6 +989,9 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
         return result.rows[0];
       });
     }catch(e:any){r.log.error({err:e,quoteId:id,documentType:cur.document_type},'quote/invoice update failed');return reply.code(500).send({error:'QUOTE_SAVE_FAILED',message:String(e?.message||'Le devis ou la facture n’a pas pu être enregistré.')});}
+    if(b.interventionAddressId!==undefined||b.clientId!==undefined){
+      await query('update quotes set intervention_address_id=$1::uuid,intervention_address_snapshot=$2 where id=$3 and organization_id=$4',[nextInterventionAddressId,nextInterventionAddressSnapshot,id,org]);
+    }
     return updated;
   });
   app.delete('/quotes/:id',async(r,reply)=>{
@@ -1132,7 +1169,16 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
       ensureActivity(r,activityId(r)),
       query(`select count(*)::int n from support_tickets where organization_id=$1 and status not in ('resolved','duplicate','closed')`,[org])
     ]);
-    if(!aid)return {tickets:Number(t.rows[0]?.n||0),unpaidCount:0,unpaidTotal:0,forecastEntries:0};
+    // Crée l’entrée de configuration pour les nouvelles organisations également, sans rouvrir une entrée que l’utilisateur a explicitement résolue.
+    const configurationState=(await query(`select configuration_incomplete from organizations where id=$1`,[org])).rows[0];
+    if(configurationState && configurationState.configuration_incomplete!==false){
+      await query(`insert into dashboard_journal_events(organization_id,event_type,title,description,severity,source,internal_path,dedupe_key)
+        values($1,'configuration_incomplete','Configuration à compléter','Certains éléments restent à renseigner ou à vérifier. Reprenez le parcours guidé ou modifiez les paramètres manuellement.','action','dashboard','/onboarding?step=2','legacy-configuration-incomplete')
+        on conflict(organization_id,dedupe_key) do nothing`,[org]);
+    } else {
+      await query(`update dashboard_journal_events set resolved_at=coalesce(resolved_at,now()) where organization_id=$1 and event_type='configuration_incomplete' and resolved_at is null`,[org]);
+    }
+    if(!aid){const events=(await query(`select id,event_type,title,description,severity,internal_path,is_read,resolved_at,created_at from dashboard_journal_events where organization_id=$1 and resolved_at is null and severity in ('action','warning','error') order by created_at desc`,[org])).rows;return {tickets:Number(t.rows[0]?.n||0),unpaidCount:0,unpaidTotal:0,forecastEntries:0,journal:events.map((x:any)=>({kind:'persistent',persisted:true,journalId:x.id,title:x.title,detail:x.description,severity:x.severity==='action'||x.severity==='error'?'red':x.severity==='warning'?'yellow':'blue',sortAt:x.created_at,internalPath:x.internal_path,isRead:x.is_read,eventType:x.event_type}))};}
     const historyMonths=Math.min(120,Math.max(1,Number((r.query as any)?.forecastMonths||6)));
     const accountingYear=new Date().getFullYear();
     const [u,f,r4,historicalResult,warrResult,appointmentsResult,subResult,yearAccounting]=await Promise.all([
@@ -1183,7 +1229,9 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     let mailReady=false;
     try{mailReady=await mailConfigured(org)}catch{mailReady=false}
     if(!mailReady)journal.push({kind:'mail',severity:'yellow',sortAt:null,title:'Messagerie',detail:'Connectez votre messagerie (une seule fois) pour envoyer vos devis et factures et mettre votre agenda à jour.',action:'settings'});
-    journal.sort((a:any,b:any)=>{const rank=(x:any)=>x.severity==='red'?0:1;const pr=rank(a)-rank(b);if(pr!==0)return pr;const at=a.sortAt?new Date(a.sortAt).getTime():Number.POSITIVE_INFINITY;const bt=b.sortAt?new Date(b.sortAt).getTime():Number.POSITIVE_INFINITY;return at-bt;});
+    const persistent=(await query(`select id,event_type,title,description,severity,internal_path,is_read,resolved_at,created_at from dashboard_journal_events where organization_id=$1 and resolved_at is null and severity in ('action','warning','error') order by is_read asc,created_at desc`,[org])).rows;
+    for(const x of persistent)journal.push({kind:'persistent',persisted:true,journalId:x.id,eventType:x.event_type,title:x.title,detail:x.description,severity:x.severity==='action'||x.severity==='error'?'red':x.severity==='warning'?'yellow':x.severity==='success'?'green':'blue',sortAt:x.created_at,internalPath:x.internal_path,isRead:x.is_read});
+    journal.sort((a:any,b:any)=>{const rank=(x:any)=>x.severity==='red'?0:x.persisted&&!x.isRead?1:x.severity==='yellow'?2:3;const pr=rank(a)-rank(b);if(pr!==0)return pr;const at=a.sortAt?new Date(a.sortAt).getTime():Number.POSITIVE_INFINITY;const bt=b.sortAt?new Date(b.sortAt).getTime():Number.POSITIVE_INFINITY;return at-bt;});
     return {tickets:Number(t.rows[0]?.n||0),unpaidCount:Number(u.rows[0]?.n||0),unpaidTotal:Number(u.rows[0]?.total||0),forecastEntries:open,fourthReminderCount:Number(r4.rows[0]?.n||0),forecast,subscription:sub,warranty:{count:Number(warr?.n||0),nextEnd:warr?.next_end||null},trialDaysLeft,journal};
   });
   app.get('/accounting/summary',async r=>{

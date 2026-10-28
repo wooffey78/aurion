@@ -11,7 +11,7 @@ const css=fs.readFileSync(path.join(root,'assets/css/app.css'),'utf8');
 
 test('étape 31: journal priorisé par urgence puis date avec scroll Aurion',()=>{
   assert.match(business,/journal\.sort\(\(a:any,b:any\)=>/,'le backend doit trier le journal');
-  assert.match(business,/rank=\(x:any\)=>x\.severity==='red'\?0:1/,'le tri doit placer les urgences rouges avant les jaunes');
+  assert.match(business,/rank=\(x:any\)=>x\.severity==='red'\?0:x\.persisted&&!x\.isRead\?1:x\.severity==='yellow'\?2:3/,'le tri doit placer les urgences rouges puis les événements persistants non lus avant les suivis jaunes');
   assert.match(business,/sortAt|due_at|starts_at/,'le tri doit disposer d’une date de référence');
   assert.match(other,/class="list" role="region" aria-label="Journal de bord"/,'le journal doit exposer une région dédiée au scroll');
   assert.match(css,/\.journal-board \.list\{[\s\S]*overflow-y:auto/,'la liste du journal doit être scrollable');

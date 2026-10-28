@@ -6,6 +6,7 @@ import{api}from'./core/api.js';
 import{getCachedSession,setSession,invalidateSession}from'./core/session.js';
 import{renderAuth}from'./pages/auth.js';import{renderVipInvite}from'./pages/vip-invite.js';
 import{renderDashboard}from'./pages/dashboard.js';
+import{renderGuidedOnboarding}from'./pages/guided-onboarding.js';
 
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});window.__aurionDeferredInstall=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();window.__aurionDeferredInstall=e});
 
@@ -35,7 +36,8 @@ async function render(){
   if(r==='/reset')return renderReset();
   if(r==='/invite'){return renderVipInvite(routeQuery().get('token')||'');}
   if(r==='/legal'||r.startsWith('/legal/'))return renderLegal(r.split('/')[2]||'');
-  if(r==='/dashboard'){if(!await getSession())return go('/auth');const q=routeQuery();if(q.get('billing')==='success'&&q.get('session_id')){try{await api.completeCheckout(q.get('session_id'));toast('Paiement confirmé. Votre abonnement est actif.','success')}catch(x){toast(x.message,'error')}location.hash='#/dashboard';return}return renderDashboard()}
+  if(r==='/onboarding'){if(!await getSession())return go('/auth');return renderGuidedOnboarding()}
+  if(r==='/dashboard'){if(!await getSession())return go('/auth');try{const journey=await api.journeyEntryState();if(journey?.shouldRedirect)return go('/onboarding')}catch{}const q=routeQuery();if(q.get('billing')==='success'&&q.get('session_id')){try{await api.completeCheckout(q.get('session_id'));toast('Paiement confirmé. Votre abonnement est actif.','success')}catch(x){toast(x.message,'error')}location.hash='#/dashboard';return}return renderDashboard()}
   if(r==='/'){
     document.querySelector('#app').innerHTML=`<main id="main" class="landing"><header class="topbar"><a class="brand" href="#/">AURION</a></header><section class="install-grid" id="install-grid" aria-label="Installer Aurion"><figure class="platform-download-card"><button class="install-card" data-platform="macos" type="button" aria-label="Installer Aurion sur macOS"><img src="./assets/platforms/macos.svg" alt="Illustration de la plateforme macOS"><span class="sr-only">Installer Aurion sur macOS</span></button><figcaption class="platform-download-copy"><strong>macOS</strong></figcaption></figure><figure class="platform-download-card"><button class="install-card" data-platform="ios" type="button" aria-label="Installer Aurion sur iOS"><img src="./assets/platforms/ios.svg" alt="Illustration de la plateforme iOS"><span class="sr-only">Installer Aurion sur iOS</span></button><figcaption class="platform-download-copy"><strong>iOS</strong></figcaption></figure><figure class="platform-download-card"><button class="install-card" data-platform="windows" type="button" aria-label="Installer Aurion sur Windows"><img src="./assets/platforms/windows.svg" alt="Illustration de la plateforme Windows"><span class="sr-only">Installer Aurion sur Windows</span></button><figcaption class="platform-download-copy"><strong>Windows</strong></figcaption></figure><figure class="platform-download-card"><button class="install-card" data-platform="android" type="button" aria-label="Installer Aurion sur Android"><img src="./assets/platforms/android.svg" alt="Illustration de la plateforme Android"><span class="sr-only">Installer Aurion sur Android</span></button><figcaption class="platform-download-copy"><strong>Android</strong></figcaption></figure></section><section class="landing-hero"><div><span class="eyebrow">LOGICIEL DE GESTION • MULTI-ACTIVITÉS</span><h1>Votre activité, <em>simplement gérée.</em></h1><p>Aurion centralise vos clients, votre catalogue, vos fournisseurs, vos interventions, vos devis, vos factures, votre agenda, votre comptabilité et votre trésorerie dans une seule application, organisée par activité.</p><div class="button-row"><a class="btn primary" href="/?auth=register">Commencer <span>→</span></a><a class="btn secondary" href="/?auth=login">Se connecter</a></div></div><img src="./assets/aurion-presentation.png" alt="Aperçu de l’interface Aurion de gestion d’activité" data-hide-on-error></section></main>`;
     if(new URLSearchParams(location.search).get('native')==='1'||location.protocol==='file:'||window.matchMedia?.('(display-mode: standalone)').matches||navigator.standalone)document.querySelector('#install-grid')?.remove();
@@ -78,8 +80,28 @@ document.addEventListener('focusout', () => window.setTimeout(syncVisualViewport
 window.addEventListener('orientationchange', () => window.setTimeout(syncVisualViewport, 250));
 syncVisualViewport();
 
+// Aide de saisie additionnelle réservée aux écrans étroits ; le libellé accessible reste inchangé.
+const mobilePlaceholderRules=[
+  [/siret/i,'SIRET : 14 chiffres (facultatif)'],[/siren/i,'SIREN : 9 chiffres (facultatif)'],[/postal|zip|code_postal/i,'Code postal (ex. 75001)'],[/email|courriel/i,'Adresse e-mail (ex. nom@entreprise.fr)'],[/phone|telephone|téléphone|tel/i,'Téléphone (ex. 06 12 34 56 78)'],[/website|site|url/i,'Site web (ex. https://…)'],[/address|adresse/i,'Adresse complète, rue et ville'],[/company|entreprise|raison_sociale/i,'Nom officiel de l’entreprise'],[/name|nom/i,'Nom ou raison sociale'],[/price|prix|amount|montant|total/i,'Montant en euros, hors symbole €'],[/date|due_at|starts_at/i,'Date au format attendu par le champ'],[/password/i,'Mot de passe conforme aux critères affichés'],[/subject|objet/i,'Objet clair et explicite'],[/reference|référence/i,'Référence du dossier (si connue)']
+];
+const mobileOriginalPlaceholders=new WeakMap();
+function refreshMobilePlaceholders(){
+  const mobile=window.matchMedia('(max-width: 700px)').matches;
+  document.querySelectorAll('input:not([type="hidden"]),textarea,select').forEach(el=>{
+    if(!mobile){if(mobileOriginalPlaceholders.has(el)){const original=mobileOriginalPlaceholders.get(el);if(original===null)el.removeAttribute('placeholder');else el.setAttribute('placeholder',original);mobileOriginalPlaceholders.delete(el);}return;}
+    if(!mobileOriginalPlaceholders.has(el))mobileOriginalPlaceholders.set(el,el.hasAttribute('placeholder')?el.getAttribute('placeholder'):null);
+    const label=el.labels?.[0]?.textContent?.trim()||'';if(!label&&!el.getAttribute('aria-label'))return;
+    const key=[el.id,el.name,el.getAttribute('autocomplete'),el.type,label].join(' ');const match=mobilePlaceholderRules.find(([re])=>re.test(key));
+    if(!match)return;const current=el.getAttribute('placeholder')||'';if(current!==match[1])el.setAttribute('placeholder',match[1]);
+  });
+}
+const mobilePlaceholderObserver=new MutationObserver(refreshMobilePlaceholders);
+mobilePlaceholderObserver.observe(document.body,{childList:true,subtree:true});
+window.matchMedia('(max-width: 700px)').addEventListener?.('change',refreshMobilePlaceholders);
+window.addEventListener('resize',refreshMobilePlaceholders,{passive:true});
+
 const formObserver=new MutationObserver(()=>enhanceFormFields(document));
 formObserver.observe(document.body,{childList:true,subtree:true});
-async function bootRender(){try{await render();enhanceFormFields(document);window.__aurionBooted=true}catch(error){showError(error)}}
+async function bootRender(){try{await render();enhanceFormFields(document);refreshMobilePlaceholders();window.__aurionBooted=true}catch(error){showError(error)}}
 listen(()=>bootRender());
 bootRender();

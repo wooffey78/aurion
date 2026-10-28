@@ -2,7 +2,7 @@ import { query } from '../db.js';
 import { config } from '../config.js';
 import { sendOrgMail } from './mail.js';
 import { AurionError } from './errors.js';
-import { signatureFor } from './signature.js';
+import { signatureForEmail, emailBodyHtml } from './signature.js';
 import { issueAndEmailSubscriptionInvoice } from './subscription-invoice.js';
 import { renderDocument, fileFromKey } from './document-renderer.js';
 import { readFile } from 'node:fs/promises';
@@ -24,8 +24,8 @@ export function startReminderWorker(log:any){
         try{
           const d=await renderDocument(q.organization_id,q.id,'invoice');const pdf=await readFile(fileFromKey(d.keys.pdf));
           const labels=['1ère relance','2e relance','3e relance'];const label=labels[next-1]||`${next}e relance`;
-          const text=`Bonjour ${q.client_name||''},\n\nVeuillez trouver votre facture ${q.number}, ${label.toLowerCase()}.\nMontant de la facture : ${Number(q.total_ttc||0).toFixed(2)} €.\n\nCordialement,\n${q.company_name||'Aurion'}`;
-          await sendOrgMail(q.organization_id,{to:q.client_email,subject:`Facture ${q.number} · ${label}`,text,attachments:[{filename:`${q.number}-${next}e-relance.pdf`,content:pdf}]});
+          const body=`Bonjour ${q.client_name||''},\n\nVeuillez trouver votre facture ${q.number}, ${label.toLowerCase()}.\nMontant de la facture : ${Number(q.total_ttc||0).toFixed(2)} €.`;const sig=await signatureForEmail(q.organization_id,q.activity_id,'invoice');const text=body+sig.text;
+          await sendOrgMail(q.organization_id,{to:q.client_email,subject:`Facture ${q.number} · ${label}`,text,html:emailBodyHtml(body,sig.html),attachments:[...(sig.inlineAttachments||[]),{filename:`${q.number}-${next}e-relance.pdf`,content:pdf}]});
           await query('insert into invoice_reminders(organization_id,quote_id,reminder_number,penalty_amount) values($1,$2,$3,0)',[q.organization_id,q.id,next]);
           const intervalDays=Math.min(365,Math.max(0,Number(q.reminder_interval_days??0))); const nextAt=next<3&&intervalDays>0?new Date(Date.now()+intervalDays*86400000):null;
           await query('update quotes set reminder_count=$1,last_reminder_at=now(),next_reminder_at=$2,updated_at=now() where id=$3',[next,nextAt,q.id]);
@@ -40,12 +40,12 @@ export function startReminderWorker(log:any){
         if(!before&&Date.now()-new Date(j.run_at).getTime()>7*86400000){await query("update notification_jobs set status='expired',updated_at=now() where id=$1",[j.id]);continue}
         if(!j.client_email){await query("update notification_jobs set status='failed',last_error='CLIENT_EMAIL_MISSING',updated_at=now() where id=$1",[j.id]);continue}
         try{
-          const sig=await signatureFor(j.organization_id,j.activity_id);
+          const sig=await signatureForEmail(j.organization_id,j.activity_id,'professional');
           const subject=before?`Rappel : ${j.title}`:`Suivi de votre rendez-vous : ${j.title}`;
           const body=before
-            ?`Bonjour ${j.client_name||''},\n\nRappel : votre rendez-vous « ${j.title} » est prévu le ${new Date(j.starts_at).toLocaleString('fr-FR')}.${sig}`
-            :`Bonjour ${j.client_name||''},\n\nNous revenons vers vous après votre rendez-vous « ${j.title} ».${sig}`;
-          await sendOrgMail(j.organization_id,{to:j.client_email,subject,text:body});
+            ?`Bonjour ${j.client_name||''},\n\nRappel : votre rendez-vous « ${j.title} » est prévu le ${new Date(j.starts_at).toLocaleString('fr-FR')}.`
+            :`Bonjour ${j.client_name||''},\n\nNous revenons vers vous après votre rendez-vous « ${j.title} ».`;
+          await sendOrgMail(j.organization_id,{to:j.client_email,subject,text:body+sig.text,html:emailBodyHtml(body,sig.html),attachments:sig.inlineAttachments});
           await query("update notification_jobs set status='sent',updated_at=now() where id=$1",[j.id]);
         }catch(e:any){
           if(e instanceof AurionError&&e.code==='MAIL_NOT_CONFIGURED')continue; // on réessaiera dès que la messagerie sera configurée

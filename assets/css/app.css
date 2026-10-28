@@ -887,3 +887,130 @@ input:-webkit-autofill,textarea:-webkit-autofill,select:-webkit-autofill{box-sha
     margin-bottom: 12px !important;
   }
 }
+
+
+/* Aurion 15.3.0 — parcours guidé, journal persistant et adresses multi-intervention. */
+@layer components{
+.guided-journey{width:min(1120px,100%);margin:0 auto;padding:22px;min-height:100vh;display:grid;align-content:start;gap:18px}
+.journey-header{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;padding:10px 0}
+.journey-header-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap}
+.journey-save-status{color:var(--muted);font-size:.8rem}
+.journey-card{padding:clamp(18px,4vw,38px);display:grid;gap:22px}
+.journey-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+.journey-heading h1{font-size:clamp(1.8rem,4vw,3.1rem);margin:9px 0 12px}
+.journey-heading .lede{color:var(--muted);max-width:720px;margin-bottom:0}
+.journey-progress-pct{border:1px solid var(--line);border-radius:99px;padding:8px 12px;font-weight:800;white-space:nowrap}
+.journey-stepper{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.journey-step{min-width:0;display:grid;justify-items:start;align-content:start;gap:8px;padding:10px;border:1px solid var(--line);border-radius:11px;background:rgba(201,220,244,.02);color:var(--muted);text-align:left}
+.journey-step>span{width:27px;height:27px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;font-weight:800}
+.journey-step small{font-size:.72rem;line-height:1.3}
+.journey-step.active{color:var(--text);border-color:var(--blue);background:rgba(130,178,154,.08)}
+.journey-step.done>span{color:var(--green);border-color:var(--green)}
+.journey-content{min-width:0;overflow-wrap:anywhere}
+.journey-content>.stack{gap:18px}
+.journey-footer{display:flex;justify-content:space-between;gap:12px;align-items:center;border-top:1px solid var(--line);padding-top:18px;flex-wrap:wrap}
+.journey-footer .button-row{align-items:center}
+.journey-inline-status{min-height:1.4em;color:var(--muted)}
+.journey-check-list{display:grid;gap:9px}
+.journey-check-list>div,.journey-formality,.journey-mail-item,.journey-create-form,.journey-upload,.journey-mail-connect{border:1px solid var(--line);border-radius:13px;padding:15px;background:rgba(201,220,244,.018);min-width:0}
+.journey-check-list>div{display:grid;gap:4px}
+.journey-check-list span,.journey-formality p,.journey-mail-item p{color:var(--muted);overflow-wrap:anywhere}
+.journey-formality-title,.journey-mail-connect{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.journey-certainty{font-size:.75rem;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:5px 9px}
+.journey-formality .journey-email-editor{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);display:grid;gap:14px}
+.journey-formalities-list,.journey-mail-list{display:grid;gap:12px}
+.journey-create-form{display:grid;gap:14px}
+.journey-upload{display:grid;gap:14px}
+.journey-recap-status{padding:15px;border:1px solid var(--line);border-radius:13px}
+.journey-recap-status>span{font-weight:800}
+.intervention-address-list{display:grid;gap:10px}
+.intervention-address-row{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:13px;border:1px solid var(--line);border-radius:12px}
+.intervention-address-row small{color:var(--muted)}
+.journal-persisted{display:flex;align-items:flex-start;gap:9px}
+.journal-persisted .journal-body{min-width:0;flex:1}
+}
+@media(max-width:700px){
+ .guided-journey{padding:12px;gap:12px}
+ .journey-header{align-items:flex-start}
+ .journey-header-actions{justify-content:flex-start;width:100%}
+ .journey-header-actions .btn{min-height:40px}
+ .journey-card{padding:16px;border-radius:14px;gap:16px}
+ .journey-stepper{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+ .journey-step{padding:7px;gap:5px}
+ .journey-step small{font-size:.68rem}
+ .journey-heading{gap:10px}
+ .journey-progress-pct{font-size:.78rem;padding:6px 8px}
+ .journey-footer{align-items:stretch}
+ .journey-footer .button-row{width:100%}
+ .journey-footer .button-row .btn{flex:1}
+ .intervention-address-row{display:grid}
+}
+
+
+/* ===== Aurion 15.3.3 : passerelle IA et aperçu de logo ===== */
+.aur-logo-assistant{display:grid;gap:14px;border:1px solid rgba(130,178,154,.35);border-radius:16px;padding:18px;background:rgba(130,178,154,.045);min-width:0}
+.aur-logo-assistant-head,.aur-logo-preview-heading{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.aur-logo-assistant-head h3{margin:4px 0 0;font-size:1.12rem}
+.aur-logo-chip{border:1px solid rgba(130,178,154,.38);border-radius:99px;padding:5px 10px;color:#9fc2b2;font-size:.75rem;font-weight:750}
+.aur-logo-assistant .field textarea{width:100%;resize:vertical;min-height:170px;white-space:pre-wrap}
+.aur-logo-preview-wrap{display:grid;gap:10px}
+.aur-logo-preview{display:grid;place-items:center;min-height:220px;padding:18px;border:1px dashed rgba(169,194,184,.5);border-radius:14px;background:repeating-conic-gradient(#1e252b 0% 25%,#252d34 0% 50%) 50% / 24px 24px;outline:none}
+.aur-logo-preview:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(130,178,154,.18)}
+.aur-logo-preview img{display:block;max-width:100%;max-height:360px;width:auto;height:auto;object-fit:contain;border-radius:5px}
+.aur-logo-placeholder{display:grid;justify-items:center;gap:8px;padding:22px;max-width:400px;text-align:center;background:rgba(16,22,27,.9);border:1px solid var(--line);border-radius:12px}
+.aur-logo-placeholder>span{font-size:2rem;color:#9fc2b2}
+.aur-logo-placeholder strong{color:var(--text)}
+.aur-logo-placeholder small{color:var(--muted);line-height:1.5}
+@media(max-width:700px){.aur-logo-assistant{padding:12px}.aur-logo-preview{min-height:170px}.aur-logo-preview img{max-height:280px}}
+
+/* ===== Aurion 15.3.3 : palette visuelle, documents et messagerie intégrée ===== */
+.aur-color-choice{display:grid;gap:10px;min-width:0}
+.aur-color-choice-main{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.aur-color-picker-label{display:inline-flex;align-items:center;gap:10px;cursor:pointer;color:var(--text);font-size:.92rem}
+.aur-color-picker-label input[type=color]{width:54px;height:44px;padding:3px;border-radius:10px;border:1px solid var(--line);background:var(--surface,#1e252b);cursor:pointer}
+.aur-color-sample{width:42px;height:42px;border-radius:11px;background:var(--aur-sample,#2563eb);border:2px solid rgba(255,255,255,.65);box-shadow:inset 0 0 0 1px rgba(0,0,0,.16)}
+.aur-color-swatches{display:flex;flex-wrap:wrap;gap:8px}
+.aur-color-swatches button{width:30px;height:30px;flex:0 0 30px;border-radius:50%;border:2px solid rgba(255,255,255,.62);background:var(--aur-swatch);cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.16)}
+.aur-color-swatches button:focus-visible,.aur-color-picker-label input:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+.aur-color-swatches button:hover{transform:scale(1.08)}
+.aur-admin-suggestions{display:grid;gap:12px}
+.aur-admin-suggestion{padding:14px;border:1px solid var(--line);border-radius:12px;display:grid;gap:10px;overflow-wrap:anywhere}
+.aur-admin-suggestion .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.aur-admin-suggestion .check{align-items:flex-start;min-width:0}
+.aur-admin-suggestion .check span{overflow-wrap:anywhere}
+.journey-mailbox-full{display:grid;gap:12px;padding:16px;border:1px solid var(--line);border-radius:14px;min-width:0}
+.journey-mailbox-full .mailbox{max-width:none}
+.journey-mailbox-full input,.journey-mailbox-full select{max-width:100%}
+@media(max-width:640px){.aur-admin-suggestion .grid-2{grid-template-columns:minmax(0,1fr)}.journey-mailbox-full{padding:10px}.aur-color-swatches{gap:6px}.aur-color-swatches button{width:28px;height:28px;flex-basis:28px}}
+
+/* ===== Aurion 15.3.4 : détections révisables et absorption des données ===== */
+.aur-ai-panel,.aur-absorption-panel{display:grid;gap:14px;border:1px solid rgba(130,178,154,.32);border-radius:15px;padding:16px;min-width:0;background:rgba(130,178,154,.035)}
+.aur-ai-panel{margin-top:18px}
+.aur-ai-panel-head,.aur-absorption-head,.aur-ai-suggestion>header,.aur-absorption-record>header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;min-width:0}
+.aur-ai-panel h3,.aur-absorption-panel h3{font-size:1.06rem;margin:0 0 5px}
+.aur-ai-panel p,.aur-absorption-panel p{overflow-wrap:anywhere;margin-top:0;margin-bottom:4px}
+.aur-ai-badge{align-self:flex-start;white-space:nowrap;border:1px solid rgba(130,178,154,.38);color:#a8ccb9;border-radius:99px;padding:5px 9px;font-size:.73rem;font-weight:750}
+.aur-ai-suggestions,.aur-absorption-results{display:grid;gap:12px;min-width:0}
+.aur-ai-suggestion,.aur-absorption-record,.aur-absorption-summary{display:grid;gap:10px;min-width:0;padding:13px;border:1px solid var(--line);border-radius:12px;background:rgba(10,15,20,.22)}
+.aur-ai-suggestion .field textarea,.aur-absorption-record .field textarea{width:100%;resize:vertical;min-width:0;max-width:100%;font-family:inherit;line-height:1.45}
+.aur-ai-suggestion .check,.aur-absorption-record .check{align-items:flex-start;min-width:0;flex:1}
+.aur-ai-meta{font-size:.79rem;color:var(--muted);overflow-wrap:anywhere}
+.aur-ai-delete{color:#e98d91}
+.aur-absorption-consent{align-items:flex-start;gap:9px}
+.aur-absorption-record .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.aur-absorption-record .field{min-width:0}
+.aur-absorption-record textarea.is-invalid{border-color:#d9535d;outline:2px solid rgba(217,83,93,.22)}
+.aur-absorption-summary{background:rgba(130,178,154,.05)}
+.aur-absorption-record select,.aur-absorption-record textarea,.aur-ai-suggestion textarea{max-width:100%}
+.aur-ai-suggestion :focus-visible,.aur-absorption-panel :focus-visible{outline-color:var(--blue)}
+@media(max-width:640px){.aur-ai-panel,.aur-absorption-panel{padding:12px}.aur-absorption-record .grid-2{grid-template-columns:minmax(0,1fr)}.aur-ai-suggestion>header,.aur-absorption-record>header{align-items:flex-start}}
+
+
+/* ===== Aurion 15.3.4 : lisibilité des actions du journal de bord ===== */
+.journal-board .journal-actions{display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;column-gap:18px;row-gap:10px;margin-top:12px;padding:10px 0 0;border-top:1px solid rgba(185,196,190,.16)}
+.journal-board .journal-actions>span{display:inline-flex;align-items:center;min-height:32px;line-height:1.45;white-space:nowrap;color:var(--muted);margin-right:2px}
+.journal-board .journal-actions .link-btn{display:inline-flex;align-items:center;min-height:32px;margin:0;padding:5px 2px;line-height:1.45;white-space:nowrap;text-decoration:underline;text-underline-offset:3px}
+.journal-board .journal-actions .link-btn+.link-btn{margin-left:2px}
+.journal-board .list-row>div:first-child{min-width:0;display:grid;gap:7px;align-content:start}
+.journal-board .list-row small{display:block;overflow-wrap:anywhere;line-height:1.45}
+@media(max-width:640px){.journal-board .journal-actions{column-gap:15px;row-gap:8px}.journal-board .journal-actions .link-btn{min-height:38px}.journal-board .list-row{align-items:flex-start;gap:12px}}

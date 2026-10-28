@@ -19,7 +19,7 @@ export interface DocModel {
   kind: 'quote' | 'invoice';
   title: string; number: string; date: string;
   company: { name: string; activity: string; siret: string; address?: string; postalCode?: string; city?: string; website?: string; logo: { data: Buffer; type: 'png' | 'jpg' } | null };
-  client: { name: string; address: string };
+  client: { name: string; address: string; interventionAddress?: string };
   interventionLabel: string; intervention: string;
   device?: { serialNumber?: string; imei?: string };
   itemsLabel: string; quantityLabel: string; items: { label: string; quantity: string }[];
@@ -99,13 +99,13 @@ export async function buildPdf(m: DocModel): Promise<Buffer> {
 
     // 2 — cartes Émetteur / Client
     let y = hEnd + 44;
-    const cw = (W - 16) / 2, ch = 92;
-    for (const [i, c] of [['Émetteur', [m.company.name || '', m.company.activity, m.company.siret ? `SIRET ${m.company.siret}` : '']], ['Client', [m.client.name || '—', ...(m.client.address ? m.client.address.split(/\r?\n/) : [])]]] as [string, string[]][] ) {
+    const cw = (W - 16) / 2, ch = m.client.interventionAddress ? 118 : 92;
+    for (const [i, c] of [['Émetteur', [m.company.name || '', m.company.activity, m.company.siret ? `SIRET ${m.company.siret}` : '']], ['Client', [m.client.name || '—', ...(m.client.address ? [`Facturation :`, ...m.client.address.split(/\r?\n/)] : []), ...(m.client.interventionAddress ? [`Adresse d’intervention :`, ...m.client.interventionAddress.split(/\r?\n/)] : [])]]] as [string, string[]][] ) {
       const x = L + (i === 'Émetteur' ? 0 : cw + 16);
       rr(x, y, cw, ch, 8).fillAndStroke(card, line);
       label(i, x + 16, y + 14, cw - 32);
       doc.font(FB).fontSize(12).fillColor(ink).text(c[0] || '—', x + 16, y + 30, { width: cw - 32, lineBreak: false, ellipsis: true });
-      doc.font(FR).fontSize(9.5).fillColor(muted).text(c.slice(1).filter(Boolean).join('\n'), x + 16, y + 48, { width: cw - 32, height: 40, lineGap: 2, ellipsis: true });
+      doc.font(FR).fontSize(9.5).fillColor(muted).text(c.slice(1).filter(Boolean).join('\n'), x + 16, y + 48, { width: cw - 32, height: ch - 52, lineGap: 2, ellipsis: true });
     }
     y += ch + 34;
 
@@ -246,7 +246,7 @@ export async function buildDocx(m: DocModel): Promise<Buffer> {
   kids.push(spacer(420));
 
   // 2 — cartes Émetteur / Client
-  const addr = m.client.address ? m.client.address.split(/\r?\n/) : [];
+  const addr = [...(m.client.address ? ['Facturation :', ...m.client.address.split(/\r?\n/)] : []), ...(m.client.interventionAddress ? ['Adresse d’intervention :', ...m.client.interventionAddress.split(/\r?\n/)] : [])];
   kids.push(table([4600, 212, 4600], [new TableRow({ cantSplit: true, children: [
     cell([label('Émetteur'), p(m.company.name || '—', { size: 24, bold: true }), ...(m.company.activity ? [p(m.company.activity, { size: 20, color: MUTED, before: 30 })] : []), ...(m.company.siret ? [p(`SIRET ${m.company.siret}`, { size: 20, color: MUTED })] : [])], 4600, { fill: 'F8FAFC', margins: 220, borders: boxed }),
     cell([p('')], 212),
@@ -374,7 +374,7 @@ export function buildOdt(m: DocModel): Buffer {
   const cell = (style: string, inner: string) => `<table:table-cell table:style-name="${style}" office:value-type="string">${inner}</table:table-cell>`;
   const tbl = (name: string, cols: string[], rows: string) => `<table:table table:name="${name}" table:style-name="Tfull">${cols.map(c => `<table:table-column table:style-name="Col${c}"/>`).join('')}${rows}</table:table>`;
   const tr = (cells: string) => `<table:table-row>${cells}</table:table-row>`;
-  const addr = (m.client.address ? m.client.address.split(/\r?\n/) : []).map(l => P('Pbody', l)).join('');
+  const addr = [...(m.client.address ? ['Facturation :', ...m.client.address.split(/\r?\n/)] : []), ...(m.client.interventionAddress ? ['Adresse d’intervention :', ...m.client.interventionAddress.split(/\r?\n/)] : [])].map(l => P('Pbody', l)).join('');
 
   let body = tbl('Entete', ['H1', 'H2'], tr(cell('Cplain', logoXml + P('Pcompany', m.company.name || 'Entreprise') + (m.company.activity ? P('Pmeta', m.company.activity) : '') + (m.company.siret ? P('Pmeta', `SIRET ${m.company.siret}`) : '')) + cell('Cplain', P('Ptitle', m.reminderLabel || m.title) + P('Pnum', `N° ${m.number}`) + P('Pdate', `Émis le ${m.date}`))));
   body += '<text:p text:style-name="Pbar"/>';
