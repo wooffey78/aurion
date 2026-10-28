@@ -686,3 +686,204 @@ input:-webkit-autofill,textarea:-webkit-autofill,select:-webkit-autofill{box-sha
     word-break: normal;
   }
 }
+
+/* Aurion — adaptation du tableau de bord aux smartphones en orientation paysage. */
+@media (orientation: landscape) and (max-height: 520px) and (max-width: 1000px) {
+  .dashboard-shell {
+    display: grid !important;
+    grid-template-columns: 58px minmax(0, 1fr) !important;
+    align-items: start;
+    min-height: 100dvh;
+  }
+  .dashboard-shell .sidebar {
+    position: sticky !important;
+    top: 0;
+    width: 58px;
+    min-width: 0;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    box-sizing: border-box;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 6px 4px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    border-right: 1px solid var(--line);
+    border-bottom: 0 !important;
+    z-index: 60;
+  }
+  .dashboard-shell .sidebar .brand {
+    min-width: 0 !important;
+    width: 100%;
+    justify-content: center !important;
+    padding: 0 !important;
+    gap: 0;
+  }
+  .dashboard-shell .sidebar .brand span:not(.brand-logo) {
+    display: none !important;
+  }
+  .dashboard-shell .burger {
+    display: none !important;
+  }
+  .dashboard-shell .sidebar .nav {
+    display: grid !important;
+    width: 100%;
+    margin: 8px 0 0 !important;
+    gap: 4px !important;
+    min-height: 0;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .dashboard-shell .sidebar .nav button {
+    width: 100% !important;
+    min-width: 0;
+    min-height: 36px;
+    justify-content: center !important;
+    gap: 0 !important;
+    padding: 8px 0 !important;
+    font-size: 0 !important;
+    white-space: normal;
+  }
+  .dashboard-shell .sidebar .nav button i {
+    width: auto !important;
+    font-size: 1.15rem !important;
+  }
+  .dashboard-shell .sidebar-bottom {
+    display: flex !important;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    margin-top: 8px !important;
+    padding-top: 4px !important;
+  }
+  .dashboard-shell .sidebar-bottom .nav-logout {
+    width: 100% !important;
+    min-width: 0;
+    justify-content: center;
+    padding: 8px 0 !important;
+    font-size: 0 !important;
+  }
+  .dashboard-shell .sidebar-bottom .nav-logout::before {
+    content: "⏻";
+    font-size: 1rem;
+  }
+  .dashboard-shell .sidebar-bottom .status-dot {
+    display: none !important;
+  }
+  .dashboard-shell .workspace {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .dashboard-shell .dashboard-top {
+    position: static;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px;
+    min-height: 50px;
+    height: auto;
+    padding: 6px 10px !important;
+    text-align: left !important;
+  }
+  .dashboard-shell .activity-switch {
+    display: flex;
+    flex: 1 1 auto;
+    width: auto !important;
+    min-width: 0;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start;
+    gap: 6px !important;
+    text-align: left !important;
+  }
+  .dashboard-shell .activity-switch .eyebrow {
+    display: block;
+    flex: 0 1 auto;
+    max-width: 20vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .62rem;
+  }
+  .dashboard-shell .activity-picker {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    gap: 4px;
+  }
+  .dashboard-shell .activity-picker span {
+    font-size: 8px;
+  }
+  .dashboard-shell .activity-picker strong {
+    display: block;
+    max-width: 22vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .82rem;
+  }
+  .dashboard-shell .top-actions {
+    flex: 0 0 auto;
+    width: auto !important;
+    min-width: 0;
+    margin: 0 !important;
+    gap: 5px !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-end !important;
+  }
+  .dashboard-shell #fs-toggle {
+    min-width: 36px;
+    padding: 6px 8px !important;
+  }
+  .dashboard-shell #fs-toggle .fs-label {
+    display: none !important;
+  }
+  .dashboard-shell .avatar {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+  }
+  .dashboard-shell .content {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+    padding: 10px !important;
+  }
+  .dashboard-shell .page-head {
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .dashboard-shell .page-head h1 {
+    margin: 2px 0;
+    font-size: clamp(1.3rem, 4vw, 1.8rem) !important;
+  }
+  .dashboard-shell .metrics,
+  .dashboard-shell .quick-grid,
+  .dashboard-shell .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+  .dashboard-shell .metrics article {
+    min-width: 0;
+    padding: 9px !important;
+  }
+  .dashboard-shell .metrics b {
+    font-size: clamp(1rem, 2.7vw, 1.4rem) !important;
+    overflow-wrap: anywhere;
+  }
+  .dashboard-shell .quick-grid .action-card {
+    min-width: 0;
+    padding: 10px !important;
+  }
+  .dashboard-shell #view > .panel,
+  .dashboard-shell #view > .quick-grid,
+  .dashboard-shell #view > .two-col {
+    margin-bottom: 12px !important;
+  }
+}
