@@ -595,3 +595,28 @@ input::placeholder,textarea::placeholder{color:#536b88!important;opacity:1}
 .modal-backdrop{background:rgba(16,43,76,.34)!important}
 :focus-visible{outline-color:#214d84!important}
 .catalog-category [data-category-content][hidden]{display:none!important}
+
+/* Aurion 15.2.50 — connexion et fiches clients : surfaces bleu clair uniquement. */
+.auth-card{background:#f6f9ff!important;color:#102b4c!important;border-color:#c3d6eb!important}
+.auth-card h1,.auth-card .lede,.auth-card p,.auth-card .field>span,.auth-card .auth-brand span,.auth-card .help,.auth-card .check,.auth-card .legal-links,.auth-card .security-note,.auth-card .tab,.auth-card .forgot-line,.auth-card #status{color:#102b4c!important}
+.auth-card a:not(.btn){color:#1f4a82!important}
+.auth-card .error{color:#a61b1b!important}
+.auth-card .auth-tabs{background:#e7f0fc!important;border-color:#c3d6eb!important}
+.auth-card .tab{color:#24415f!important}
+.auth-card .tab.active{background:#f6f9ff!important;color:#1f4a82!important;border-color:#9fbde0!important}
+.auth-card input:not([type="checkbox"]):not([type="radio"]),.auth-card textarea,.auth-card select{background:#f7faff!important;color:#102b4c!important;border-color:#9fbde0!important}
+.auth-card input::placeholder,.auth-card textarea::placeholder{color:#536b88!important;opacity:1}
+.client-card,.sheet{background:#edf4fd!important;color:#102b4c!important;border-color:#c3d6eb!important}
+.sheet.modal{background:#edf4fd!important}
+.client-card header,.client-card footer{background:transparent!important;color:#102b4c!important}
+.client-card h3,.client-card p,.client-card small,.client-card span,.client-card li,.client-card .contact-list,.client-card .client-stats,.client-card .client-stats span,.client-card .client-stats b,.sheet .sheet-id h2,.sheet .sheet-id small,.sheet .contact-tile,.sheet .contact-tile span,.sheet .contact-tile em,.sheet .sheet-block,.sheet .sheet-block h3,.sheet .hist-row,.sheet .hist-row small,.sheet .hist-row b{color:#102b4c!important}
+.client-card .contact-list,.client-card .client-stats,.client-card .client-stats>div,.sheet .sheet-block,.sheet .contact-tile{background:#f2f7fe!important;border-color:#c3d6eb!important}
+.client-card .avatar-lg,.sheet .avatar-xl{background:#dfeafa!important;color:#214d84!important;border-color:#c3d6eb!important}
+.client-card a:not(.btn),.sheet .contact-tile a{color:#1f4a82!important}
+.client-toolbar input{background:#f7faff!important;color:#102b4c!important;border-color:#9fbde0!important}
+.client-toolbar input::placeholder{color:#536b88!important;opacity:1}
+.forecast-auto-value{display:grid;align-content:start;gap:7px;min-width:0;padding:14px;border:1px solid #c3d6eb;border-radius:12px;background:#edf4fd!important;color:#102b4c!important}
+.forecast-auto-value span{color:#334f6f!important;font-size:.82rem;font-weight:700}
+.forecast-auto-value strong{color:#102b4c!important;font-size:1.2rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.forecast-auto-value small{color:#435d7b!important;font-size:.76rem;line-height:1.4}
+.forecast-auto-grid{margin-bottom:16px}
