@@ -624,3 +624,25 @@ input::placeholder,textarea::placeholder{color:#42566d!important;opacity:1}
 
 /* Contraste des champs préremplis par le navigateur : couleurs adaptées au thème bleu clair. */
 input:-webkit-autofill,textarea:-webkit-autofill,select:-webkit-autofill{-webkit-text-fill-color:#0d223d!important;caret-color:#0d223d!important;box-shadow:0 0 0 1000px #bad2f2 inset!important;transition:background-color 9999s}
+
+
+/* Aurion 15.2.50 — surfaces allégées, couleurs de texte conservées. */
+:root{--bg:#d9e7f8;--bg2:#e3effc;--panel:#eaf3fd}
+html,body{background:#d9e7f8!important}
+body{background-image:linear-gradient(135deg,#e6f0fc 0%,#dfeafa 56%,#d9e7f8 100%)!important}
+.content,.workspace,.dashboard-shell{background:#d9e7f8!important}
+.dashboard-top{background:#e8f1fc!important}
+.sidebar,.sidebar-bottom{background:#e5effc!important}
+.glass,.panel,.modal{background:#eaf3fd!important}
+.metrics article,.module-card,.action-card,.catalog-item,.catalog-overview-stats>div,.catalog-category-tools,.catalog-filter,.catalog-category-index,.catalog-count,.catalog-item-kind,.catalog-detail-modal,.toast{background:#eaf3fd!important}
+.field input,.field select,.field textarea,.line-row input,.big-input,.client-toolbar input{background:#edf4fd!important}
+.catalog-category-toggle{background:#e8f1fc!important}
+.nav button:hover,.nav button.active{background:#dce9f9!important}
+.auth-tabs,.auth-card .auth-tabs{background:#e2edfb!important}
+.tab.active,.auth-card .tab.active{background:#eaf3fd!important}
+.forecast-table{background:#eaf3fd!important}
+.forecast-table thead th{background:#dce9f9!important}
+.auth-card,.client-card,.sheet,.sheet.modal{background:#eaf3fd!important}
+.client-card .contact-list,.client-card .client-stats,.client-card .client-stats>div,.sheet .sheet-block,.sheet .contact-tile{background:#e5effc!important}
+.forecast-auto-value{background:#e5effc!important}
+input:-webkit-autofill,textarea:-webkit-autofill,select:-webkit-autofill{box-shadow:0 0 0 1000px #edf4fd inset!important}
