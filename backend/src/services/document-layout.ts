@@ -21,6 +21,7 @@ export interface DocModel {
   company: { name: string; activity: string; siret: string; address?: string; postalCode?: string; city?: string; website?: string; logo: { data: Buffer; type: 'png' | 'jpg' } | null };
   client: { name: string; address: string };
   interventionLabel: string; intervention: string;
+  device?: { serialNumber?: string; imei?: string };
   itemsLabel: string; quantityLabel: string; items: { label: string; quantity: string }[];
   warranty: string; reminderLabel?: string; reminderPenalty?: string; mileage: { km: string; rate: string; total: string; visible?: boolean }; totalTtc: string; cgv: string;
 }
@@ -114,6 +115,16 @@ export async function buildPdf(m: DocModel): Promise<Buffer> {
     label(m.interventionLabel, L + 16, y + 2, W - 16);
     doc.font(FB).fontSize(16).fillColor(ink).text(m.intervention || '—', L + 16, y + 16, { width: W - 16 });
     y = Math.max(doc.y, y + 44) + 30;
+    const deviceLines = [
+      m.device?.serialNumber ? `N° de série : ${m.device.serialNumber}` : '',
+      m.device?.imei ? `IMEI : ${m.device.imei}` : '',
+    ].filter(Boolean);
+    if (deviceLines.length) {
+      y = need(y, 42);
+      label('Identification de l’appareil', L, y, W);
+      doc.font(FR).fontSize(10.5).fillColor(ink).text(deviceLines.join(' · '), L, y + 14, { width: W });
+      y = Math.max(doc.y, y + 34) + 18;
+    }
 
     // 4 — tableau des pièces : N° · désignation · quantité
     if (m.items.length) {
@@ -249,6 +260,15 @@ export async function buildDocx(m: DocModel): Promise<Buffer> {
     cell([label(m.interventionLabel), p(m.intervention || '—', { size: 32, bold: true })], CW - 90, { margins: 0 }),
   ] })]));
   kids.push(spacer(460));
+  const deviceLines = [
+    m.device?.serialNumber ? `N° de série : ${m.device.serialNumber}` : '',
+    m.device?.imei ? `IMEI : ${m.device.imei}` : '',
+  ].filter(Boolean);
+  if (deviceLines.length) {
+    kids.push(label('Identification de l’appareil'));
+    kids.push(p(deviceLines.join(' · '), { size: 20, color: MUTED, after: 120 }));
+    kids.push(spacer(220));
+  }
 
   // 4 — tableau des pièces
   if (m.items.length) {
@@ -362,6 +382,11 @@ export function buildOdt(m: DocModel): Buffer {
   body += P('Pspace', '');
   body += tbl('Prestation', ['B1', 'B2'], tr(cell('Cbar', P('Pbody', '')) + cell('Cplain', `<text:p text:style-name="Plabel">${x(m.interventionLabel)}</text:p>${P('Pprest', m.intervention || '—')}`.replace('<text:p text:style-name="Plabel">', '<text:p text:style-name="Plabel">'))));
   body += P('Pspace', '');
+  const deviceLines = [
+    m.device?.serialNumber ? `N° de série : ${m.device.serialNumber}` : '',
+    m.device?.imei ? `IMEI : ${m.device.imei}` : '',
+  ].filter(Boolean);
+  if (deviceLines.length) body += P('Plabel', 'Identification de l’appareil') + P('Pmeta', deviceLines.join(' · ')) + P('Pspace', '');
   if (m.items.length) {
     body += tbl('Pieces', ['N1', 'N2', 'N3'], tr(cell('Chead', P('Phead', 'N°')) + cell('Chead', P('Phead', m.itemsLabel.toUpperCase())) + cell('Chead', P('Pheadr', m.quantityLabel.toUpperCase()))) +
       m.items.map((it, i) => { const st = i % 2 === 0 ? 'Crowz' : 'Crow'; return tr(cell(st, P('Pnumr', String(i + 1).padStart(2, '0'))) + cell(st, P('Pitem', it.label)) + cell(st, P('Pqty', it.quantity))); }).join(''));
@@ -402,6 +427,7 @@ export function starterModel(kind: 'quote' | 'invoice'): DocModel {
     company: { name: '{{COMPANY_NAME}}', activity: '{{COMPANY_ACTIVITY}}', siret: '{{SIRET}}', address: '{{COMPANY_ADDRESS}}', postalCode: '{{COMPANY_POSTAL_CODE}}', city: '{{COMPANY_CITY}}', website: '{{COMPANY_WEBSITE}}', logo: null },
     client: { name: '{{CLIENT_NAME}}', address: '{{CLIENT_ADDRESS}}' },
     interventionLabel: 'Prestation', intervention: '{{INTERVENTION}}',
+    device: { serialNumber: '{{SERIAL_NUMBER}}', imei: '{{IMEI}}' },
     itemsLabel: 'Désignation', quantityLabel: 'Qté', items: [{ label: '{{ITEMS}}', quantity: '' }],
     warranty: '{{WARRANTY}}', reminderLabel: '{{DOCUMENT_TITLE}}', reminderPenalty: '{{LATE_PENALTY}}', mileage: { km: '{{MILEAGE_KM}}', rate: '{{MILEAGE_RATE}}', total: '{{MILEAGE_TOTAL}}', visible: true }, totalTtc: '{{TOTAL_TTC}}', cgv: '{{CGV}}',
     legal: ['{{LEGAL_NOTES}}'], theme: { accent: '#0b63ce', dark: '#0b1220', font: 'sans', radius: 'round', customized: false },

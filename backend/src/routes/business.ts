@@ -175,7 +175,7 @@ const warrantyPolicyPatchInputSchema = warrantyPolicyCreateInputSchema.omit({ ac
 
 const quoteCreateInputSchema = z.object({
   clientId: optionalUuid, activityId: optionalUuid, intervention: z.string().max(240).optional(),
-  documentType: z.enum(['quote','invoice']).optional(), items: z.array(quoteLineInputSchema).max(500).nullable().optional(),
+  documentType: z.enum(['quote','invoice']).optional(), imei: z.string().max(80).nullable().optional(), serialNumber: z.string().max(160).nullable().optional(), items: z.array(quoteLineInputSchema).max(500).nullable().optional(),
   currentItems: z.array(quoteLineInputSchema).max(500).nullable().optional(),
   vatRate: numericInput, urssafRate: numericInput, shippingCost: numericInput, purchaseVatRate: numericInput,
   reminderIntervalDays: numericInput, latePenaltyValue: numericInput, mileageKm: numericInput,
@@ -857,10 +857,10 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
           invoice_address_source,billing_address_snapshot,due_at,reminder_interval_days,late_penalty_mode,
           late_penalty_value,next_reminder_at,catalog_pricing,structured_invoice,part_coefficient_percent,
           labor_coefficient_percent,mileage_internal_rate,mileage_client_rate,labor_selling_ht,labor_internal_cost_ht,
-          purchase_vat_mode,purchase_vat_rate,contribution_snapshot,calculation_snapshot,calculation_version
+          purchase_vat_mode,purchase_vat_rate,contribution_snapshot,calculation_snapshot,calculation_version,imei,serial_number
         ) values(
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,
-          $26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50
+          $26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52
         )`,[
           id,org,aid,b.clientId,number,documentType,status,String(b.intervention).trim(),summarize(items)||b.product||null,
           rawPart,shippingCost,mileageKm,mileageClientRate,mileageTotal,mileageMode,p.laborHt,p.grossMargin,
@@ -868,7 +868,8 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
           unit==='percent'?selectedValue:0,selectedValue,unit,basis,'unpaid',invoiceAddressSource,billingAddress,b.dueAt||null,
           reminderInterval,['fixed','percent'].includes(String(b.latePenaltyMode))?String(b.latePenaltyMode):'none',Math.max(0,Number(b.latePenaltyValue||0)),null,
           catalogPricing===true,structured,partCoefficient,laborCoefficient,mileageInternalRate,mileageClientRate,laborSellingHt??p.laborSellingHt,laborInternalCostHt,
-          purchaseVatMode,b.purchaseVatRate===''||b.purchaseVatRate===undefined?null:Number(b.purchaseVatRate),JSON.stringify(contributions),JSON.stringify(snapshot),2
+          purchaseVatMode,b.purchaseVatRate===''||b.purchaseVatRate===undefined?null:Number(b.purchaseVatRate),JSON.stringify(contributions),JSON.stringify(snapshot),2,
+          (typeof b.imei==='string'?b.imei.trim().slice(0,80):'')||null,(typeof b.serialNumber==='string'?b.serialNumber.trim().slice(0,160):'')||null
         ]);
         await saveItems(clientDb,id,org,aid,items,partCoefficient,basis,unit,selectedValue);
       });
@@ -936,14 +937,18 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
           late_penalty_mode=coalesce($25,late_penalty_mode),late_penalty_value=case when $26::numeric is null then late_penalty_value else greatest(0,$26::numeric) end,
           client_id=coalesce($27,client_id),catalog_pricing=coalesce($28,catalog_pricing),part_coefficient_percent=$29,labor_coefficient_percent=$30,
           mileage_internal_rate=$31,mileage_client_rate=$32,labor_selling_ht=$33,labor_internal_cost_ht=$34,
-          purchase_vat_mode=$35,purchase_vat_rate=$36,contribution_snapshot=$37,calculation_snapshot=$38,calculation_version=2,updated_at=now()
-          where id=$39::uuid and organization_id=$40::uuid returning *`,[
+          purchase_vat_mode=$35,purchase_vat_rate=$36,contribution_snapshot=$37,calculation_snapshot=$38,calculation_version=2,
+           imei=case when $39::boolean then $40::varchar(80) else imei end,
+           serial_number=case when $41::boolean then $42::varchar(160) else serial_number end,updated_at=now()
+          where id=$43::uuid and organization_id=$44::uuid returning *`,[
           b.intervention!==undefined?(String(b.intervention).trim()||null):null,
           summarize(items)||b.product||null,rawPart,shippingCost,mileageKm,mileageClientRate,mileageTotal,mileageMode,p.grossMargin,
           Number(b.vatRate??cur.vat_rate??0),Number(b.urssafRate??cur.urssaf_rate??0),p.totalHt,p.vat,p.totalTtc,targetTtc,b.warrantyText||null,
           unit==='percent'?selectedValue:0,selectedValue,unit,basis,invoiceAddressSource,billingAddress,b.dueAt??cur.due_at??null,reminderInterval,latePenaltyMode,
           b.latePenaltyValue===undefined?null:Number(b.latePenaltyValue||0),clientId,b.catalogPricing===undefined?null:Boolean(catalogPricing),partCoefficient,laborCoefficient,
-          mileageInternalRate,mileageClientRate,laborSellingHt??p.laborSellingHt,laborInternalCostHt,purchaseVatMode,purchaseVatRate,JSON.stringify(contributions),JSON.stringify(snapshot),id,org
+          mileageInternalRate,mileageClientRate,laborSellingHt??p.laborSellingHt,laborInternalCostHt,purchaseVatMode,purchaseVatRate,JSON.stringify(contributions),JSON.stringify(snapshot),
+          b.imei!==undefined,b.imei===undefined?null:(String(b.imei??'').trim().slice(0,80)||null),
+          b.serialNumber!==undefined,b.serialNumber===undefined?null:(String(b.serialNumber??'').trim().slice(0,160)||null),id,org
         ]);
         if(!result.rowCount)throw new AurionError('NOT_FOUND','Document introuvable.');
         await saveItems(clientDb,id,org,cur.activity_id,items,partCoefficient,basis,unit,selectedValue);
