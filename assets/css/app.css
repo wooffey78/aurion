@@ -563,33 +563,35 @@ a{color:#1d4ed8}.eyebrow{color:#315b8a;text-shadow:none}.sidebar{background:#f8f
 }
 
 /* Aurion 15.2.50 — fond bleu très clair et typographie bleu profond. */
-:root{color-scheme:light;--bg:#f1f6fc;--bg2:#eaf1fa;--panel:#f9fbff;--line:#c6d7eb;--text:#173252;--muted:#435d7b;--blue:#28558d;--blue2:#1d426f;--violet:#526783;--green:#166534;--red:#a61b1b;--shadow:0 3px 14px rgba(30,64,125,.07)}
-html,body{background:#f1f6fc!important;color:#173252!important}
-body{background-image:linear-gradient(135deg,#f5f9ff 0%,#eef4fc 56%,#f1f6fc 100%)!important}
-.content,.workspace,.dashboard-shell{background:#f1f6fc!important}
-.dashboard-top{background:#f7faff!important;border-bottom-color:#c6d7eb!important}
-.sidebar,.sidebar-bottom{background:#f8fbff!important;border-color:#c6d7eb!important}
-.glass,.panel,.modal{background:#f9fbff!important;color:#173252!important;border-color:#c6d7eb!important;box-shadow:0 3px 14px rgba(30,64,125,.07)!important}
-.metrics article,.module-card,.action-card,.catalog-item,.catalog-overview-stats>div,.catalog-category-tools,.catalog-filter,.catalog-category-index,.catalog-count,.catalog-item-kind,.catalog-detail-modal,.toast{background:#f9fbff!important;color:#173252!important;border-color:#c6d7eb!important}
-body,.content,.workspace,.dashboard-shell,.glass,.panel,.modal,.catalog-page,.catalog-category,.catalog-item,.catalog-overview,.catalog-detail-list,.catalog-detail-row dd,.page-head,.page-head h1,.page-head h2,.page-head h3,.section-title,.section-title h2,.catalog-category-header h2,.catalog-item-heading h3,.auth-card h1,.auth-brand strong,.forecast-table tbody th{color:#173252!important}
-.metrics span,.metrics small,.muted,.help,.page-head p,.catalog-category-header p,.catalog-item p,.list-row small,.table-row small,.action-card small,.catalog-footer-note,.catalog-detail-row dt,.catalog-supplier-row small,.brand small,.auth-brand span,.forecast-input small,.forecast-title .help{color:#435d7b!important}
-a:not(.btn):not(.brand),.link-btn{color:#244f86!important}
-.nav button,.nav-logout{color:#294764!important}
-.nav button:hover,.nav button.active{color:#244f86!important;background:#eaf2fc!important;border-color:#a8c2e2!important}
-.field,.status-dot{color:#294764!important}
-.field input,.field select,.field textarea,.line-row input,.big-input{background:#fdfefe!important;color:#173252!important;border-color:#a9c2e0!important}
-.field input::placeholder,.field textarea::placeholder{color:#617a97!important}
-.catalog-category-toggle{background:#f7faff!important;color:#244f86!important;border-color:#a9c2e0!important}
-.catalog-category-toggle:hover{background:#eaf2fc!important}
-.catalog-supplier-list summary{color:#294f7b!important}
-.brand{color:#173252!important}
-.auth-tabs{background:#edf3fb!important;border-color:#c6d7eb!important}
-.tab{color:#3d5674!important}
-.tab.active{background:#f9fbff!important;color:#244f86!important;border-color:#a9c2e0!important}
-.forecast-table{background:#f9fbff}
-.forecast-table th,.forecast-table td{border-color:#d3e0ef}
-.forecast-table thead th{background:#edf4fc;color:#294764}
-.forecast-table tbody th{color:#173252}
-.modal-backdrop{background:rgba(23,50,82,.34)!important}
-:focus-visible{outline-color:#28558d!important}
+:root{color-scheme:light;--bg:#eaf2fc;--bg2:#e3edfa;--panel:#f6f9ff;--line:#c3d6eb;--text:#102b4c;--muted:#334f6f;--blue:#214d84;--blue2:#173a66;--violet:#4c627f;--green:#166534;--red:#a61b1b;--shadow:0 3px 14px rgba(30,64,125,.06)}
+html,body{background:#eaf2fc!important;color:#102b4c!important}
+body{background-image:linear-gradient(135deg,#edf4fd 0%,#e5effb 56%,#eaf2fc 100%)!important}
+.content,.workspace,.dashboard-shell{background:#eaf2fc!important}
+.dashboard-top{background:#f2f7fe!important;border-bottom-color:#c3d6eb!important}
+.sidebar,.sidebar-bottom{background:#f4f8ff!important;border-color:#c3d6eb!important}
+.glass,.panel,.modal{background:#f6f9ff!important;color:#102b4c!important;border-color:#c3d6eb!important;box-shadow:0 3px 14px rgba(30,64,125,.06)!important}
+.metrics article,.module-card,.action-card,.catalog-item,.catalog-overview-stats>div,.catalog-category-tools,.catalog-filter,.catalog-category-index,.catalog-count,.catalog-item-kind,.catalog-detail-modal,.toast{background:#f6f9ff!important;color:#102b4c!important;border-color:#c3d6eb!important}
+body,.content,.workspace,.dashboard-shell,.glass,.panel,.modal,.catalog-page,.catalog-category,.catalog-item,.catalog-overview,.catalog-detail-list,.catalog-detail-row dd,.page-head,.page-head h1,.page-head h2,.page-head h3,.section-title,.section-title h2,.catalog-category-header h2,.catalog-item-heading h3,.auth-card h1,.auth-brand strong,.forecast-table tbody th{color:#102b4c!important}
+.metrics span,.metrics small,.muted,.help,.page-head p,.catalog-category-header p,.catalog-item p,.list-row small,.table-row small,.action-card small,.catalog-footer-note,.catalog-detail-row dt,.catalog-supplier-row small,.brand small,.auth-brand span,.forecast-input small,.forecast-title .help{color:#334f6f!important}
+a:not(.btn):not(.brand),.link-btn{color:#1f4a82!important}
+.nav button,.nav-logout{color:#24415f!important}
+.nav button:hover,.nav button.active{color:#1f4a82!important;background:#e3eefb!important;border-color:#9fbde0!important}
+.field,.status-dot{color:#24415f!important}
+.field input,.field select,.field textarea,.line-row input,.big-input{background:#f7faff!important;color:#102b4c!important;border-color:#9fbde0!important}
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="submit"]):not([type="button"]),textarea,select,[contenteditable="true"]{color:#102b4c!important;caret-color:#173f70!important}
+input::placeholder,textarea::placeholder{color:#536b88!important;opacity:1}
+.field input::placeholder,.field textarea::placeholder{color:#536b88!important;opacity:1}
+.catalog-category-toggle{background:#f2f7fe!important;color:#1f4a82!important;border-color:#9fbde0!important}
+.catalog-category-toggle:hover{background:#e3eefb!important}
+.catalog-supplier-list summary{color:#244a76!important}
+.brand{color:#102b4c!important}
+.auth-tabs{background:#e7f0fc!important;border-color:#c3d6eb!important}
+.tab{color:#344e6c!important}
+.tab.active{background:#f6f9ff!important;color:#1f4a82!important;border-color:#9fbde0!important}
+.forecast-table{background:#f6f9ff}
+.forecast-table th,.forecast-table td{border-color:#cfdeef}
+.forecast-table thead th{background:#e7f0fc;color:#24415f}
+.forecast-table tbody th{color:#102b4c}
+.modal-backdrop{background:rgba(16,43,76,.34)!important}
+:focus-visible{outline-color:#214d84!important}
 .catalog-category [data-category-content][hidden]{display:none!important}
