@@ -692,16 +692,30 @@ export async function businessRoutes(app:FastifyInstance){
   });app.delete('/parts/:id',async(r,reply)=>{const x=await query('delete from parts where id=$1 and organization_id=$2',[((r.params as any).id),r.auth!.organizationId]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true}});
   app.post('/parts/:id/prices',async(r,reply)=>{
     const parsed=partPriceInputSchema.safeParse(r.body||{});
-    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT',message:'Les informations du prix fournisseur sont invalides.'});
     const b:any=parsed.data;
     let purchasePrice=0;
-    try{purchasePrice=optionalNumber(b.purchasePrice,'Prix d’achat',0,1e9)??0}catch{return reply.code(400).send({error:'INVALID_INPUT'})}
+    try{purchasePrice=optionalNumber(b.purchasePrice,'Prix d’achat',0,1e9)??0}catch{return reply.code(400).send({error:'INVALID_INPUT',message:'Le prix d’achat doit être un nombre positif ou nul.'})}
     const part=await query('select id,activity_id from parts where id=$1 and organization_id=$2',[String((r.params as any).id),r.auth!.organizationId]);
-    if(!part.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
+    if(!part.rowCount)return reply.code(404).send({error:'NOT_FOUND',message:'Pièce détachée introuvable.'});
     const supplier=await query('select id from suppliers where id=$1 and organization_id=$2 and activity_id=$3',[b.supplierId,r.auth!.organizationId,part.rows[0].activity_id]);
-    if(!supplier.rowCount)return reply.code(400).send({error:'INVALID_INPUT'});
-    await query(`insert into supplier_parts(supplier_id,part_id,supplier_reference,purchase_price,available,updated_at) values($1,$2,$3,$4,$5,now()) on conflict(supplier_id,part_id) do update set supplier_reference=excluded.supplier_reference,purchase_price=excluded.purchase_price,available=excluded.available,updated_at=now()`,[b.supplierId,part.rows[0].id,b.supplierReference||null,purchasePrice,b.available!==false]);
-    return {ok:true};
+    if(!supplier.rowCount)return reply.code(400).send({error:'INVALID_INPUT',message:'Le fournisseur sélectionné n’appartient pas à l’activité de cette pièce.'});
+    const partId=String(part.rows[0].id);
+    const client=await db.connect();
+    try{
+      await client.query('begin');
+      await client.query('select pg_advisory_xact_lock(hashtext($1),hashtext($2))',[`aurion-part-price:${partId}`,String(b.supplierId)]);
+      const updated=await client.query('update supplier_parts set supplier_reference=$1,purchase_price=$2,available=$3,updated_at=now() where supplier_id=$4 and part_id=$5',[b.supplierReference||null,purchasePrice,b.available!==false,b.supplierId,partId]);
+      if(!updated.rowCount){
+        await client.query('insert into supplier_parts(supplier_id,part_id,supplier_reference,purchase_price,available,updated_at) values($1,$2,$3,$4,$5,now())',[b.supplierId,partId,b.supplierReference||null,purchasePrice,b.available!==false]);
+      }
+      await client.query('commit');
+      return {ok:true};
+    }catch(e:any){
+      await client.query('rollback').catch(()=>{});
+      r.log.error({err:e,partId,supplierId:b.supplierId},'supplier part price save failed');
+      return reply.code(500).send({error:'SUPPLIER_PART_PRICE_SAVE_FAILED',message:'Le prix fournisseur n’a pas pu être enregistré. Vérifiez le fournisseur et réessayez.'});
+    }finally{client.release()}
   });
 
 app.get('/interventions',async r=>(await query('select * from interventions where organization_id=$1 and activity_id=$2 order by name',[r.auth!.organizationId,activityId(r)])).rows);
