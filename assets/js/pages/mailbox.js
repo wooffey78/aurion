@@ -3,7 +3,7 @@ import{api}from'../core/api.js';
 import{escapeHtml as e,toast}from'../core/ui.js';
 import{askConfirm}from'./dash/core.js';
 
-const eye=`<button type="button" class="icon-btn eye" aria-label="Afficher ou masquer le mot de passe">◉</button>`;
+const eye=`<button type="button" class="icon-btn eye" aria-label="Afficher le mot de passe" aria-pressed="false">◉</button>`;
 
 export async function renderMailbox(root,{onChange,compact=false,companyName=''}={}){
   root.innerHTML='<div class="mailbox"><p class="muted">Chargement de la messagerie…</p></div>';
@@ -22,7 +22,7 @@ function connected(root,st,ctx){
   const a=st.account,p=st.presets.find(x=>x.id===a.provider);
   root.innerHTML=`<div class="mailbox">${head(st,'Vos devis et factures partent de votre adresse')}
     <div class="mailbox-line"><span class="chip ok">✓ E-mail</span><b>${e(a.email)}</b><small>${e(p?.label||'Messagerie personnalisée')} · ${e(a.host)}:${a.port}</small></div>
-    <div class="mailbox-line"><span class="chip ${st.google.connected?'ok':'info'}">${st.google.connected?'✓ Google Agenda':'✓ Agenda'}</span><small>${st.google.connected?'Les rendez-vous sont synchronisés avec Google Agenda.':`Chaque rendez-vous est envoyé en invitation à <b>${e(a.email)}</b> : votre agenda (Google, Outlook, Apple) l’ajoute automatiquement ou en un clic. Les modifications et annulations suivent.`}</small></div>
+    <div class="mailbox-line"><span class="chip ${st.google.connected?'ok':'info'}">${st.google.connected?'✓ Google Agenda':'Invitation iCalendar'}</span><small>${st.google.connected?'Les rendez-vous sont créés, modifiés et annulés directement dans Google Agenda.':`Aurion envoie une invitation iCalendar à <b>${e(a.email)}</b>. Ouvrez la pièce jointe pour l’ajouter à votre agenda (Google, Outlook ou Apple). Les modifications et annulations utilisent le même événement.`}</small></div>
     <div class="button-row"><button class="btn secondary" id="mb-test">Envoyer un e-mail de test</button><button class="btn secondary" id="mb-edit">Modifier</button><button class="btn danger" id="mb-del">Déconnecter</button></div>
     <p class="help">🔒 Votre mot de passe est chiffré dans la base du serveur Aurion et n’est plus renvoyé à cette interface.</p>${google(st)}</div>`;
   root.querySelector('#mb-test').onclick=async b=>{b.currentTarget.disabled=true;try{const r=await api.mailTest();toast(`E-mail de test envoyé à ${r.sentTo}`,'success')}catch(x){toast(x.message,'error')}finally{b.currentTarget.disabled=false}};
@@ -36,7 +36,15 @@ function google(st){
   return`<details class="advanced"><summary>Connexion Google avancée (Google Agenda en direct)</summary><div class="button-row"><button class="btn secondary" id="g-connect">${st.google.connected?'Reconnecter Google':'Connecter Google'}</button>${st.google.connected?'<button class="btn danger" id="g-off">Déconnecter Google</button>':''}</div></details>`;
 }
 function bindGoogle(root,ctx){
-  root.querySelector('#g-connect')?.addEventListener('click',async()=>{try{const r=await api.googleStart();if(r.url)window.open(r.url,'_blank');else toast('Connexion Google non configurée.','error')}catch(x){toast(x.message,'error')}});
+  root.querySelector('#g-connect')?.addEventListener('click',async()=>{
+    const popup=window.open('about:blank','_blank');
+    if(popup)popup.opener=null;
+    try{
+      const r=await api.googleStart();
+      if(!r.url){popup?.close();toast('Connexion Google non configurée.','error');return}
+      if(popup)popup.location.assign(r.url);else window.location.assign(r.url);
+    }catch(x){popup?.close();toast(x.message,'error')}
+  });
   root.querySelector('#g-off')?.addEventListener('click',async()=>{await api.googleDisconnect();toast('Compte Google déconnecté','success');await renderMailbox(root,ctx)});
 }
 
@@ -52,7 +60,7 @@ function form(root,st,ctx){
     <div id="mb-guide"></div>
     <label class="field"><span>Nom affiché comme expéditeur</span><input id="mb-name" placeholder="Nom de votre entreprise" value="${e(a?.fromName||ctx.companyName||'')}"></label>
     <details class="advanced" id="mb-adv"><summary>Paramètres avancés (serveur d’envoi)</summary><div class="grid-2"><label class="field"><span>Serveur SMTP</span><input id="mb-host" placeholder="smtp.exemple.fr" value="${e(a?.host||'')}"></label><label class="field"><span>Port</span><input id="mb-port" type="number" min="1" max="65535" value="${a?.port||''}"></label></div><label class="field"><span>Sécurité</span><select id="mb-security"><option value="">Votre choix</option><option value="ssl">SSL / TLS (port 465)</option><option value="starttls">STARTTLS (port 587)</option></select></label></details>
-    <p id="mb-error" class="error" hidden></p>
+    <p id="mb-error" class="error" role="alert" aria-live="assertive" hidden></p>
     <div class="button-row"><button class="btn primary" id="mb-save" type="submit">Vérifier et enregistrer</button>${editing?'<button class="btn secondary" type="button" id="mb-cancel">Annuler</button>':''}<button class="link-btn" type="button" id="mb-skip" ${ctx.compact?'':'hidden'}>Configurer plus tard</button></div>
     <p class="help">🔒 Le mot de passe est transmis au serveur Aurion pour vérifier la connexion, puis chiffré dans sa base de données. Il n’est jamais écrit dans le navigateur. Aurion se connecte avant d’enregistrer les réglages.</p></form>`;
   const q=s=>root.querySelector(s);
@@ -65,7 +73,7 @@ function form(root,st,ctx){
     if(!p||p.id==='custom')q('#mb-adv').open=true;
   };
   q('#mb-email').addEventListener('input',sync);q('#mb-provider').addEventListener('change',()=>{q('#mb-host').value='';q('#mb-port').value='';sync()});
-  q('.eye').onclick=()=>{const i=q('#mb-password');i.type=i.type==='password'?'text':'password'};
+  q('.eye').onclick=()=>{const i=q('#mb-password'),b=q('.eye'),show=i.type==='password';i.type=show?'text':'password';b.setAttribute('aria-pressed',String(show));b.setAttribute('aria-label',show?'Masquer le mot de passe':'Afficher le mot de passe')};
   if(editing)q('#mb-security').value=a.security==='none'?'ssl':a.security;
   sync();
   q('#mb-cancel')?.addEventListener('click',()=>{delete root.dataset.editing;renderMailbox(root,ctx)});

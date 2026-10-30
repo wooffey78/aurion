@@ -925,3 +925,12 @@ input:-webkit-autofill,textarea:-webkit-autofill,select:-webkit-autofill{box-sha
 .company-lookup-details dd{margin:0;overflow-wrap:anywhere}
 .company-lookup-result :focus-visible{outline:3px solid var(--blue);outline-offset:3px}
 @media(max-width:700px){.company-lookup-form{grid-template-columns:minmax(0,1fr)}.company-lookup-form .btn{width:100%}.company-lookup-result{padding:12px}.company-lookup-details>div{grid-template-columns:minmax(0,1fr);gap:2px}}
+
+
+/* Accessibilité et confort tactile de la version entreprise. */
+.btn.primary{color:#fff;background:linear-gradient(135deg,#31584e,#3f695d)}
+.status-dot{color:#8fb6a2}
+@media (pointer:coarse){
+  .nav button,.btn.small,.icon-btn{min-height:44px}
+  .nav button{padding-block:10px}
+}

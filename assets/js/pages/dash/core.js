@@ -93,8 +93,13 @@ export function emailToast(status,noun='Document'){
 }
 export function calendarToast(c,verb){
   if(!c)return toast(`Rendez-vous ${verb}.`,'success');
-  if(c.ok)return toast(`Rendez-vous ${verb} et agenda mis à jour.`,'success');
-  if(c.error==='MAIL_NOT_CONFIGURED')return toast(`Rendez-vous ${verb}. Configurez la messagerie (Paramètres) pour mettre votre agenda à jour.`,'info');
-  toast(`Rendez-vous ${verb}, mais l’agenda n’a pas été mis à jour : ${c.error}`,'error');
+  if(c.ok){
+    if(c.client==='failed')return toast(`Rendez-vous ${verb} et agenda mis à jour, mais l’e-mail au client n’a pas été confirmé${c.clientError?': '+c.clientError:''}.`,'error');
+    if(c.client==='skipped')return toast(`Rendez-vous ${verb} et agenda mis à jour. Aucun e-mail client n’a été envoyé (adresse absente).`,'info');
+    return toast(`Rendez-vous ${verb} et agenda mis à jour.`,'success');
+  }
+  if(c.error==='MAIL_NOT_CONFIGURED')return toast(`Rendez-vous ${verb}. Configurez Google Agenda ou votre messagerie dans Paramètres pour synchroniser votre agenda.`,'info');
+  const clientNotice=c.client==='sent'?' Le client a néanmoins reçu une notification.':c.client==='failed'?' La notification au client a également échoué.':'';
+  toast(`Rendez-vous ${verb}, mais l’agenda n’a pas été mis à jour : ${c.error||'erreur inconnue'}.${clientNotice}`,'error');
 }
 export const itemsText=q=>(q.items||[]).map(i=>`${Number(i.quantity)} × ${i.label}`).join(', ');
