@@ -32,7 +32,7 @@ export async function renderDataImport(root) {
         <p class="data-import-meta">${esc(record.reason||"Données à vérifier")}${record.duplicate?` · Correspondance possible : ${esc(record.duplicateLabel||"fiche existante")}`:""}</p>
         <div class="grid-2"><label class="field"><span>Type de fiche</span><select data-import-entity="${esc(record.id)}">${entities.map(value=>`<option value="${value}" ${entity===value?"selected":""}>${esc(labels[value])}</option>`).join("")}</select></label><label class="field"><span>Action</span><select data-import-action="${esc(record.id)}">${options}</select></label></div>
         <label class="field"><span>Données reconnues — JSON modifiable</span><textarea rows="7" spellcheck="false" data-import-data="${esc(record.id)}">${esc(JSON.stringify(record.data||{},null,2))}</textarea></label>
-        <p class="help">Un import ne valide aucune démarche administrative. Une mise à jour peut modifier une fiche existante : relisez chaque champ avant de confirmer.</p>
+        <p class="help">L’import ne remplace jamais une vérification métier. Une mise à jour peut modifier une fiche existante : relisez chaque champ avant de confirmer.</p>
       </article>`;
     }).join("")||`<p class="empty">Aucune donnée métier reconnue. Essayez un export CSV, XLSX ou JSON, ou autorisez explicitement l’analyse IA.</p>`}`;
     commit.disabled=!records.length;
