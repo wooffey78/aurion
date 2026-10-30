@@ -9,7 +9,7 @@ export async function renderDataImport(root) {
   if (!root) return;
   let preview = null, busy = false;
   root.innerHTML = `<div class="data-import">
-    <label class="field" for="data-import-files"><span>Fichiers à analyser</span><input id="data-import-files" type="file" multiple accept=".csv,.tsv,.xlsx,.xls,.json,.xml,.zip,.sql,.pdf,.docx,.odt,.txt,.png,.jpg,.jpeg,.webp"><small class="help">CSV, TSV, XLSX, JSON, XML, ZIP, SQL (texte non exécuté), PDF, DOCX, ODT, TXT et images. Jusqu’à 30 fichiers et 80 Mo au total. Convertissez les anciens fichiers XLS en XLSX ou CSV.</small></label>
+    <label class="field" for="data-import-files"><span>Fichiers à analyser</span><input id="data-import-files" type="file" multiple accept=".csv,.tsv,.xlsx,.json,.xml,.zip,.sql,.pdf,.docx,.odt,.txt,.png,.jpg,.jpeg,.webp"><small class="help">CSV, TSV, XLSX, JSON, XML, ZIP, SQL (texte non exécuté), PDF, DOCX, ODT, TXT et images. Jusqu’à 30 fichiers et 80 Mo au total. Convertissez les anciens fichiers XLS en XLSX ou CSV.</small></label>
     <label class="check data-import-consent"><input id="data-import-ai-consent" type="checkbox"> J’autorise l’analyse des documents compatibles par le fournisseur IA distant configuré par Aurion. Sans cette autorisation, le préclassement reste local.</label>
     <div class="button-row"><button type="button" class="btn secondary" id="data-import-preview">Analyser les fichiers</button><button type="button" class="btn primary" id="data-import-commit" disabled>Importer les éléments sélectionnés</button></div>
     <p class="help" id="data-import-status" role="status" aria-live="polite">Aucune donnée n’a été importée. L’analyse ne modifie pas vos fiches.</p>
