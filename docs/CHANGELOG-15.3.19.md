@@ -13,3 +13,5 @@
 - Audite les deux services Render et le projet Neon; les migrations 070–072 ont été préparées et vérifiées sur une branche temporaire, sans application à la production.
 
 Le code TypeScript a compilé et les scripts PowerShell/Node ont passé l’analyse syntaxique. L’installation Ollama complète et les parcours applicatifs ne sont pas testés sur le poste d’origine. La bascule Frankfurt, l’upgrade payant et le stockage restent à faire; le service Oregon est encore actif.
+
+**Publication :** commit `c1bf397fd0f13e2a2c0ea879e39f36dc78c5b75f` poussé sur GitHub `main`. Render a ignoré le commit (`commit_ignored`) conformément au marqueur `[skip render]`; aucun service n’exécute encore le code 15.3.19.

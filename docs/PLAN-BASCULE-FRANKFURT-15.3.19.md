@@ -2,6 +2,8 @@
 
 Ce guide prépare la cible choisie : le service Render `aurion` à Francfort, Neon en UE, OVH Object Storage `de` Francfort, sauvegarde chiffrée dans un autre emplacement UE. Au contrôle du 30 octobre 2026, `aurion` à Francfort n’avait pas sa configuration backend complète et redirigeait vers `aurion-web` en Oregon; l’Oregon répondait à `/health/db`. Les deux services étaient gratuits, reliés à `main` et en auto-déploiement. Le code source corrige la destination canonique et ferme Frankfurt en HTTP 503 s’il n’est pas configuré. Le connecteur ne permet ni de lire les secrets Render existants ni de changer le plan; la bascule nécessite la copie contrôlée des mêmes clés chiffrantes, des réglages DB et du stockage S3 avant de servir des utilisateurs. Le domaine canonique doit être vérifié dans les réglages DNS.
 
+Depuis ce contrôle, le commit 15.3.19 (`c1bf397`) a été poussé sur GitHub `main`. Render a enregistré `commit_ignored`; aucun déploiement n’a été lancé.
+
 ## Avant de commencer
 
 - Vérifier le domaine Aurion et l’accès DNS.

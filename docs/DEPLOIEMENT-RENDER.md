@@ -2,6 +2,8 @@
 
 Render a déjà un service `aurion` en région Frankfurt et un `aurion-web` en Oregon, tous deux sur le plan gratuit au contrôle du 30 octobre 2026. `aurion-web` répond à `/health/db` en Oregon; le service Frankfurt n’a pas de configuration backend complète et redirige actuellement vers Oregon. La version 15.3.19 de `render.yaml` cible le nom existant `aurion` et demande un plan `starter`. Le connecteur Render peut déclencher un déploiement et modifier les variables, mais ne permet pas de lire les variables déjà présentes ni de mettre à niveau directement le plan. Un sync de Blueprint peut modifier et redéployer ce service; vérifier le diff de ressources avant de confirmer. Le Blueprint ne crée ni base, ni bucket, ni fournisseur de courriel. Suivre d’abord [le plan de bascule Frankfurt 15.3.19](PLAN-BASCULE-FRANKFURT-15.3.19.md).
 
+Le commit 15.3.19 (`c1bf397`) est maintenant poussé sur `main`; Render a enregistré `commit_ignored` et n’a déployé aucun service. Ne déclencher le déploiement Frankfurt qu’après passage au plan convenu, configuration DB/S3, copie contrôlée des secrets et approbation des migrations 070–072.
+
 ## Configuration attendue
 
 - Runtime Node.js 22.16.0 ou supérieur, conformément aux manifests du projet.
