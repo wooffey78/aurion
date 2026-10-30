@@ -5,7 +5,7 @@ export async function dashboardJournalRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.requireAuth);
   app.get('/journal/events', async r => {
     const org = r.auth!.organizationId;
-    return { events: (await query('select id,event_type as "eventType",title,description,severity,source,internal_path as "internalPath",external_url as "externalUrl",is_read as "isRead",resolved_at as "resolvedAt",created_at as "createdAt" from dashboard_journal_events where organization_id=$1 and event_type not like 'administrative_%' and event_type not like 'journey_%' order by created_at desc', [org])).rows };
+    return { events: (await query(`select id,event_type as "eventType",title,description,severity,source,internal_path as "internalPath",external_url as "externalUrl",is_read as "isRead",resolved_at as "resolvedAt",created_at as "createdAt" from dashboard_journal_events where organization_id=$1 and event_type not like 'administrative_%' and event_type not like 'journey_%' order by created_at desc`, [org])).rows };
   });
   app.patch('/journal/events/:id', async (r, reply) => {
     const org = r.auth!.organizationId, id = String((r.params as any).id), b = r.body as any || {};
