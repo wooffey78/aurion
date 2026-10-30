@@ -22,5 +22,5 @@ test('agenda setup explains direct Google sync versus iCalendar email invitation
   const mailbox = read('../../assets/js/pages/mailbox.js');
   assert.match(agenda, /S\.mail\?\.google\?\.connected/);
   assert.match(agenda, /invitations iCalendar/);
-  assert.match(mailbox, /Ajoutez la pièce jointe pour l’ajouter à votre agenda/);
+  assert.match(mailbox, /Ouvrez la pièce jointe pour l’ajouter à votre agenda/);
 });
