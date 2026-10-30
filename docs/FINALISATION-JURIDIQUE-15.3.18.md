@@ -37,7 +37,7 @@ Définir des durées justifiées par catégorie et implémenter l’effacement d
 
 ## Garde-fou technique de publication
 
-La version 15.3.18 prépare les documents juridiques en version 2.2. `AURION_LEGAL_PUBLICATION_APPROVAL` doit valoir exactement `2.2` pour permettre de publier un texte; les champs d’environnement requis doivent tous être fournis et les marqueurs de brouillon/complétion supprimés. Cette valeur ne doit pas être ajoutée avant la complétion factuelle et la revue juridique. Après déploiement, confirmer dans Neon que les documents 2.2 sont courants et restent `is_draft=true`.
+La version 15.3.18 prépare les documents juridiques en version 2.2. `AURION_LEGAL_PUBLICATION_APPROVAL` doit valoir exactement `2.2` pour permettre de publier un texte; les champs d’environnement requis doivent tous être fournis et les marqueurs de brouillon/complétion supprimés. Cette valeur ne doit pas être ajoutée avant la complétion factuelle et la revue juridique. Après le déploiement, Neon confirme les cinq documents 2.2 comme courants et `is_draft=true`; les inscriptions et paiements restent donc bloqués.
 
 ## Sources officielles
 

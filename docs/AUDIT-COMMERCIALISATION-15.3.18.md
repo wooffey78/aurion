@@ -21,9 +21,10 @@
 ## Déploiement et documents
 
 - Aurion 15.3.17 a été vérifié en état `live` sur les deux services Render. La 15.3.16 a échoué au build du service web à cause d’un lockfile tronqué par le transfert; la 15.3.17 a restauré le lockfile complet et les déploiements sont repartis.
+- Le commit 15.3.18 (`8c422d598db90e3a67d16183a848c7f32e6dbe62`) est ensuite passé `live` sur les deux services Render.
 - La configuration montre que **`aurion-web` en Oregon (États-Unis) est l’application canonique** : ce service exécute le backend Node et répond à `/health/db`. Le service `aurion` situé à Francfort redirige vers la production active. Les appels applicatifs sont donc traités par le service américain.
 - Neon est en région AWS `eu-central-1` (UE). Après déploiement 15.3.17, les cinq documents courants en base (mentions légales, CGV, confidentialité, cookies et accessibilité) sont version 2.1 et `is_draft=true`.
-- Aurion 15.3.18 prépare la version 2.2 et exige `AURION_LEGAL_PUBLICATION_APPROVAL=2.2`, les champs obligatoires renseignés et l’absence de marqueurs de projet. Le résultat de migration en production devra être relu après son déploiement.
+- Aurion 15.3.18 prépare la version 2.2 et exige `AURION_LEGAL_PUBLICATION_APPROVAL=2.2`, les champs obligatoires renseignés et l’absence de marqueurs de projet. Après déploiement, la requête Neon confirme les cinq documents 2.2 courants avec `is_draft=true`.
 - L’inscription, l’acceptation d’invitation et le paiement sont refusés tant que les documents requis demeurent brouillons; les comptes existants peuvent se connecter.
 
 ## Informations d’éditeur reçues
