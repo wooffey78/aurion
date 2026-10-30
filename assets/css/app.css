@@ -1178,3 +1178,16 @@ body input[type="checkbox"],body input[type="radio"],body input[type="color"]{cu
 .passkey-setup-dialog .button-row{justify-content:flex-end}
 @media(max-width:1050px){.auth-shell{grid-template-columns:minmax(0,1fr);padding:20px}.auth-visual{display:none}.auth-card{width:min(560px,100%);margin:0 auto;padding:28px}.landing-hero{grid-template-columns:minmax(0,1fr);min-height:auto;padding:22px 0}.landing-hero img{max-width:440px;max-height:38vh}}
 @media(max-width:700px){.auth-shell{padding:12px}.auth-card{width:100%;margin:0 auto;padding:20px 16px}.landing-hero img{max-width:360px;max-height:30vh}.passkey-setup-dialog .button-row{display:grid;grid-template-columns:1fr}}
+
+/* Import de données d'une entreprise existante — responsive et accessible. */
+.data-import{display:grid;gap:14px;min-width:0}
+.data-import-consent{align-items:flex-start}
+.data-import-results{display:grid;gap:12px;min-width:0}
+.data-import-summary,.data-import-record{display:grid;gap:10px;min-width:0;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel,rgba(10,21,39,.04))}
+.data-import-summary p,.data-import-meta{margin:0;color:var(--muted);overflow-wrap:anywhere}
+.data-import-record header{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.data-import-record .check{align-items:flex-start;min-width:0}
+.data-import-record textarea{width:100%;max-width:100%;min-width:0;resize:vertical;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.88rem;line-height:1.45}
+.data-import-record textarea.is-invalid{border-color:var(--red);outline:2px solid rgba(217,83,93,.22)}
+.data-import-record .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:640px){.data-import-record .grid-2{grid-template-columns:minmax(0,1fr)}.data-import-record{padding:11px}.data-import .button-row{display:grid;grid-template-columns:minmax(0,1fr)}.data-import .button-row>*{width:100%}}

@@ -2,6 +2,7 @@
 import{api,getActiveActivity,setActiveActivity}from'../../core/api.js';
 import{S,e,toast,modalForm,confirmDelete,hooks,askConfirm}from'./core.js';
 import{renderMailbox}from'../mailbox.js';
+import{renderDataImport}from'../data-import.js';
 import{mergeRegistryFields}from'../../core/registry-fill.js';
 import{isValidRegistryIdentifier}from'../../core/registry-fill.js';
 
@@ -105,7 +106,7 @@ export const view=()=>{
   const completeness=settingsCompleteness(S.company||{});
   return `<div class="page-head"><div><span class="eyebrow">ENTREPRISE & ACTIVITÉS</span><h1>Paramètres</h1><p>Une information est saisie une seule fois, détectée quand elle est disponible, puis réutilisée partout dans Aurion.</p></div></div>
   <section class="panel settings-toolbar"><div class="grid-2"><label class="field"><span>Rechercher dans les paramètres</span><input id="settings-search" type="search" placeholder="Entreprise, fiscalité, facturation, tarification…"></label><div class="notice"><b>Profil complété à ${completeness} %</b><small>Les données manquantes restent à renseigner par l’utilisateur.</small></div></div>
-    <nav class="settings-nav" aria-label="Navigation des paramètres"><button type="button" data-target="settings-company">Entreprise</button><button type="button" data-target="settings-configuration">Configuration</button><button type="button" data-target="settings-activities">Activités</button><button type="button" data-target="settings-mailbox">Messagerie & agenda</button><button type="button" data-target="settings-signature">Signature e-mail</button><button type="button" data-target="settings-account">Compte & sécurité</button><button type="button" data-target="settings-subscription">Abonnement</button></nav>
+    <nav class="settings-nav" aria-label="Navigation des paramètres"><button type="button" data-target="settings-company">Entreprise</button><button type="button" data-target="settings-configuration">Configuration</button><button type="button" data-target="settings-data-import">Import de données</button><button type="button" data-target="settings-activities">Activités</button><button type="button" data-target="settings-mailbox">Messagerie & agenda</button><button type="button" data-target="settings-signature">Signature e-mail</button><button type="button" data-target="settings-account">Compte & sécurité</button><button type="button" data-target="settings-subscription">Abonnement</button></nav>
   </section>
   <section class="panel stack settings-section" id="settings-company" data-settings-text="entreprise identité siren siret adresse code postal ville site web forme juridique naf registre logo">
     <div class="section-title"><div><h2>1 · Entreprise</h2><small>Identité juridique et siège : source unique pour les devis, factures et activités.</small></div><span class="pill" id="company-completeness">Détection active</span></div>
@@ -122,6 +123,10 @@ export const view=()=>{
       </form>
 
     </div>
+  </section>
+  <section class="panel stack settings-section" id="settings-data-import" data-settings-text="import données entreprise existante ancien logiciel clients fournisseurs produits services devis factures">
+    <div class="section-title"><div><h2>Import de données d’une entreprise existante</h2><small>Prévisualisez les exports de vos anciens outils, corrigez les rapprochements, puis choisissez ce qui sera importé.</small></div></div>
+    <div id="data-import-slot"></div>
   </section>
   <section class="panel stack settings-section" id="settings-mailbox" data-settings-text="messagerie agenda compte connexion">
     <div class="section-title"><div><h2>2 · Messagerie & agenda</h2><small>Les intégrations existantes restent au même endroit, sans recopier l’identité de l’entreprise.</small></div></div>
@@ -161,6 +166,7 @@ export function bind(){
   };
   populateLegalForms();
   renderMailbox($('#mailbox-slot'),{companyName:S.company?.name||'',onChange:async()=>{S.mail=await api.mailStatus().catch(()=>S.mail)}});
+  renderDataImport($('#data-import-slot'));
   const signatureFields=['signature-first','signature-last','signature-role','signature-company','signature-email-phone','signature-website','signature-address','signature-extra'];
   const setSignatureFields=signature=>{const s=signature||{};const pairs={'signature-first':'firstName','signature-last':'lastName','signature-role':'jobTitle','signature-company':'company','signature-email-phone':'phone','signature-website':'website','signature-address':'address','signature-extra':'extra'};for(const [id,key] of Object.entries(pairs)){const el=$('#'+id);if(el)el.value=s[key]||'';}$('#signature-enabled').checked=s.enabled!==false;$('#signature-quotes').checked=s.includeQuotes!==false;$('#signature-invoices').checked=s.includeInvoices!==false;$('#signature-professional').checked=s.includeProfessional!==false;};
   const signaturePayload=()=>({enabled:$('#signature-enabled').checked,firstName:$('#signature-first').value.trim(),lastName:$('#signature-last').value.trim(),jobTitle:$('#signature-role').value.trim(),company:$('#signature-company').value.trim(),phone:$('#signature-email-phone').value.trim(),website:$('#signature-website').value.trim(),address:$('#signature-address').value.trim(),extra:$('#signature-extra').value,includeQuotes:$('#signature-quotes').checked,includeInvoices:$('#signature-invoices').checked,includeProfessional:$('#signature-professional').checked});
