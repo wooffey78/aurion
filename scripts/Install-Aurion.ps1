@@ -6,6 +6,85 @@ $script:Interactive = $true
 $steps = 9; $n = 0
 function Step([string]$m) { $script:n++; Write-Step ("[{0}/{1}] {2}" -f $script:n, $steps, $m); if ($script:IsWin) { try { Write-Progress -Activity 'Installation d''Aurion' -Status $m -PercentComplete ([int](100 * ($script:n - 1) / $steps)) } catch {} } }
 
+function Get-AurionOllamaPath {
+    $command = Get-Command 'ollama.exe' -ErrorAction SilentlyContinue
+    if ($command) { return $command.Source }
+    $candidate = Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'
+    if (Test-Path -LiteralPath $candidate) { return $candidate }
+    return $null
+}
+
+function Install-AurionLocalAI {
+    if (-not $script:IsWin) { return }
+    $model = 'qwen3.5:4b'
+    $ollama = Get-AurionOllamaPath
+    $installedNow = $false
+
+    if (-not $ollama) {
+        $message = "Aurion peut installer Ollama pour activer son IA locale, puis télécharger Qwen3.5-4B (3,3 à 4 Go).`n`nCela demande une connexion Internet et plusieurs Go libres. L'installation d'Ollama se fait pour votre compte Windows, sans droit administrateur. Le modèle fonctionne sur ce PC et n'active aucun repli cloud.`n`nInstaller Ollama et télécharger le modèle maintenant ?"
+        if (-not (Show-YesNoDialog 'Aurion - IA locale' $message)) {
+            Write-Log "Installation Ollama/Qwen refusée ou différée par l’utilisateur." 'WARN'
+            return
+        }
+
+        $installer = Join-Path $env:TEMP 'Aurion-OllamaSetup.exe'
+        try {
+            Write-Step "Téléchargement de l’installateur officiel Ollama"
+            Invoke-WebRequest -Uri 'https://ollama.com/download/OllamaSetup.exe' -OutFile $installer -UseBasicParsing -TimeoutSec 900
+            $signature = Get-AuthenticodeSignature -FilePath $installer
+            if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch '(^|, )O=Ollama Inc\.(,|$)') {
+                throw "La signature Authenticode de l’installateur Ollama est invalide ou son éditeur ne correspond pas à Ollama Inc."
+            }
+            Write-Step "Installation d’Ollama (éditeur vérifié)"
+            $process = Start-Process -FilePath $installer -ArgumentList '/VERYSILENT /NORESTART /SUPPRESSMSGBOXES' -Wait -PassThru
+            if ($process.ExitCode -ne 0) { throw "L’installation Ollama a échoué (code $($process.ExitCode))." }
+            $ollama = Get-AurionOllamaPath
+            if (-not $ollama) { throw 'Ollama est installé mais son exécutable est introuvable dans le compte Windows.' }
+            $env:Path = (Split-Path -Parent $ollama) + [IO.Path]::PathSeparator + $env:Path
+            $installedNow = $true
+        } catch {
+            $script:LocalAIWarning = "Ollama n’a pas pu être installé ; Aurion continue sans IA locale. Consultez logs\aurion.log."
+            Write-Log ("Installation IA locale ignorée après erreur : {0}" -f $_.Exception.Message) 'WARN'
+            return
+        } finally {
+            Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    $listed = Invoke-Native $ollama @('list')
+    if ($listed.Code -eq 0 -and $listed.Output -match '(?im)^\s*qwen3\.5:4b(?:\s|$)') {
+        Write-Log "Modèle IA local déjà installé : $model."
+        return
+    }
+    if (-not $installedNow) {
+        $message = "Télécharger Qwen3.5-4B (3,3 à 4 Go) pour activer l’IA locale d’Aurion ?`n`nUne connexion Internet et plusieurs Go libres sont nécessaires. Aucun service cloud ne sera utilisé."
+        if (-not (Show-YesNoDialog 'Aurion - Modèle IA local' $message)) {
+            Write-Log "Téléchargement de $model différé par l’utilisateur ; Aurion reste installable." 'WARN'
+            return
+        }
+    }
+
+    try {
+        Write-Step "Téléchargement du modèle IA $model (plusieurs Go)"
+        $aiLog = Join-Path $script:LogDir 'aurion-ollama-model.log'
+        $oldPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            & $ollama pull $model 2>&1 | ForEach-Object {
+                $line = "$_"
+                Write-Host $line
+                try { [IO.File]::AppendAllText($aiLog, $line + "`r`n", $script:Utf8NoBom) } catch {}
+            }
+            $pullExit = $LASTEXITCODE
+        } finally { $ErrorActionPreference = $oldPreference }
+        if ($pullExit -ne 0) { throw "ollama pull a échoué (code $pullExit). Voir logs\aurion-ollama-model.log." }
+        Write-Log "Modèle IA local prêt : $model."
+    } catch {
+        $script:LocalAIWarning = "Le modèle Qwen n’a pas pu être téléchargé ; Aurion continue sans IA locale. Relancez « ollama pull qwen3.5:4b » après installation."
+        Write-Log ("Téléchargement du modèle local échoué : {0}" -f $_.Exception.Message) 'WARN'
+    }
+}
+
 try {
     Write-Log "=== Installation Aurion $(Get-AppVersion) dans $script:Root ==="
     $warnings = @()
@@ -45,6 +124,10 @@ try {
 
     Step 'Composants (peut durer quelques minutes)'
     Install-Dependencies
+
+    Step 'IA locale (Ollama et modèle Qwen, facultatifs)'
+    Install-AurionLocalAI
+    if ($script:LocalAIWarning) { $warnings += $script:LocalAIWarning; $script:LocalAIWarning = $null }
 
     Step 'Moteur de documents LibreOffice (facultatif)'
     # LibreOffice est un moteur complementaire : un telechargement externe bloque ou echoue

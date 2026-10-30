@@ -1,4 +1,4 @@
-# Aurion 15.3.12
+# Aurion 15.3.13
 
 ## Pour vos clients : un seul fichier
 Envoyez **Aurion-Setup.bat** (il contient l'intégralité d'Aurion). Le client double-clique dessus :
@@ -13,7 +13,7 @@ Le MSI LibreOffice n’est pas embarqué dans l’archive de sources ni dans le 
 
 ## IA locale
 
-Aurion utilise Qwen3.5-4B via Ollama pour les fonctions IA de texte et de vision sur une installation locale. Installez Ollama puis exécutez `ollama pull qwen3.5:4b`. Les détails et les limites, dont la génération locale de logo qui demande un moteur d’image séparé, figurent dans `docs/IA-LOCALE.md`.
+Le setup propose d’installer Ollama (éditeur vérifié, installation par utilisateur sans droits administrateur) et de télécharger Qwen3.5-4B (3,3 à 4 Go). Cette étape est facultative : si elle est refusée ou échoue, Aurion s’installe normalement et l’IA locale reste indisponible jusqu’à l’installation manuelle d’Ollama et de `qwen3.5:4b`. En mode local, aucune requête IA ne bascule vers le cloud. La génération locale de logo demande encore un moteur d’image séparé ; les détails figurent dans `docs/IA-LOCALE.md`.
 
 ## Au quotidien
 Icône **Aurion** : arrête proprement le serveur et PostgreSQL, les relance, applique les mises à jour de la base, puis ouvre Aurion en plein écran (**F11** pour quitter / rétablir le plein écran).

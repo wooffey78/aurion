@@ -1,4 +1,4 @@
-# IA locale d’Aurion 15.3.12
+# IA locale d’Aurion 15.3.13
 
 ## Modèle retenu pour le texte et la vision
 
@@ -7,7 +7,7 @@
 - L’inférence texte et images passe au serveur Ollama de la machine Aurion, limité à `127.0.0.1:11434`. L’absence d’Ollama ou du modèle ne déclenche aucun repli vers une API cloud. Les règles locales de classement des e-mails restent le secours sans IA.
 - Le statut de l’IA indique si le modèle est présent et son empreinte de registre Ollama (`digest`) lorsqu’elle est publiée par le moteur. Le tag recommandé est `qwen3.5:4b`; pour un audit reproductible, conserver également cette empreinte avec la version d’Ollama installée.
 
-Pour l’installation locale, installer Ollama depuis [le site officiel](https://ollama.com/download/windows), puis télécharger le modèle avec `ollama pull qwen3.5:4b`. Le backend Aurion local écoute par défaut en développement et sélectionne le mode local. En production Render, le mode est explicitement `managed`, car Render ne peut pas joindre le moteur Ollama de l’ordinateur du client.
+Le setup Windows propose l’installation signée d’Ollama par utilisateur et le téléchargement du modèle, après confirmation indiquant la taille (3,3–4,0 Go). En cas de refus ou d’échec, installer Ollama depuis [le site officiel](https://ollama.com/download/windows), puis exécuter `ollama pull qwen3.5:4b`. Le backend Aurion local écoute par défaut en développement et sélectionne le mode local. En production Render, le mode est explicitement `managed`, car Render ne peut pas joindre le moteur Ollama de l’ordinateur du client.
 
 ## Portée et garde-fous
 
