@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800" role="img" aria-labelledby="title desc">
+  <title id="title">Tableau de bord Aurion</title>
+  <desc id="desc">Aperçu du tableau de bord Aurion avec le journal de bord, les clients, les devis, l’agenda et la trésorerie.</desc>
+  <defs>
+    <linearGradient id="back" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f3f7ff"/><stop offset="1" stop-color="#dceaff"/></linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#2872ee"/><stop offset="1" stop-color="#22b8e8"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#173252" flood-opacity=".16"/></filter>
+  </defs>
+  <rect width="1280" height="800" rx="34" fill="url(#back)"/>
+  <circle cx="1170" cy="84" r="180" fill="#c9defb" opacity=".42"/>
+  <circle cx="75" cy="730" r="160" fill="#bed7fa" opacity=".38"/>
+  <g filter="url(#shadow)">
+    <rect x="38" y="34" width="1204" height="732" rx="26" fill="#fff"/>
+    <path d="M64 34h205v732H64a26 26 0 0 1-26-26V60a26 26 0 0 1 26-26Z" fill="#10213b"/>
+    <path d="M87 78 108 35l21 43h-12l-9-18-9 18Z" fill="url(#blue)"/>
+    <text x="140" y="70" fill="#fff" font-family="Arial,sans-serif" font-size="25" font-weight="700" letter-spacing="2">AURION</text>
+    <text x="141" y="91" fill="#9db8de" font-family="Arial,sans-serif" font-size="11" font-weight="700" letter-spacing="3">PRO</text>
+    <g font-family="Arial,sans-serif" font-size="15" fill="#b9c9df">
+      <rect x="55" y="123" width="171" height="44" rx="11" fill="#213d63"/>
+      <rect x="68" y="137" width="16" height="16" rx="5" fill="#27bde9"/><text x="98" y="153" fill="#fff" font-weight="700">Tableau de bord</text>
+      <circle cx="76" cy="204" r="8" fill="#5285f7"/><text x="98" y="209">Clients</text>
+      <circle cx="76" cy="251" r="8" fill="#52c4b6"/><text x="98" y="256">Catalogue métier</text>
+      <circle cx="76" cy="298" r="8" fill="#f6a84d"/><text x="98" y="303">Fournisseurs</text>
+      <circle cx="76" cy="345" r="8" fill="#a27bf5"/><text x="98" y="350">Devis &amp; factures</text>
+      <circle cx="76" cy="392" r="8" fill="#ed8e52"/><text x="98" y="397">Agenda</text>
+      <circle cx="76" cy="439" r="8" fill="#45c3e7"/><text x="98" y="444">Comptabilité</text>
+      <circle cx="76" cy="486" r="8" fill="#f07a8b"/><text x="98" y="491">Support Aurion</text>
+      <circle cx="76" cy="533" r="8" fill="#a5b6cb"/><text x="98" y="538">Paramètres</text>
+    </g>
+    <circle cx="74" cy="713" r="6" fill="#30ce9b"/><text x="91" y="718" fill="#b9c9df" font-family="Arial,sans-serif" font-size="12">Système opérationnel</text>
+
+    <text x="302" y="75" fill="#70819a" font-family="Arial,sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">ACTIVITÉ ACTIVE</text>
+    <text x="302" y="102" fill="#172b49" font-family="Arial,sans-serif" font-size="19" font-weight="700">Mon entreprise</text>
+    <rect x="1076" y="55" width="126" height="38" rx="19" fill="#edf4ff"/>
+    <circle cx="1097" cy="74" r="8" fill="#3578f6"/><text x="1114" y="79" fill="#244265" font-family="Arial,sans-serif" font-size="13" font-weight="700">Mon compte</text>
+
+    <text x="302" y="153" fill="#172b49" font-family="Arial,sans-serif" font-size="27" font-weight="700">Activité active</text>
+    <text x="302" y="178" fill="#71839b" font-family="Arial,sans-serif" font-size="14">Votre espace de travail, vos démarches et votre activité en un seul endroit.</text>
+    <rect x="896" y="130" width="145" height="42" rx="10" fill="url(#blue)"/><text x="918" y="157" fill="#fff" font-family="Arial,sans-serif" font-size="13" font-weight="700">+ Nouveau devis</text>
+    <rect x="1050" y="130" width="152" height="42" rx="10" fill="#fff" stroke="#bfd2ec"/><text x="1070" y="157" fill="#21436e" font-family="Arial,sans-serif" font-size="13" font-weight="700">+ Nouveau client</text>
+
+    <rect x="300" y="201" width="902" height="132" rx="15" fill="#fff" stroke="#dce7f6"/>
+    <text x="324" y="232" fill="#172b49" font-family="Arial,sans-serif" font-size="18" font-weight="700">Journal de bord</text>
+    <rect x="1077" y="213" width="99" height="27" rx="13" fill="#fff4df"/><text x="1093" y="231" fill="#926116" font-family="Arial,sans-serif" font-size="11" font-weight="700">À surveiller</text>
+    <line x1="324" y1="250" x2="1178" y2="250" stroke="#e9eff8"/>
+    <circle cx="338" cy="279" r="7" fill="#33b98b"/><text x="356" y="284" fill="#72839a" font-family="Arial,sans-serif" font-size="14">Aucune action urgente ou en attente</text>
+    <text x="1156" y="284" fill="#3578f6" font-family="Arial,sans-serif" font-size="13" font-weight="700">Ouvrir →</text>
+    <line x1="324" y1="302" x2="1178" y2="302" stroke="#eef2f8"/>
+    <text x="324" y="322" fill="#8593a6" font-family="Arial,sans-serif" font-size="12">Les informations importantes et les prochaines étapes apparaissent ici.</text>
+
+    <g>
+      <rect x="300" y="352" width="212" height="104" rx="14" fill="#f8fbff" stroke="#dce7f6"/><text x="322" y="382" fill="#71839b" font-family="Arial,sans-serif" font-size="13">Clients</text><text x="322" y="425" fill="#172b49" font-family="Arial,sans-serif" font-size="30" font-weight="700">—</text><circle cx="475" cy="383" r="17" fill="#e5f1ff"/><circle cx="475" cy="383" r="7" fill="#3578f6"/>
+      <rect x="523" y="352" width="212" height="104" rx="14" fill="#f8fbff" stroke="#dce7f6"/><text x="545" y="382" fill="#71839b" font-family="Arial,sans-serif" font-size="13">Devis en cours</text><text x="545" y="425" fill="#172b49" font-family="Arial,sans-serif" font-size="30" font-weight="700">—</text><circle cx="698" cy="383" r="17" fill="#eee9ff"/><circle cx="698" cy="383" r="7" fill="#9370ef"/>
+      <rect x="746" y="352" width="212" height="104" rx="14" fill="#f8fbff" stroke="#dce7f6"/><text x="768" y="382" fill="#71839b" font-family="Arial,sans-serif" font-size="13">CA HT du mois</text><text x="768" y="425" fill="#172b49" font-family="Arial,sans-serif" font-size="30" font-weight="700">—</text><circle cx="921" cy="383" r="17" fill="#e5faf4"/><circle cx="921" cy="383" r="7" fill="#21af86"/>
+      <rect x="969" y="352" width="233" height="104" rx="14" fill="#f8fbff" stroke="#dce7f6"/><text x="991" y="382" fill="#71839b" font-family="Arial,sans-serif" font-size="13">Rendez-vous</text><text x="991" y="425" fill="#172b49" font-family="Arial,sans-serif" font-size="30" font-weight="700">—</text><circle cx="1165" cy="383" r="17" fill="#fff1e7"/><circle cx="1165" cy="383" r="7" fill="#ef9a45"/>
+    </g>
+
+    <rect x="300" y="475" width="430" height="250" rx="15" fill="#fff" stroke="#dce7f6"/>
+    <text x="324" y="508" fill="#172b49" font-family="Arial,sans-serif" font-size="17" font-weight="700">Temps économisé avec Aurion</text>
+    <text x="324" y="532" fill="#8492a6" font-family="Arial,sans-serif" font-size="12">Suivi de votre activité</text>
+    <line x1="336" y1="672" x2="700" y2="672" stroke="#e3ebf6"/><line x1="336" y1="562" x2="336" y2="672" stroke="#e3ebf6"/>
+    <path d="M337 648 C390 634 412 619 455 626 S518 575 561 588 627 551 700 564" fill="none" stroke="url(#blue)" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="455" cy="626" r="6" fill="#367af5"/><circle cx="561" cy="588" r="6" fill="#367af5"/><circle cx="700" cy="564" r="6" fill="#20b8e7"/>
+    <rect x="748" y="475" width="454" height="112" rx="15" fill="#fff" stroke="#dce7f6"/>
+    <text x="772" y="508" fill="#172b49" font-family="Arial,sans-serif" font-size="17" font-weight="700">Actions rapides</text>
+    <rect x="772" y="526" width="192" height="42" rx="9" fill="#edf4ff"/><circle cx="794" cy="547" r="7" fill="#3578f6"/><text x="811" y="552" fill="#315170" font-family="Arial,sans-serif" font-size="13">Tickets de support</text>
+    <rect x="978" y="526" width="200" height="42" rx="9" fill="#e9faf4"/><circle cx="1000" cy="547" r="7" fill="#20ad84"/><text x="1017" y="552" fill="#315170" font-family="Arial,sans-serif" font-size="13">Entrées prévues</text>
+    <rect x="748" y="601" width="454" height="124" rx="15" fill="#fff" stroke="#dce7f6"/>
+    <text x="772" y="635" fill="#172b49" font-family="Arial,sans-serif" font-size="17" font-weight="700">Derniers documents</text>
+    <line x1="772" y1="652" x2="1178" y2="652" stroke="#edf1f7"/><text x="772" y="687" fill="#8593a6" font-family="Arial,sans-serif" font-size="13">Aucun document.</text>
+  </g>
+</svg>

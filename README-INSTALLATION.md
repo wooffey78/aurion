@@ -1,4 +1,4 @@
-# Aurion 15.3.13
+# Aurion 15.3.14
 
 ## Pour vos clients : un seul fichier
 Envoyez **Aurion-Setup.bat** (il contient l'intégralité d'Aurion). Le client double-clique dessus :
@@ -27,7 +27,7 @@ La messagerie et l'agenda se configurent **dans Aurion** (Paramètres → Messag
 | Journaux | dossier `logs\` (`aurion.log` en premier) |
 
 ## Pour vous (développeur)
-- Construire le fichier à distribuer : `tools\Build-Setup.bat` → `dist-setup\Aurion-Setup.bat`. Vos dossiers `branding\` et `assets\aurion-presentation.png` sont intégrés automatiquement.
+- Construire le fichier à distribuer : `tools\Build-Setup.bat` → `dist-setup\Aurion-Setup.bat`. Vos dossiers `branding\` et `assets\aurion-overview.svg` sont intégrés automatiquement.
 - Vérifier le contenu et l’extraction réelle du setup (Windows) : `npm run test:setup-package`. Ce contrôle n’exécute pas l’installation complète de Node.js, PostgreSQL et LibreOffice.
 - Tester les règles de paiement/échéancier : `npm run test:business`. Tester l’accessibilité des notifications : `npm run test:ui-a11y`.
 - Installer depuis les sources (sans le fichier unique) : `INSTALL-DEPUIS-LES-SOURCES.bat`.

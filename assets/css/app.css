@@ -1162,3 +1162,17 @@ body input[type="checkbox"],body input[type="radio"],body input[type="color"]{cu
 @layer base{::selection{background:#174fc4;color:#fff;text-shadow:none}::-moz-selection{background:#174fc4;color:#fff;text-shadow:none}body{color:var(--text)}.muted,.help,.check,.field,.nav button,.nav-logout,.pill,.chip,.journey-save-status,.journey-inline-status,.journey-formality p,.journey-mail-item p,.journey-admin-overview-head p{color:var(--muted)}.eyebrow,.brand small{color:#8fe0ce}.link-btn{color:#a9d3ff}.notice{color:#e2ebf6;background:rgba(33,69,116,.26);border-color:rgba(132,174,226,.4)}.field input::placeholder,.field textarea::placeholder,input::placeholder,textarea::placeholder{color:#a5b4c7;opacity:1}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #ffd166;outline-offset:3px}}
 @layer components{.journey-profile-intake,.journey-status-intake{display:grid;gap:16px;padding:clamp(16px,3vw,24px);border:1px solid rgba(125,169,220,.42);border-radius:18px;background:linear-gradient(145deg,rgba(26,50,82,.76),rgba(11,23,41,.78));box-shadow:0 14px 34px rgba(0,0,0,.18)}.journey-profile-intake h2,.journey-status-intake h2{margin:0;font-size:clamp(1.2rem,2.4vw,1.65rem);color:#fff}.journey-profile-intake>div:first-child p,.journey-status-intake>p{margin:6px 0 0;color:#d4deeb}.journey-profile-intake .journey-mailbox-early{margin-top:2px;padding:clamp(13px,2.5vw,20px);border-color:rgba(114,214,192,.46);background:rgba(8,20,36,.7)}.journey-profile-intake .journey-mailbox-early h3{margin-bottom:5px;color:#eaf7ff}.journey-status-intake .journey-choice{margin:0;padding:14px;border-color:rgba(180,202,230,.28);background:rgba(7,17,31,.55)}.journey-status-intake .journey-choice:has(input:checked){border-color:#72d6c0;background:rgba(52,124,245,.2);box-shadow:0 0 0 2px rgba(114,214,192,.18)}.journey-reassurance{color:#bdcadd}.journey-save-status.error{color:#ffadb2}.chip.ok,.pill.ok{color:#a6f0ba}.chip.warn,.pill.warn{color:#ffe08a}.chip.info,.pill.info{color:#bfdcff}}
 @media(max-width:700px){.journey-profile-intake,.journey-status-intake{padding:14px}}
+
+/* Connexion mobile, formulaire plus haut et aperçu Aurion compact. */
+.auth-shell{grid-template-columns:minmax(360px,.94fr) minmax(0,1.06fr);gap:24px;align-items:start}
+.auth-card{align-self:start;width:min(580px,100%);margin:20px auto 0;padding:30px}
+.auth-visual{align-items:flex-start;padding-top:18px}
+.auth-visual img{display:block;width:min(100%,660px);height:auto;max-height:58vh;object-fit:contain;margin-inline:auto;opacity:1}
+.landing-hero{min-height:auto;grid-template-columns:minmax(0,.88fr) minmax(0,1.12fr);gap:24px;padding:30px 0}
+.landing-hero img{width:min(100%,620px);max-height:54vh;object-fit:contain;margin-inline:auto;animation:none}
+.passkey-setup-dialog{width:min(540px,100%);gap:14px}
+.passkey-setup-dialog h2{margin:0;color:#0d223d}
+.passkey-setup-dialog p{margin:0;line-height:1.55}
+.passkey-setup-dialog .button-row{justify-content:flex-end}
+@media(max-width:1050px){.auth-shell{grid-template-columns:minmax(0,1fr);padding:20px}.auth-visual{display:none}.auth-card{width:min(560px,100%);margin:0 auto;padding:28px}.landing-hero{grid-template-columns:minmax(0,1fr);min-height:auto;padding:22px 0}.landing-hero img{max-width:440px;max-height:38vh}}
+@media(max-width:700px){.auth-shell{padding:12px}.auth-card{width:100%;margin:0 auto;padding:20px 16px}.landing-hero img{max-width:360px;max-height:30vh}.passkey-setup-dialog .button-row{display:grid;grid-template-columns:1fr}}

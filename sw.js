@@ -1,9 +1,9 @@
-const CACHE='aurion-shell-v15.3.13-r1';
+const CACHE='aurion-shell-v15.3.14-r1';
 const SCOPE=self.registration.scope;
 const ASSETS=[
   './','./index.html','./assets/css/app.css','./assets/js/config.js','./assets/js/boot-guard.js','./assets/js/main.js',
   './assets/platforms/android.svg','./assets/platforms/windows.svg','./assets/platforms/macos.svg',
-  './assets/platforms/ios.svg','./assets/cursors/arrow-dark.svg','./assets/cursors/pointer-dark.svg','./assets/cursors/text-dark.svg','./branding/aurion-192.png','./branding/aurion.png','./branding/aurion-maskable-512.png'
+  './assets/platforms/ios.svg','./assets/cursors/arrow-dark.svg','./assets/cursors/pointer-dark.svg','./assets/cursors/text-dark.svg','./assets/aurion-overview.svg','./branding/aurion-192.png','./branding/aurion.png','./branding/aurion-maskable-512.png'
 ];
 const CACHEABLE_EXACT=new Set([
   new URL('./',SCOPE).pathname,

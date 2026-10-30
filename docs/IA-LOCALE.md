@@ -1,4 +1,4 @@
-# IA locale d’Aurion 15.3.13
+# IA locale d’Aurion 15.3.14
 
 ## Modèle retenu pour le texte et la vision
 

@@ -126,7 +126,11 @@ try {
     Install-Dependencies
 
     Step 'IA locale (Ollama et modèle Qwen, facultatifs)'
-    Install-AurionLocalAI
+    try { Install-AurionLocalAI }
+    catch {
+        $script:LocalAIWarning = "L’installation facultative d’Ollama a échoué ; Aurion continue sans IA locale. Consultez logs\aurion.log."
+        Write-Log ("Étape IA locale ignorée après erreur : {0}" -f $_.Exception.Message) 'WARN'
+    }
     if ($script:LocalAIWarning) { $warnings += $script:LocalAIWarning; $script:LocalAIWarning = $null }
 
     Step 'Moteur de documents LibreOffice (facultatif)'

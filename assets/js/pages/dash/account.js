@@ -3,6 +3,7 @@ import{api}from'../../core/api.js';
 import{invalidateSession}from'../../core/session.js';
 import{go}from'../../core/router.js';
 import{passwordScore,suggestPassword}from'../../core/security.js';
+import{isMobileDevice,supportsPlatformPasskeys}from'../../core/device.js';
 import{S,e,toast,askConfirm,hooks}from'./core.js';
 
 let acc=null;
@@ -30,7 +31,7 @@ export async function bind(){
      <button class="btn primary" type="submit">Changer le mot de passe</button><p id="pw-err" class="error" hidden></p></form>
     <p class="help">${u.passwordChangedAt?`Dernier changement : ${fdate(u.passwordChangedAt)}.`:'Mot de passe jamais modifié depuis la création du compte.'} Un changement déconnecte vos autres appareils.</p>
     <section class="account-passkeys stack" aria-labelledby="passkeys-title">
-     <div class="section-title"><div><h3 id="passkeys-title">Clés d’accès</h3><p class="help">Connexion sans mot de passe, avec l’authentificateur de l’appareil ou une clé de sécurité compatible.</p></div><button class="btn secondary small" id="passkey-add" type="button">Ajouter une clé</button></div>
+     <div class="section-title"><div><h3 id="passkeys-title">Clés d’accès</h3><p class="help">Sur mobile, une clé d’accès peut être déverrouillée par empreinte, visage ou code de l’appareil.</p></div><button class="btn secondary small" id="passkey-add" type="button">Ajouter une clé sur ce téléphone</button></div>
      <div id="passkey-list" class="passkey-list" aria-live="polite"><p class="muted">Chargement des clés d’accès…</p></div>
      <p class="help">La vérification locale peut utiliser une empreinte, la reconnaissance faciale ou le code de l’appareil selon le système configuré. Votre authentifiant n’envoie pas vos données biométriques à Aurion.</p>
     </section>
@@ -48,12 +49,14 @@ export async function bind(){
   const $=s=>root.querySelector(s);
   const b64u=x=>{const bytes=new Uint8Array(x);let out='';for(const b of bytes)out+=String.fromCharCode(b);return btoa(out).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')};
   const dec=x=>{const text=String(x).replace(/-/g,'+').replace(/_/g,'/');return Uint8Array.from(atob(text),c=>c.charCodeAt(0))};
-  const passkeyAllowed=()=>Boolean(window.isSecureContext&&window.PublicKeyCredential&&navigator.credentials?.create&&navigator.credentials?.get);
+  const browserPasskeysAvailable=()=>Boolean(window.isSecureContext&&window.PublicKeyCredential&&navigator.credentials?.create&&navigator.credentials?.get);
+  const passkeyAllowed=()=>supportsPlatformPasskeys();
   const passkeyDate=value=>value?new Date(value).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'}):'Jamais utilisée';
   const loadPasskeys=async()=>{
     const list=$('#passkey-list'),button=$('#passkey-add');if(!list)return;
+    button.hidden=!isMobileDevice();
     button.disabled=!passkeyAllowed();
-    if(!passkeyAllowed()){list.innerHTML='<p class="muted">Les clés d’accès nécessitent un navigateur compatible et une connexion sécurisée (HTTPS).</p>';return}
+    if(!browserPasskeysAvailable()){list.innerHTML='<p class="muted">La gestion des clés d’accès nécessite un navigateur compatible et une connexion sécurisée (HTTPS).</p>';return}
     try{
       const result=await api.webauthnCredentials(),items=Array.isArray(result.credentials)?result.credentials:[];
       list.innerHTML=items.length?items.map(item=>`<article class="passkey-row"><div><strong>Clé d’accès</strong><small>Ajoutée le ${e(passkeyDate(item.createdAt))} · Dernière utilisation : ${e(passkeyDate(item.lastUsedAt))}</small><small>Type : ${e((item.transports||[]).join(', ')||'Authentificateur de l’appareil ou synchronisé')}</small></div><button class="btn danger small" type="button" data-passkey-delete="${e(item.id)}">Retirer</button></article>`).join(''):'<p class="muted">Aucune clé d’accès n’est enregistrée pour ce compte.</p>';
@@ -71,7 +74,8 @@ export async function bind(){
     button.disabled=true;
     try{
       const options=await api.webauthnRegisterOptions();
-      const credential=await navigator.credentials.create({publicKey:{challenge:dec(options.challenge),rp:options.rp,user:{id:dec(options.user.id),name:options.user.name,displayName:options.user.displayName},pubKeyCredParams:options.pubKeyCredParams,authenticatorSelection:options.authenticatorSelection,timeout:options.timeout,attestation:options.attestation}});
+      const selection=Object.assign({},options.authenticatorSelection||{},{authenticatorAttachment:'platform',residentKey:'required',userVerification:'required'});
+      const credential=await navigator.credentials.create({publicKey:{challenge:dec(options.challenge),rp:options.rp,user:{id:dec(options.user.id),name:options.user.name,displayName:options.user.displayName},pubKeyCredParams:options.pubKeyCredParams,authenticatorSelection:selection,timeout:options.timeout,attestation:options.attestation}});
       if(!credential)throw new Error('Création de clé d’accès annulée.');
       await api.webauthnRegisterVerify({response:{clientDataJSON:b64u(credential.response.clientDataJSON),attestationObject:b64u(credential.response.attestationObject),transports:credential.response.getTransports?.()||[]}});
       toast('Clé d’accès enregistrée.','success');await loadPasskeys();
