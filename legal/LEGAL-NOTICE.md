@@ -1,6 +1,6 @@
 # Mentions légales — Aurion
 
-> **DOSSIER DE PRÉPARATION — NE PAS PUBLIER AVANT VÉRIFICATION.** Version 2.3 pour Aurion 15.3.19, préparée le 30 octobre 2026. Les informations d’identité ci-dessous proviennent exclusivement des réponses de l’éditeur; elles n’ont pas été contrôlées sur un justificatif RNE/Sirene. L’hébergement décrit est la cible future et non la production vérifiée. Les coordonnées exactes des entités contractantes devront être insérées après commande des services.
+> **DOSSIER DE PRÉPARATION — NE PAS PUBLIER AVANT VÉRIFICATION.** Version 2.3 pour Aurion 15.3.20, préparée le 30 octobre 2026. Les informations d’identité ci-dessous proviennent exclusivement des réponses de l’éditeur; elles n’ont pas été contrôlées sur un justificatif RNE/Sirene. L’hébergement décrit est la cible future et non la production vérifiée. Les changements 15.3.20 sont sur une branche de travail, non fusionnée ni déployée. Les coordonnées exactes des entités contractantes devront être insérées après commande des services.
 
 ## Éditeur du service
 
@@ -31,7 +31,7 @@ La mention de l’immatriculation et les registres compétents doivent être com
 
 ## Propriété intellectuelle et responsabilité éditoriale
 
-Aurion comprend du code et des composants tiers régis par leurs licences respectives. Les utilisateurs vérifient les résultats, calculs et documents produits. Aurion 15.3.19 ne transmet pas les factures à une Plateforme Agréée et n’accomplit pas l’e-reporting fiscal.
+Aurion comprend du code et des composants tiers régis par leurs licences respectives. Les utilisateurs vérifient les résultats, calculs et documents produits. Aurion 15.3.20 ne transmet pas les factures à une Plateforme Agréée et n’accomplit pas l’e-reporting fiscal.
 
 ## Données personnelles et traceurs
 
