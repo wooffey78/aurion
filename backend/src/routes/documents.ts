@@ -1,19 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
-import { createWriteStream } from 'node:fs';
-import { mkdir, unlink, readFile } from 'node:fs/promises';
+import { unlink } from 'node:fs/promises';
 import path from 'node:path';
-import { privateRoot, savePrivateUpload, readPrivateObject, deletePrivateObject } from '../services/storage.js';
-import { pipeline } from 'node:stream/promises';
+import { savePrivateUpload, readPrivateObject, deletePrivateObject } from '../services/storage.js';
 import { query } from '../db.js';
 import { quotePdf, clientPdf, supplierPdf } from '../services/pdf.js';
 import { renderDocument, findSoffice, TEMPLATE_FIELDS } from '../services/document-renderer.js';
 import AdmZip from 'adm-zip';
-import { addBrandLogoAssets, addBrandGuideFiles, addBrandGuidePdf, brandBundleReadme } from '../services/brand-assets.js';
 
 const documentTypes=new Set(['application/pdf','image/png','image/jpeg','image/webp','image/svg+xml','text/plain','text/csv','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.oasis.opendocument.text']);
 const templateTypes=new Set(['application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.oasis.opendocument.text']);
-const logoTypes=new Set(['image/png','image/jpeg']);
 const extFor=(name:string)=>{const e=path.extname(name).toLowerCase().replace(/[^a-z0-9.]/g,'');return e.length>=2&&e.length<=10?e:'.bin'};
 function contentType(ext:string){return ext==='.pdf'?'application/pdf':ext==='.docx'?'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'application/vnd.oasis.opendocument.text'}
 
@@ -52,60 +48,37 @@ export async function documentsRoutes(app:FastifyInstance){
  app.get('/documents/invoices/:id.odt',async(r,reply)=>generated(r,reply,'invoice',(r.params as any).id,'odt'));
  app.get('/documents/clients/:id.pdf',async(r,reply)=>{let x:any;try{x=await clientPdf(r.auth!.organizationId,(r.params as any).id)}catch(e:any){if(e?.message==='NOT_FOUND')return reply.code(404).send({error:'NOT_FOUND',message:'Client introuvable.'});throw e}reply.header('Content-Type','application/pdf').header('Content-Disposition',`inline; filename="fiche-client-${x.row.id}.pdf"`).send(x.buffer)});
  app.get('/documents/export-all.zip',async(r,reply)=>{
-   const org=r.auth!.organizationId,zip=new AdmZip(),clients=(await query('select id,name from clients where organization_id=$1 order by name',[org])).rows;
-   const docs=(await query(`select id,number,document_type from quotes where organization_id=$1 order by created_at`,[org])).rows;
-   const suppliers=(await query(`select id,name from suppliers where organization_id=$1 order by name`,[org])).rows;
+   const org=r.auth!.organizationId,zip=new AdmZip();
+   const clients=(await query('select id,name from clients where organization_id=$1 order by name',[org])).rows;
+   const quotes=(await query('select id,number,document_type from quotes where organization_id=$1 order by created_at',[org])).rows;
+   const suppliers=(await query('select id,name from suppliers where organization_id=$1 order by name',[org])).rows;
    for(const c of clients){try{const x=await clientPdf(org,c.id);zip.addFile(`fiches-clients/fiche-${String(c.name||c.id).replace(/[^A-Za-z0-9_-]/g,'_')}-${c.id}.pdf`,x.buffer)}catch{}}
-   for(const d of docs){try{const x=await quotePdf(org,d.id);zip.addFile(`${d.document_type==='invoice'?'factures':'devis'}/${String(d.number||d.id).replace(/[^A-Za-z0-9_-]/g,'_')}.pdf`,x.buffer)}catch{}}
+   for(const d of quotes){try{const x=await quotePdf(org,d.id);zip.addFile(`${d.document_type==='invoice'?'factures':'devis'}/${String(d.number||d.id).replace(/[^A-Za-z0-9_-]/g,'_')}.pdf`,x.buffer)}catch{}}
    for(const s of suppliers){try{const x=await supplierPdf(org,s.id);zip.addFile(`fournisseurs/fiche-${String(s.name||s.id).replace(/[^A-Za-z0-9_-]/g,'_')}-${s.id}.pdf`,x.buffer)}catch{}}
    const aid=(await query('select id from activities where organization_id=$1 and active=true order by created_at limit 1',[org])).rows[0]?.id;
    if(aid){try{const {accountingReportPdf}=await import('../services/accounting-report.js');const year=Number((r.query as any)?.year)||new Date().getFullYear();const x=await accountingReportPdf(org,aid,year);zip.addFile(`comptabilite/comptabilite-${year}.pdf`,x.buffer)}catch{}}
-   // Ajouts rétrocompatibles à l'export historique : dossier administratif, état du parcours,
-   // signature, adresses d'intervention et fichiers réellement présents dans le stockage privé.
-   const orgData=(await query(`select id,name,activity,custom_activity,siren,siret,legal_form,address,postal_code,city,website,configuration_incomplete,logo_key from organizations where id=$1`,[org])).rows[0]||{};
-   const themeRow=(await query(`select accent,dark,font,radius,customized,quote_template_style,invoice_template_style from document_themes where organization_id=$1`,[org])).rows[0]||null;
-   const signatureRow=(await query(`select enabled,first_name,last_name,job_title,company,phone,website,address,extra,include_quotes,include_invoices,include_professional,signature_html,signature_text,updated_at from email_signatures where organization_id=$1`,[org])).rows[0]||null;
-   const journeyRow=(await query(`select status,current_step,business_status,data,first_redirect_at,completed_at,created_at,updated_at from onboarding_journeys where organization_id=$1`,[org])).rows[0]||null;
-   const formalitiesRows=(await query(`select id,activity_id,title,organization_name,category,applicability,status,official_url,source_label,source_checked_at,certainty,missing_information,prerequisites,next_action,rationale,notes,prepared_email,provider_message_id,provider_thread_id,expected_sender_domain,reference_tokens,manual_evidence,declared_completed_at,proven_completed_at,history,created_at,updated_at from administrative_formalities where organization_id=$1 order by created_at`,[org])).rows;
-   const mailRows=(await query(`select id,formality_id,provider,provider_message_id,thread_id,sender,subject,received_at,category,confidence,minimal_excerpt,safe_open_url,user_confirmed,created_at from administrative_mail_items where organization_id=$1 order by received_at nulls last,created_at`,[org])).rows;
-   const adminDocs=(await query(`select l.formality_id,l.purpose,d.id,d.original_name,d.mime_type,d.size_bytes,d.storage_key,d.status,d.created_at from administrative_document_links l join documents d on d.id=l.document_id and d.organization_id=l.organization_id where l.organization_id=$1 and d.status<>'deleted' order by d.created_at`,[org])).rows;
-   const interventions=(await query(`select a.id,a.client_id,c.name as client_name,a.label,a.address,a.is_default,a.is_active,a.created_at,a.updated_at from client_intervention_addresses a join clients c on c.id=a.client_id and c.organization_id=a.organization_id where a.organization_id=$1 order by c.name,a.created_at`,[org])).rows;
-   const storedDocs=(await query(`select id,original_name,mime_type,size_bytes,storage_key,status,created_at from documents where organization_id=$1 and status<>'deleted' order by created_at`,[org])).rows;
+   const company=(await query('select id,name,activity,custom_activity,siren,siret,legal_form,address,postal_code,city,website,configuration_data,configuration_incomplete,created_at,updated_at from organizations where id=$1',[org])).rows[0]||{};
+   const signature=(await query('select enabled,first_name,last_name,job_title,company,phone,website,address,extra,include_quotes,include_invoices,include_professional,signature_html,signature_text,updated_at from email_signatures where organization_id=$1',[org])).rows[0]||null;
+   const interventions=(await query('select a.id,a.client_id,c.name as client_name,a.label,a.address,a.is_default,a.is_active,a.created_at,a.updated_at from client_intervention_addresses a join clients c on c.id=a.client_id and c.organization_id=a.organization_id where a.organization_id=$1 order by c.name,a.created_at',[org])).rows;
+   const journal=(await query("select event_type,title,description,severity,source,internal_path,external_url,dedupe_key,is_read,resolved_at,created_at from dashboard_journal_events where organization_id=$1 and event_type not like 'administrative_%' and event_type not like 'journey_%' order by created_at",[org])).rows;
+   const storedDocs=(await query("select id,original_name,mime_type,size_bytes,storage_key,status,created_at from documents where organization_id=$1 and status<>'deleted' order by created_at",[org])).rows;
+   const templates=(await query('select id,activity_id,document_type,name,mime_type,size_bytes,storage_key,active,source,file_format,mapping_status,version,created_at,updated_at from document_templates where organization_id=$1 order by created_at',[org])).rows;
+   const generated=(await query('select id,activity_id,quote_id,document_type,template_id,docx_key,odt_key,pdf_key,created_at from generated_documents where organization_id=$1 order by created_at',[org])).rows;
    const safeName=(name:any)=>String(name||'document').normalize('NFKD').replace(/[^A-Za-z0-9._-]+/g,'_').replace(/^\.+/,'').slice(0,150)||'document';
-   const addStoredFile=async (key:any, archiveName:string)=>{if(!key)return false;try{const bytes=await readPrivateObject(String(key));zip.addFile(archiveName.replace(/\\/g,'/').replace(/^\/+|(?:\.\.[/\\])/g,''),bytes);return true;}catch{return false;}};
+   const addStoredFile=async(key:any,archiveName:string)=>{if(!key)return false;try{const bytes=await readPrivateObject(String(key));const safe=archiveName.replace(/\\/g,'/').replace(/^\/+|(?:\.\.[/\\])/g,'');zip.addFile(safe,bytes);return true}catch{return false}};
    const putJson=(name:string,data:any)=>zip.addFile(name,Buffer.from(JSON.stringify(data,null,2),'utf8'));
-   putJson('dossier-administratif/entreprise.json',orgData);
-   putJson('dossier-administratif/parcours.json',journeyRow);
-   putJson('dossier-administratif/formalites.json',formalitiesRows);
-   putJson('dossier-administratif/documents-index.json',adminDocs.map(({storage_key,...doc}:any)=>({...doc,storedInArchive:storedDocs.some((d:any)=>d.id===doc.id)})));
-   putJson('dossier-administratif/messages-detectes.json',mailRows);
-   putJson('dossier-administratif/journal-de-bord.json',(await query(`select event_type,title,description,severity,source,internal_path,external_url,dedupe_key,is_read,resolved_at,created_at from dashboard_journal_events where organization_id=$1 order by created_at`,[org])).rows);
-   putJson('clients/adresses-intervention.json',interventions);
-   putJson('parametres/signature-email.json',signatureRow);
+   putJson('entreprise/identite-legale.json',company);
+   putJson('entreprise/signature-email.json',signature);
+   putJson('entreprise/adresses-intervention-clients.json',interventions);
+   putJson('journal/evenements.json',journal);
+   putJson('documents/index.json',storedDocs.map(({storage_key,...row}:any)=>({...row,storedInArchive:storedDocs.some((d:any)=>d.id===row.id)})));
    let storedCount=0;
-   for(const d of storedDocs){const ok=await addStoredFile(d.storage_key,`dossier-administratif/fichiers/${safeName(d.id)}-${safeName(d.original_name)}`);if(ok)storedCount++;}
-   // Les modèles et versions ne sont pas forcément enregistrés dans la table documents.
-   const templates=(await query(`select id,activity_id,document_type,name,mime_type,size_bytes,storage_key,active,source,file_format,mapping_status,version,created_at,updated_at from document_templates where organization_id=$1 order by created_at`,[org])).rows;
+   for(const d of storedDocs){if(await addStoredFile(d.storage_key,`documents/fichiers/${safeName(d.id)}-${safeName(d.original_name)}`))storedCount++;}
    putJson('modeles-documents/index.json',templates.map(({storage_key,...row}:any)=>row));
    for(const t of templates)await addStoredFile(t.storage_key,`modeles-documents/${safeName(t.id)}-${safeName(t.name)}`);
-   const generated=(await query(`select id,activity_id,quote_id,document_type,template_id,docx_key,odt_key,pdf_key,created_at from generated_documents where organization_id=$1 order by created_at`,[org])).rows;
    putJson('documents-generes/index.json',generated.map(({docx_key,odt_key,pdf_key,...row}:any)=>row));
    for(const g of generated){for(const [ext,key] of [['docx',g.docx_key],['odt',g.odt_key],['pdf',g.pdf_key]] as const)if(key)await addStoredFile(key,`documents-generes/${safeName(g.id)}.${ext}`);}
-   // Bundle visuel réel : fichiers persistés uniquement, et absence explicitement documentée.
-   const brandZip=new AdmZip();
-   const palette={organization:orgData.name||'',activity:orgData.activity||'',accent:themeRow?.accent||'#0b63ce',dark:themeRow?.dark||'#0b1220',font:themeRow?.font||'sans',radius:themeRow?.radius||'round',documentThemeCustomized:Boolean(themeRow?.customized),quoteTemplate:themeRow?.quote_template_style||'aurion-classic',invoiceTemplate:themeRow?.invoice_template_style||'aurion-classic'};
-   brandZip.addFile('palette.json',Buffer.from(JSON.stringify(palette,null,2),'utf8'));
-   if(signatureRow?.signature_html)brandZip.addFile('signature/signature.html',Buffer.from(String(signatureRow.signature_html),'utf8'));
-   if(signatureRow?.signature_text)brandZip.addFile('signature/signature.txt',Buffer.from(String(signatureRow.signature_text),'utf8'));
-   let logoBuffer:Buffer|undefined;
-   if(orgData.logo_key){try{const logo=await readPrivateObject(String(orgData.logo_key));const ext=path.extname(String(orgData.logo_key)).toLowerCase();if(['.png','.jpg','.jpeg'].includes(ext)){addBrandLogoAssets(brandZip,logo,ext,palette.accent,palette.dark);logoBuffer=logo;}}catch{}}
-   addBrandGuideFiles(brandZip,{companyName:orgData.name,activity:orgData.activity,accent:palette.accent,dark:palette.dark,font:palette.font,radius:palette.radius});
-   await addBrandGuidePdf(brandZip,{companyName:orgData.name,activity:orgData.activity,accent:palette.accent,dark:palette.dark,font:palette.font,radius:palette.radius},logoBuffer);
-   brandZip.addFile('README.txt',Buffer.from(brandBundleReadme(orgData.name,brandZip.getEntries().map(entry=>entry.entryName)),'utf8'));
-   zip.addFile('identite-visuelle.zip',brandZip.toBuffer());
-   putJson('export-manifest.json',{formatVersion:2,generatedAt:new Date().toISOString(),organizationId:org,contents:{clients:clients.length,quotes:docs.length,suppliers:suppliers.length,storedDocuments:storedDocs.length,storedDocumentsIncluded:storedCount,administrativeFormalities:formalitiesRows.length,detectedMailMetadata:mailRows.length,interventionAddresses:interventions.length,templates:templates.length,generatedDocuments:generated.length,journeyIncluded:Boolean(journeyRow),identityBundle:true},security:{oauthTokensIncluded:false,secretsIncluded:false,crossOrganizationDataIncluded:false}});
-   const buf=zip.toBuffer();return reply.header('Content-Type','application/zip').header('Content-Disposition','attachment; filename="aurion-donnees.zip"').header('Cache-Control','no-store').send(buf);
+   putJson('export-manifest.json',{formatVersion:3,generatedAt:new Date().toISOString(),organizationId:org,contents:{clients:clients.length,quotes:quotes.length,suppliers:suppliers.length,storedDocuments:storedDocs.length,storedDocumentsIncluded:storedCount,interventionAddresses:interventions.length,templates:templates.length,generatedDocuments:generated.length,journalEvents:journal.length,signatureIncluded:Boolean(signature)},security:{oauthTokensIncluded:false,secretsIncluded:false,crossOrganizationDataIncluded:false}});
+   const buffer=zip.toBuffer();return reply.header('Content-Type','application/zip').header('Content-Disposition','attachment; filename="aurion-donnees.zip"').header('Cache-Control','no-store').send(buffer);
  });
- app.get('/documents/logo',async(request,reply)=>{const row=(await query('select logo_key from organizations where id=$1',[request.auth!.organizationId])).rows[0];if(!row?.logo_key)return reply.code(404).send({error:'NOT_FOUND',message:'Aucun logo enregistré.'});try{const key=String(row.logo_key);const ext=path.extname(key).toLowerCase();const mime=ext==='.png'?'image/png':(ext==='.jpg'||ext==='.jpeg')?'image/jpeg':'application/octet-stream';const buf=await readPrivateObject(key);return reply.header('Content-Type',mime).header('Cache-Control','no-store').header('Content-Security-Policy',"img-src 'self' blob: data:").send(buf)}catch{return reply.code(404).send({error:'NOT_FOUND',message:'Logo introuvable.'})}});
- app.post('/documents/logo',async(request,reply)=>{const part=await request.file();if(!part||!logoTypes.has(part.mimetype))return reply.code(400).send({error:'INVALID_LOGO'});const s=await savePrivateUpload(request.auth!.organizationId,part,5*1024*1024);try{const head=(await readFile(s.target)).subarray(0,12),ext=path.extname(part.filename).toLowerCase();const valid=part.mimetype==='image/png'?ext==='.png'&&head.length>=8&&head.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])):['.jpg','.jpeg'].includes(ext)&&head.length>=3&&head[0]===0xff&&head[1]===0xd8&&head[2]===0xff;if(!valid){await unlink(s.target).catch(()=>{});return reply.code(400).send({error:'FILE_CONTENT_MISMATCH',message:'Le contenu réel du logo ne correspond pas au format PNG ou JPEG annoncé.'});}await query('update organizations set logo_key=$1,updated_at=now() where id=$2',[`private/${request.auth!.organizationId}/${s.safe}`,request.auth!.organizationId]);return{ok:true,stored:true};}catch(e){await unlink(s.target).catch(()=>{});throw e}});
 }
