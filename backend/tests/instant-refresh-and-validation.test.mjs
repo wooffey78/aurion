@@ -6,7 +6,8 @@ const read=p=>readFileSync(new URL(p,root),'utf8');
 
 test('la synchronisation inter-appareils détecte une modification en environ une seconde',()=>{
   const sync=read('assets/js/account-sync.js');
-  assert.match(sync,/window\.setInterval\(poll,1000\)/);
+  assert.match(sync,/const BASE_POLL_MS=1000/);
+  assert.match(sync,/window\.setTimeout\(async\(\)=>\{await poll\(\);schedule\(\)\},delay\)/);
   assert.doesNotMatch(sync,/window\.setInterval\(poll,20000\)/);
   assert.match(sync,/aurion:account-sync-changed/);
   assert.doesNotMatch(sync,/location\.reload\(\)/);

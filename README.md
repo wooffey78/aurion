@@ -1,4 +1,4 @@
-# Aurion 15.2.32
+# Aurion 15.3.11
 
 Application de gestion pour indépendants et petites entreprises, avec interface web/PWA et API Node.js/Fastify/PostgreSQL.
 
@@ -11,6 +11,10 @@ Application de gestion pour indépendants et petites entreprises, avec interface
 5. Contrôler `http://127.0.0.1:4000/health` et exécuter `npm run check`.
 
 Pour l’installation Windows autonome, suivre `README-INSTALLATION.md`. Pour Render et ses limites de stockage, lire `docs/DEPLOIEMENT-RENDER.md`. La configuration Render de référence est dans `render.yaml`.
+
+L’archive de sources ne contient ni dépendances installées, ni secrets locaux, ni journaux ou données d’exécution. Installez les dépendances à partir du fichier de verrouillage avant le build. LibreOffice est téléchargé en ligne par l’installateur Windows si nécessaire ; le MSI n’est pas inclus dans l’archive source.
+
+Après avoir exécuté les contrôles, créez une archive de sources propre avec `pwsh tools/Build-Source-Archive.ps1 -Out <chemin-de-sortie.zip>`. Le script conserve la racine du projet et ses fichiers de verrouillage, vérifie les trois versions déclarées et exclut les dépendances, builds et données locales.
 
 ## Publication
 

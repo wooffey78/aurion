@@ -33,7 +33,8 @@ for(const entry of moduleFiles){
     await rootModule.link(async(specifier,referencingModule)=>{
       if(!specifier.startsWith('.'))throw new Error('Import non relatif non autorisé dans assets/js: '+specifier);
       const from=referencingModule.identifier.startsWith('file:')?fileURLToPath(referencingModule.identifier):referencingModule.identifier;
-      const target=path.resolve(path.dirname(from),specifier);
+      const cleanSpecifier=specifier.split(/[?#]/,1)[0];
+      const target=path.resolve(path.dirname(from),cleanSpecifier);
       if(!target.startsWith(jsRoot+path.sep)||!existsSync(target)||!path.extname(target))throw new Error('Import introuvable: '+path.relative(root,from)+' -> '+specifier);
       return load(target);
     });

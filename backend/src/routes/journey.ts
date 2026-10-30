@@ -3,12 +3,12 @@ import crypto, { randomBytes, randomUUID } from 'node:crypto';
 import { readFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
-import { query } from '../db.js';
+import { db, query } from '../db.js';
 import { config } from '../config.js';
 import { fileFromKey, savePrivateUpload } from '../services/storage.js';
-import { encrypt, decrypt, oauthClient, gmailSendAdministrative } from '../services/google.js';
+import { encrypt, decrypt, oauthClient, gmailSendAdministrative, googleOAuthSetupStatus } from '../services/google.js';
 import { signatureForEmail, emailBodyHtml } from '../services/signature.js';
-import { addBrandLogoAssets } from '../services/brand-assets.js';
+import { addBrandLogoAssets, addBrandGuideFiles, addBrandGuidePdf, brandBundleReadme } from '../services/brand-assets.js';
 
 const STATUSES = new Set(['to_complete','missing_information','ready_to_prepare','to_do','awaiting_user_send','sent','awaiting_response','response_received','action_required','to_correct','validated_by_evidence','completed','not_applicable','to_verify']);
 const APPLICABILITY = new Set(['applicable','potentially_applicable','not_applicable','missing_information','to_verify']);
@@ -41,10 +41,10 @@ const eventTitle = (kind: string) => ({
   administrative_mail_sync_error: 'Synchronisation de la messagerie en erreur', brand_saved: 'Identité visuelle mise à jour',
 } as Record<string,string>)[kind] || 'Mise à jour du parcours';
 
-async function journal(org: string, kind: string, description: string, opts: { severity?: string; path?: string | null; dedupe?: string; source?: string; externalUrl?: string | null; title?: string } = {}) {
+async function journal(org: string, kind: string, description: string, opts: { severity?: string; path?: string | null; dedupe?: string; source?: string; externalUrl?: string | null; title?: string } = {}, executor: any = {query}) {
   const dedupe = clean(opts.dedupe || `${kind}:${crypto.createHash('sha256').update(description).digest('hex').slice(0,32)}`, 240);
   const external = opts.externalUrl ? safeHttps(opts.externalUrl) : null;
-  await query(`insert into dashboard_journal_events(organization_id,event_type,title,description,severity,source,internal_path,external_url,dedupe_key)
+  await executor.query(`insert into dashboard_journal_events(organization_id,event_type,title,description,severity,source,internal_path,external_url,dedupe_key)
     values($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict(organization_id,dedupe_key) do nothing`,
     [org,kind,clean(opts.title || eventTitle(kind),240),clean(description,4000),opts.severity || 'info',opts.source || 'journey',clean(opts.path,500)||null,external,dedupe]);
 }
@@ -107,11 +107,11 @@ export async function journeyRoutes(app: FastifyInstance) {
   app.get('/journey/state', async r => {
     const org = r.auth!.organizationId;
     const result = await query('select * from onboarding_journeys where organization_id=$1',[org]);
-    if (!result.rowCount) return { eligible:false, shouldRedirect:false, status:'not_started', currentStep:1, businessStatus:null, data:{}, firstRedirectAt:null, completedAt:null };
+    if (!result.rowCount) return { eligible:false, shouldRedirect:false, status:'not_started', currentStep:1, businessStatus:null, data:{}, revision:0, firstRedirectAt:null, completedAt:null };
     const row = result.rows[0];
     const shouldRedirect = !row.first_redirect_at && row.status !== 'completed';
     if (shouldRedirect) await query('update onboarding_journeys set first_redirect_at=now(),updated_at=now() where organization_id=$1 and first_redirect_at is null',[org]);
-    return { eligible:true, shouldRedirect, status:row.status, currentStep:Number(row.current_step||1), businessStatus:row.business_status, data:row.data||{}, firstRedirectAt:row.first_redirect_at, completedAt:row.completed_at, updatedAt:row.updated_at };
+    return { eligible:true, shouldRedirect, status:row.status, currentStep:Number(row.current_step||1), businessStatus:row.business_status, data:row.data||{}, revision:Number(row.revision||0), firstRedirectAt:row.first_redirect_at, completedAt:row.completed_at, updatedAt:row.updated_at };
   });
 
   app.put('/journey/state', async (r, reply) => {
@@ -119,42 +119,76 @@ export async function journeyRoutes(app: FastifyInstance) {
     const currentStep = Number(b.currentStep);
     if (!Number.isInteger(currentStep) || currentStep < 1 || currentStep > 7) return reply.code(400).send({error:'INVALID_STEP'});
     const status = ['in_progress','paused','completed','not_started'].includes(String(b.status)) ? String(b.status) : 'in_progress';
-    const businessStatus = ['existing','to_create'].includes(String(b.businessStatus)) ? String(b.businessStatus) : null;
+    const businessStatus = ['existing','to_create','unknown'].includes(String(b.businessStatus)) ? String(b.businessStatus) : null;
     const data = object(b.data);
+    if(data.steps!==undefined&&(!data.steps||typeof data.steps!=='object'||Array.isArray(data.steps)||Object.values(data.steps).some(step=>!step||typeof step!=='object'||Array.isArray(step))))return reply.code(400).send({error:'INVALID_JOURNEY_DATA'});
+    if(data.steps&&Object.keys(data.steps).some(key=>!/^\d+$/.test(key)||Number(key)<1||Number(key)>7))return reply.code(400).send({error:'INVALID_JOURNEY_STEP'});
     if (jsonBytes(data) > 100_000) return reply.code(413).send({error:'JOURNEY_DATA_TOO_LARGE'});
-    await query(`insert into onboarding_journeys(organization_id,status,current_step,business_status,data,updated_at)
-      values($1,$2,$3,$4,$5::jsonb,now()) on conflict(organization_id) do update set
-      status=excluded.status,current_step=excluded.current_step,business_status=coalesce(excluded.business_status,onboarding_journeys.business_status),
-      data=onboarding_journeys.data || excluded.data,updated_at=now(),completed_at=case when excluded.status='completed' then coalesce(onboarding_journeys.completed_at,now()) else null end`,
-      [org,status,currentStep,businessStatus,JSON.stringify(data)]);
-    if (b.recordEvent === true) await journal(org,'journey_step_saved',`Étape ${currentStep} enregistrée.`,{severity:'info',path:`/onboarding?step=${currentStep}`,dedupe:`journey:step:${currentStep}:${new Date().toISOString().slice(0,13)}`});
-    return {ok:true,status,currentStep,savedAt:new Date().toISOString()};
+    const expectedRevision=b.expectedRevision===undefined?undefined:Number(b.expectedRevision);
+    if(expectedRevision!==undefined&&(!Number.isSafeInteger(expectedRevision)||expectedRevision<0))return reply.code(400).send({error:'INVALID_JOURNEY_REVISION'});
+    const client=await db.connect();
+    try{
+      await client.query('begin');
+      // Lock the organization first so first-time saves from two tabs are serialized too.
+      await client.query('select id from organizations where id=$1 for update',[org]);
+      const current=await client.query('select revision from onboarding_journeys where organization_id=$1 for update',[org]);
+      const actualRevision=current.rowCount?Number(current.rows[0].revision||0):0;
+      if(expectedRevision!==undefined&&expectedRevision!==actualRevision){
+        await client.query('rollback');
+        return reply.code(409).send({error:'JOURNEY_REVISION_CONFLICT',message:'Une version plus récente du parcours existe sur le serveur. Rechargez-la avant de poursuivre.',currentRevision:actualRevision});
+      }
+      const result=await client.query(`insert into onboarding_journeys(organization_id,status,current_step,business_status,data,revision,updated_at)
+        values($1,$2,$3,$4,$5::jsonb,1,now()) on conflict(organization_id) do update set
+        status=excluded.status,current_step=excluded.current_step,business_status=coalesce(excluded.business_status,onboarding_journeys.business_status),
+        data=(onboarding_journeys.data || excluded.data) || jsonb_build_object('steps',coalesce(onboarding_journeys.data->'steps','{}'::jsonb) || coalesce(excluded.data->'steps','{}'::jsonb)),
+        revision=onboarding_journeys.revision+1,updated_at=now(),completed_at=case when excluded.status='completed' then coalesce(onboarding_journeys.completed_at,now()) else null end
+        returning revision,updated_at`,[org,status,currentStep,businessStatus,JSON.stringify(data)]);
+      if (b.recordEvent === true) await journal(org,'journey_step_saved',`Étape ${currentStep} enregistrée.`,{severity:'info',path:`/onboarding?step=${currentStep}`,dedupe:`journey:step:${currentStep}:${new Date().toISOString().slice(0,13)}`},client);
+      await client.query('commit');
+      return {ok:true,status,currentStep,revision:Number(result.rows[0].revision),savedAt:new Date(result.rows[0].updated_at).toISOString()};
+    }catch(error){await client.query('rollback').catch(()=>{});throw error;}finally{client.release();}
   });
 
   app.post('/journey/complete', async (r, reply) => {
     const org = r.auth!.organizationId;
-    const state = await query(`select j.data,o.name,o.activity,o.custom_activity,o.legal_form
-      from onboarding_journeys j join organizations o on o.id=j.organization_id where j.organization_id=$1`,[org]);
-    if (!state.rowCount) return reply.code(409).send({error:'JOURNEY_NOT_STARTED'});
+    const client=await db.connect();
+    try{
+    await client.query('begin');
+    await client.query('select id from organizations where id=$1 for update',[org]);
+    const state = await client.query(`select j.data,o.name,o.activity,o.custom_activity,o.legal_form
+      from onboarding_journeys j join organizations o on o.id=j.organization_id where j.organization_id=$1 for update of j`,[org]);
+    if (!state.rowCount){await client.query('rollback');return reply.code(409).send({error:'JOURNEY_NOT_STARTED'});}
     const data = object(state.rows[0].data), steps = object(data.steps), step1 = object(steps['1']), step2 = object(steps['2']), step3 = object(steps['3']);
     const valuePresent = (value: unknown) => {
       const normalized = clean(value, 300).toLocaleLowerCase('fr-FR');
       return Boolean(normalized) && !/^(nouvelle entreprise|à configurer|a configurer|je ne sais pas encore|inconnu|inconnue)$/.test(normalized);
     };
     const businessStatus = clean(step1.businessStatus || data.businessStatus, 80);
-    const companyName = state.rows[0].name || step2.name;
-    const activity = state.rows[0].custom_activity || state.rows[0].activity || step2.activity || step3.activity;
-    const legalForm = state.rows[0].legal_form || step2.legalForm || step3.legalForm;
+    const firstPresent = (...values: unknown[]) => values.find(valuePresent);
+    const companyName = firstPresent(step2.name, state.rows[0].name) || '';
+    const activity = businessStatus === 'existing'
+      ? firstPresent(state.rows[0].custom_activity, state.rows[0].activity, step2.activity, step3.activity) || ''
+      : step3.activity;
+    const legalForm = firstPresent(state.rows[0].legal_form, step2.legalForm, step3.legalForm) || '';
     const skippedSteps = Array.isArray(data.skippedSteps) ? data.skippedSteps.map(Number) : [];
-    const configurationIncomplete = !['existing','to_create'].includes(businessStatus) || !valuePresent(companyName) || !valuePresent(activity) || !valuePresent(legalForm) || skippedSteps.length > 0 || [1,2,3].some(n => object(steps[String(n)]).skipped === true);
+    const visibleSkippedSteps = businessStatus === 'to_create' ? skippedSteps.filter(step => step !== 2) : skippedSteps;
+    const skippedRequiredStep = [1,3].some(n => object(steps[String(n)]).skipped === true)
+      || (businessStatus !== 'to_create' && object(steps['2']).skipped === true);
+    const missingRequiredData = businessStatus === 'existing'
+      ? !valuePresent(companyName) || !valuePresent(activity) || !valuePresent(legalForm)
+      : businessStatus === 'to_create' ? !valuePresent(activity) : true;
+    const configurationIncomplete = missingRequiredData || visibleSkippedSteps.length > 0 || skippedRequiredStep;
     // La fin du parcours reste possible même si des informations manquent ; le tableau de bord ne garde alors qu’une alerte de configuration à vérifier.
-    await query(`update onboarding_journeys set status='completed',current_step=7,completed_at=coalesce(completed_at,now()),updated_at=now() where organization_id=$1`,[org]);
-    await query(`update organizations set configuration_incomplete=$1,updated_at=now() where id=$2`,[configurationIncomplete,org]);
+    await client.query(`update onboarding_journeys set status='completed',current_step=7,completed_at=coalesce(completed_at,now()),updated_at=now(),revision=revision+1 where organization_id=$1`,[org]);
+    await client.query(`update organizations set configuration_incomplete=$1,updated_at=now() where id=$2`,[configurationIncomplete,org]);
     if (!configurationIncomplete) {
-      await query(`update dashboard_journal_events set resolved_at=coalesce(resolved_at,now()) where organization_id=$1 and event_type='configuration_incomplete' and resolved_at is null`,[org]);
+      await client.query(`update dashboard_journal_events set resolved_at=coalesce(resolved_at,now()) where organization_id=$1 and event_type='configuration_incomplete' and resolved_at is null`,[org]);
     }
-    await journal(org,'journey_completed','Le parcours a été marqué comme terminé par l’utilisateur. Les formalités administratives conservent leur état propre.',{severity:'success',path:'/onboarding?step=7',dedupe:'journey:completed'});
-    return {ok:true,confirmedByUser:true,configurationIncomplete,completedAt:(await query('select completed_at from onboarding_journeys where organization_id=$1',[org])).rows[0]?.completed_at};
+    await journal(org,'journey_completed','Le parcours a été marqué comme terminé par l’utilisateur. Les formalités administratives conservent leur état propre.',{severity:'success',path:'/onboarding?step=7',dedupe:'journey:completed'},client);
+    const completedAt=(await client.query('select completed_at from onboarding_journeys where organization_id=$1',[org])).rows[0]?.completed_at;
+    await client.query('commit');
+    return {ok:true,confirmedByUser:true,configurationIncomplete,completedAt};
+    }catch(error){await client.query('rollback').catch(()=>{});throw error;}finally{client.release();}
   });
 
   app.get('/journey/events', async r => {
@@ -189,13 +223,18 @@ export async function journeyRoutes(app: FastifyInstance) {
     const officialUrl=safeHttps(b.officialUrl);
     if (b.officialUrl && !officialUrl) return reply.code(400).send({error:'INVALID_OFFICIAL_URL',message:'Seules les URL HTTPS sans identifiants sont acceptées.'});
     const id=randomUUID(), missing=Array.isArray(b.missingInformation)?b.missingInformation.map(x=>clean(x,300)).filter(Boolean).slice(0,50):[], prerequisites=Array.isArray(b.prerequisites)?b.prerequisites.map(x=>clean(x,300)).filter(Boolean).slice(0,50):[];
-    await query(`insert into administrative_formalities(id,organization_id,title,organization_name,category,applicability,status,official_url,source_label,source_checked_at,certainty,missing_information,prerequisites,next_action,rationale,notes,expected_sender_domain,reference_tokens,history)
+    const client=await db.connect();
+    try{
+      await client.query('begin');
+      await client.query(`insert into administrative_formalities(id,organization_id,title,organization_name,category,applicability,status,official_url,source_label,source_checked_at,certainty,missing_information,prerequisites,next_action,rationale,notes,expected_sender_domain,reference_tokens,history)
       values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13::jsonb,$14,$15,$16,$17,$18::jsonb,$19::jsonb)`,[
       id,org,title,clean(b.organizationName,180)||null,clean(b.category,80)||'to_verify',applicability,status,officialUrl,clean(b.sourceLabel,240)||null,b.sourceCheckedAt?new Date(b.sourceCheckedAt):null,
       ['low','medium','high'].includes(String(b.certainty))?String(b.certainty):'low',JSON.stringify(missing),JSON.stringify(prerequisites),clean(b.nextAction,1000)||null,clean(b.rationale,2000)||null,clean(b.notes,4000)||null,
       clean(b.expectedSenderDomain,255).toLowerCase().replace(/^@/,'')||null,JSON.stringify(Array.isArray(b.referenceTokens)?b.referenceTokens.map(x=>clean(x,120)).filter(Boolean).slice(0,30):[]),JSON.stringify([{at:new Date().toISOString(),action:'created',status,source:'user'}])
-    ]);
-    await journal(org,'administrative_formality_created',`« ${title} » ajoutée au suivi. Son applicabilité reste à vérifier tant qu’une source officielle n’a pas été contrôlée.`,{severity:'info',path:'/onboarding?step=5',dedupe:`formality-created:${id}`});
+      ]);
+      await journal(org,'administrative_formality_created',`« ${title} » ajoutée au suivi. Son applicabilité reste à vérifier tant qu’une source officielle n’a pas été contrôlée.`,{severity:'info',path:'/onboarding?step=5',dedupe:`formality-created:${id}`},client);
+      await client.query('commit');
+    }catch(error){await client.query('rollback').catch(()=>{});throw error;}finally{client.release();}
     return reply.code(201).send({id});
   });
 
@@ -319,9 +358,15 @@ export async function journeyRoutes(app: FastifyInstance) {
       const fh=await (await import('node:fs/promises')).open(saved.target,'r');let sample:Buffer;try{sample=Buffer.alloc(1024);const read=await fh.read(sample,0,sample.length,0);sample=sample.subarray(0,read.bytesRead)}finally{await fh.close();}
       if(!await realFileType(fileName,mime,sample,saved.target)){await unlink(saved.target).catch(()=>{});return reply.code(400).send({error:'FILE_CONTENT_MISMATCH',message:'Le contenu réel du fichier ne correspond pas au format déclaré.'});}
       const documentId=randomUUID();
-      await query(`insert into documents(id,organization_id,original_name,mime_type,size_bytes,storage_key,status) values($1,$2,$3,$4,$5,$6,'quarantined')`,[documentId,org,fileName,mime,saved.size,`private/${org}/${saved.safe}`]);
-      await query(`insert into administrative_document_links(organization_id,document_id,formality_id,purpose) values($1,$2,$3,$4)`,[org,documentId,formalityId,purpose]);
-      await journal(org,'administrative_document_uploaded',`Document « ${fileName} » ajouté au dossier administratif. Le fichier est conservé dans le stockage privé de l’organisation.`,{severity:'info',path:'/onboarding?step=5',dedupe:`admin-document:${documentId}`});
+      const client=await db.connect();
+      try{
+        await client.query('begin');
+        await client.query(`insert into documents(id,organization_id,original_name,mime_type,size_bytes,storage_key,status) values($1,$2,$3,$4,$5,$6,'quarantined')`,[documentId,org,fileName,mime,saved.size,`private/${org}/${saved.safe}`]);
+        await client.query(`insert into administrative_document_links(organization_id,document_id,formality_id,purpose) values($1,$2,$3,$4)`,[org,documentId,formalityId,purpose]);
+        await client.query('commit');
+      }catch(error){await client.query('rollback').catch(()=>{});throw error;}finally{client.release();}
+      try{await journal(org,'administrative_document_uploaded',`Document « ${fileName} » ajouté au dossier administratif. Le fichier est conservé dans le stockage privé de l’organisation.`,{severity:'info',path:'/onboarding?step=5',dedupe:`admin-document:${documentId}`});}
+      catch(error){r.log.error({err:error,organizationId:org,documentId},'Administrative document saved but its journal event could not be written');}
       return reply.code(201).send({ok:true,document:{id:documentId,originalName:fileName,mimeType:mime,sizeBytes:saved.size,status:'quarantined'},virusScan:'not_available'});
     } catch(e:any){ if(saved?.target)await unlink(saved.target).catch(()=>{}); if(e?.statusCode===413)return reply.code(413).send({error:'FILE_TOO_LARGE'}); throw e; }
   });
@@ -330,11 +375,12 @@ export async function journeyRoutes(app: FastifyInstance) {
     const org=r.auth!.organizationId;
     const row=(await query('select google_email,scopes,last_sync_at,last_sync_error,connected_at from administrative_mail_connections where organization_id=$1',[org])).rows[0];
     const send=(await query('select google_email,scopes,connected_at from administrative_mail_send_connections where organization_id=$1',[org])).rows[0];
-    return {configured:Boolean(config.GOOGLE_CLIENT_ID&&config.GOOGLE_CLIENT_SECRET&&config.APP_BASE_URL),connected:Boolean(row?.refresh_token_enc||row?.google_email),email:row?.google_email||null,scopes:row?.scopes||[],lastSyncAt:row?.last_sync_at||null,lastError:row?.last_sync_error||null,connectedAt:row?.connected_at||null,sendConnected:Boolean(send?.refresh_token_enc||send?.google_email),sendEmail:send?.google_email||null,sendScopes:send?.scopes||[],sendConnectedAt:send?.connected_at||null,redirectUri:config.APP_BASE_URL?new URL('/administrative-mail/oauth/callback',config.APP_BASE_URL).toString():null};
+    const googleSetup=googleOAuthSetupStatus(),missingConfiguration=[...googleSetup.missingConfiguration,...(!config.APP_BASE_URL?['APP_BASE_URL']:[])];
+    return {...googleSetup,configured:missingConfiguration.length===0,missingConfiguration,connected:Boolean(row?.refresh_token_enc||row?.google_email),email:row?.google_email||null,scopes:row?.scopes||[],lastSyncAt:row?.last_sync_at||null,lastError:row?.last_sync_error||null,connectedAt:row?.connected_at||null,sendConnected:Boolean(send?.refresh_token_enc||send?.google_email),sendEmail:send?.google_email||null,sendScopes:send?.scopes||[],sendConnectedAt:send?.connected_at||null,redirectUri:config.APP_BASE_URL?new URL('/administrative-mail/oauth/callback',config.APP_BASE_URL).toString():null};
   });
 
   app.get('/administrative-mail/oauth/start', async (r, reply) => {
-    if(!config.GOOGLE_CLIENT_ID||!config.GOOGLE_CLIENT_SECRET||!config.APP_BASE_URL)return reply.code(503).send({error:'GOOGLE_OAUTH_NOT_CONFIGURED',message:'Configurez les identifiants OAuth Google et l’URL de callback dédiée à la lecture Gmail.'});
+    const googleSetup=googleOAuthSetupStatus();if(!googleSetup.configured||!config.APP_BASE_URL)return reply.code(503).send({error:'GOOGLE_OAUTH_NOT_CONFIGURED',message:'Configurez les identifiants OAuth Google, la clé de chiffrement des jetons et l’URL de callback Gmail.',missingConfiguration:[...googleSetup.missingConfiguration,...(!config.APP_BASE_URL?['APP_BASE_URL']:[])]});
     const state=randomBytes(32).toString('base64url'),hash=crypto.createHash('sha256').update(state).digest('hex'),redirectUri=new URL('/administrative-mail/oauth/callback',config.APP_BASE_URL).toString();
     await query(`insert into administrative_mail_oauth_states(state_hash,organization_id,user_id,expires_at,purpose) values($1,$2,$3,now()+interval '10 minutes','read')`,[hash,r.auth!.organizationId,r.auth!.userId]);
     const client=await oauthClient(redirectUri);
@@ -343,7 +389,7 @@ export async function journeyRoutes(app: FastifyInstance) {
   });
 
   app.get('/administrative-mail/send-oauth/start', async (r, reply) => {
-    if(!config.GOOGLE_CLIENT_ID||!config.GOOGLE_CLIENT_SECRET||!config.APP_BASE_URL)return reply.code(503).send({error:'GOOGLE_OAUTH_NOT_CONFIGURED',message:'Configurez les identifiants OAuth Google et le callback Gmail dédié.'});
+    const googleSetup=googleOAuthSetupStatus();if(!googleSetup.configured||!config.APP_BASE_URL)return reply.code(503).send({error:'GOOGLE_OAUTH_NOT_CONFIGURED',message:'Configurez les identifiants OAuth Google, la clé de chiffrement des jetons et le callback Gmail dédié.',missingConfiguration:[...googleSetup.missingConfiguration,...(!config.APP_BASE_URL?['APP_BASE_URL']:[])]});
     const state=randomBytes(32).toString('base64url'),hash=crypto.createHash('sha256').update(state).digest('hex'),redirectUri=new URL('/administrative-mail/oauth/callback',config.APP_BASE_URL).toString();
     await query(`insert into administrative_mail_oauth_states(state_hash,organization_id,user_id,expires_at,purpose) values($1,$2,$3,now()+interval '10 minutes','send')`,[hash,r.auth!.organizationId,r.auth!.userId]);
     const client=await oauthClient(redirectUri);
@@ -479,9 +525,11 @@ export async function journeyRoutes(app: FastifyInstance) {
     zip.addFile('signature/configuration.json',Buffer.from(JSON.stringify(sig,null,2)));
     zip.addFile('signature/signature.html',Buffer.from(String(sig.signature_html||'<!-- Aucune signature HTML n’a encore été enregistrée. -->')));
     zip.addFile('signature/signature.txt',Buffer.from(String(sig.signature_text||'')));
-    let logoAdded=false,monochromeAdded=false;
-    if(company.logo_key){try{const logo=await readFile(fileFromKey(company.logo_key));const ext=path.extname(String(company.logo_key)).toLowerCase();if(['.png','.jpg','.jpeg'].includes(ext)){const variants=addBrandLogoAssets(zip,logo,ext,theme.accent,theme.dark);logoAdded=variants.originalAdded;monochromeAdded=variants.monochromeAdded;}}catch{}}
-    zip.addFile('README.md',Buffer.from(`# Identité visuelle Aurion\n\nEntreprise : ${clean(company.name,160)}\n\nCette archive contient uniquement les ressources réellement enregistrées et les adaptations d’affichage générées à partir du logo principal.\n\n- Logo principal : ${logoAdded?'inclus':'aucun logo principal lisible/enregistré'}.\n- Variantes : fond clair, fond sombre, fond de couleur principale, icône carrée et favicon SVG. Ces SVG incorporent l’image réelle du logo et adaptent son cadre ; ils ne prétendent pas redessiner automatiquement le tracé original.\n- Variantes monochromes : ${monochromeAdded?'incluses, car la source PNG contient de la transparence':'non générées, car la source ne présente pas un canal alpha suffisamment identifiable pour produire une silhouette propre sans détériorer le visuel'}.\n- Palette et thème de documents : palette.json.\n- Signature d’e-mail : signature/.\n- Aucune donnée d’une autre organisation ni aucun jeton OAuth n’est inclus.\n`));
+    let logoBuffer:Buffer|undefined;
+    if(company.logo_key){try{const logo=await readFile(fileFromKey(company.logo_key));const ext=path.extname(String(company.logo_key)).toLowerCase();if(['.png','.jpg','.jpeg'].includes(ext)){addBrandLogoAssets(zip,logo,ext,theme.accent,theme.dark);logoBuffer=logo;}}catch{}}
+    addBrandGuideFiles(zip,{companyName:company.name,activity:company.custom_activity||company.activity,website:company.website,accent:theme.accent,dark:theme.dark,font:theme.font,radius:theme.radius});
+    await addBrandGuidePdf(zip,{companyName:company.name,activity:company.custom_activity||company.activity,website:company.website,accent:theme.accent,dark:theme.dark,font:theme.font,radius:theme.radius},logoBuffer);
+    zip.addFile('README.md',Buffer.from(brandBundleReadme(company.name,zip.getEntries().map(entry=>entry.entryName)),'utf8'));
     const buffer=zip.toBuffer();
     return reply.header('Content-Type','application/zip').header('Content-Disposition','attachment; filename="aurion-identite-visuelle.zip"').header('Cache-Control','no-store').send(buffer);
   });

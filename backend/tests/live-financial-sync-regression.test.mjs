@@ -5,7 +5,8 @@ const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 
 test('synchronisation live : 1 seconde, sans rechargement et sans interception globale de fetch',()=>{
   const s=read('../../assets/js/account-sync.js');
-  assert.ok(s.includes('window.setInterval(poll,1000)'));
+  assert.ok(s.includes('const BASE_POLL_MS=1000'));
+  assert.ok(s.includes('window.setTimeout(async()=>{await poll();schedule()},delay)'));
   assert.ok(!s.includes('location.reload('));
   assert.ok(!s.includes('window.fetch=async'));
   assert.ok(s.includes('aurion:account-sync-changed'));

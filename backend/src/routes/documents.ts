@@ -9,7 +9,7 @@ import { query } from '../db.js';
 import { quotePdf, clientPdf, supplierPdf } from '../services/pdf.js';
 import { renderDocument, fileFromKey, findSoffice, TEMPLATE_FIELDS } from '../services/document-renderer.js';
 import AdmZip from 'adm-zip';
-import { addBrandLogoAssets } from '../services/brand-assets.js';
+import { addBrandLogoAssets, addBrandGuideFiles, addBrandGuidePdf, brandBundleReadme } from '../services/brand-assets.js';
 
 const documentTypes=new Set(['application/pdf','image/png','image/jpeg','image/webp','image/svg+xml','text/plain','text/csv','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.oasis.opendocument.text']);
 const templateTypes=new Set(['application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.oasis.opendocument.text']);
@@ -97,9 +97,11 @@ export async function documentsRoutes(app:FastifyInstance){
    brandZip.addFile('palette.json',Buffer.from(JSON.stringify(palette,null,2),'utf8'));
    if(signatureRow?.signature_html)brandZip.addFile('signature/signature.html',Buffer.from(String(signatureRow.signature_html),'utf8'));
    if(signatureRow?.signature_text)brandZip.addFile('signature/signature.txt',Buffer.from(String(signatureRow.signature_text),'utf8'));
-   let brandLogoAdded=false,brandMonochromeAdded=false;
-   if(orgData.logo_key){try{const logo=await readFile(fileFromKey(String(orgData.logo_key)));const ext=path.extname(String(orgData.logo_key)).toLowerCase();if(['.png','.jpg','.jpeg'].includes(ext)){const variants=addBrandLogoAssets(brandZip,logo,ext,palette.accent,palette.dark);brandLogoAdded=variants.originalAdded;brandMonochromeAdded=variants.monochromeAdded;}}catch{}}
-   brandZip.addFile('README.txt',Buffer.from(`Identité visuelle exportée depuis Aurion.\n\nLogo principal : ${brandLogoAdded?'inclus':'aucun logo lisible/enregistré'}.\nVariantes générées autour du fichier réellement enregistré : fond clair, fond sombre, fond de couleur principale, icône carrée et favicon SVG. Les SVG incorporent le logo source et adaptent son cadre ; ils ne prétendent pas vectoriser/redessiner automatiquement le tracé original.\nVariantes monochromes : ${brandMonochromeAdded?'incluses, car la source PNG contient de la transparence':'non générées, car aucune transparence exploitable n’a été confirmée dans la source'}.\nLa palette.json reflète le thème de document enregistré (ou les valeurs natives si aucun thème personnalisé n’existe). Aucune clé secrète ni connexion OAuth n’est exportée.\n`, 'utf8'));
+   let logoBuffer:Buffer|undefined;
+   if(orgData.logo_key){try{const logo=await readFile(fileFromKey(String(orgData.logo_key)));const ext=path.extname(String(orgData.logo_key)).toLowerCase();if(['.png','.jpg','.jpeg'].includes(ext)){addBrandLogoAssets(brandZip,logo,ext,palette.accent,palette.dark);logoBuffer=logo;}}catch{}}
+   addBrandGuideFiles(brandZip,{companyName:orgData.name,activity:orgData.activity,accent:palette.accent,dark:palette.dark,font:palette.font,radius:palette.radius});
+   await addBrandGuidePdf(brandZip,{companyName:orgData.name,activity:orgData.activity,accent:palette.accent,dark:palette.dark,font:palette.font,radius:palette.radius},logoBuffer);
+   brandZip.addFile('README.txt',Buffer.from(brandBundleReadme(orgData.name,brandZip.getEntries().map(entry=>entry.entryName)),'utf8'));
    zip.addFile('identite-visuelle.zip',brandZip.toBuffer());
    putJson('export-manifest.json',{formatVersion:2,generatedAt:new Date().toISOString(),organizationId:org,contents:{clients:clients.length,quotes:docs.length,suppliers:suppliers.length,storedDocuments:storedDocs.length,storedDocumentsIncluded:storedCount,administrativeFormalities:formalitiesRows.length,detectedMailMetadata:mailRows.length,interventionAddresses:interventions.length,templates:templates.length,generatedDocuments:generated.length,journeyIncluded:Boolean(journeyRow),identityBundle:true},security:{oauthTokensIncluded:false,secretsIncluded:false,crossOrganizationDataIncluded:false}});
    const buf=zip.toBuffer();return reply.header('Content-Type','application/zip').header('Content-Disposition','attachment; filename="aurion-donnees.zip"').header('Cache-Control','no-store').send(buf);

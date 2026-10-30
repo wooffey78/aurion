@@ -1,5 +1,12 @@
 # Aurion 15.3.4 — Détections révisables et absorption de données
 
+## Complément d’audit — bundle d’identité visuelle
+
+- L’export du logo annonce maintenant uniquement les fichiers effectivement inclus ; sans logo enregistré, il n’annonce plus de variantes absentes.
+- Les variantes monochromes sont créées uniquement après décodage des pixels alpha d’un PNG non entrelacé pris en charge. La présence d’un canal alpha dans l’en-tête ne suffit plus à présenter une image comme une silhouette transparente.
+- Les bundles incluent un guide de marque imprimable, une palette calculée depuis le thème enregistré et des tokens CSS réutilisables. Les valeurs textuelles sont échappées et les couleurs sont validées avant inclusion.
+- Ajout d’un test runtime ciblé sans dépendance npm : `npm run test:brand`.
+
 - Ajout d’un panneau de détections et déductions locales sur chacune des sept étapes du parcours guidé, avec analyse IA facultative et explicite.
 - Suggestions assorties d’une source, d’une confiance indicative, d’un champ modifiable, d’une action d’application et d’une suppression individuelle. Les suggestions ne remplacent pas silencieusement les valeurs déjà présentes.
 - Étape Identification : ajout d’un import en plusieurs fichiers, d’une prévisualisation des données reconnues et d’un import confirmé vers les fiches entreprise, clients, fournisseurs, produits/pièces, prestations/catalogue et documents historiques.

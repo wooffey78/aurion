@@ -1,4 +1,4 @@
-# Configuration Gmail, e-mails et assistants IA — Aurion 15.3.4
+# Configuration Gmail, e-mails et assistants IA — Aurion 15.3.6
 
 Ce guide configure les clés privées du serveur. Il ne pousse aucune donnée secrète dans le navigateur, le dépôt Git ou le ZIP distribué.
 
@@ -22,6 +22,8 @@ La lecture Gmail est une autorisation OAuth distincte de la configuration SMTP e
    - `GOOGLE_TOKEN_ENCRYPTION_KEY=` une valeur secrète aléatoire d'au moins 32 caractères.
 7. En production, laisser `COOKIE_SECURE=true`; ne pas copier le secret dans les fichiers sources. Redémarrer le backend après ajout des variables.
 8. Dans Aurion, à l'étape 5, cliquer **Autoriser la lecture Gmail**. Sélectionner le compte Google souhaité, lire l'écran de consentement et autoriser la permission. De retour dans Aurion, vérifier l'adresse et l'état de connexion, puis cliquer sur **Synchroniser** pour lancer une recherche ciblée.
+
+L'écran indique les variables manquantes lorsqu'il ne peut pas démarrer OAuth. Une configuration signalée comme présente ne garantit pas que Google a validé l'application, les scopes ou le compte.
 
 La lecture utilise le scope `https://www.googleapis.com/auth/gmail.readonly`. Aurion ne doit utiliser les e-mails comme source non fiable : il propose un rapprochement à confirmer et n'exécute ni instructions ni liens provenant du message.
 
@@ -52,6 +54,8 @@ Ajouter uniquement les clés souhaitées dans l'environnement privé du backend 
 - `XAI_API_KEY` : génération/édition via Grok Imagine.
 
 Sur Render, aller dans le service **backend Aurion → Environment**, ajouter les variables, enregistrer puis redéployer/redémarrer le service selon le mode de déploiement de l'utilisateur. Ce ZIP ne modifie pas Render et ne contient aucune clé.
+
+À l'étape 4, le diagnostic Aurion affiche uniquement si la variable de chaque clé est présente, jamais sa valeur. Il ne déclenche pas d'appel facturable et ne peut donc pas vérifier que la clé est valide, que le compte autorise le modèle ou que le quota est disponible.
 
 Dans Aurion, à l'étape 4, sélectionner l'assistant, vérifier le prompt généré et utiliser **Générer le logo** ou **Ajuster le logo**. Le résultat doit apparaître dans l'aperçu. Cliquer sur **Enregistrer ce logo dans Aurion** pour le conserver, puis utiliser **Télécharger mon identité visuelle (.zip)** pour obtenir le logo principal, les déclinaisons de fond/cadre, l'icône et le favicon. Les déclinaisons SVG adaptent l'affichage de l'image source et ne constituent pas un redessin vectoriel automatique.
 

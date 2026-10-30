@@ -521,6 +521,16 @@ async function commitAbsorption(request:FastifyRequest, body:any) {
 
 export async function aiAssistanceRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.requireAuth);
+  app.get('/ai/status', async () => ({
+    checkedAt: new Date().toISOString(),
+    providers: {
+      chatgpt: { keyPresent: Boolean(process.env.OPENAI_API_KEY?.trim()), environmentVariable: 'OPENAI_API_KEY', capabilities: ['logo', 'document-analysis', 'onboarding-analysis', 'data-import'] },
+      gemini: { keyPresent: Boolean(process.env.GEMINI_API_KEY?.trim()), environmentVariable: 'GEMINI_API_KEY', capabilities: ['logo'] },
+      claude: { keyPresent: Boolean(process.env.ANTHROPIC_API_KEY?.trim()), environmentVariable: 'ANTHROPIC_API_KEY', capabilities: ['svg-logo'] },
+      grok: { keyPresent: Boolean(process.env.XAI_API_KEY?.trim()), environmentVariable: 'XAI_API_KEY', capabilities: ['logo'] },
+    },
+    note: 'La présence d’une clé ne confirme ni sa validité, ni les droits du compte, ni le quota ou la facturation du fournisseur.',
+  }));
   app.post('/ai/brand-logo/generate', { bodyLimit: 9 * 1024 * 1024, config: { rateLimit: { max: 6, timeWindow: '1 minute' } } }, async (request, reply) => {
     try { return await generateLogo(request.body); }
     catch (error: any) { request.log.error({ provider: (request.body as any)?.provider, statusCode: error?.statusCode }, 'AI logo generation failed'); return reply.code(Number(error?.statusCode) || 502).send({ error: 'AI_LOGO_GENERATION_FAILED', message: str(error?.message || 'La génération du logo a échoué.', 500) }); }

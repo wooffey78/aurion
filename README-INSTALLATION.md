@@ -1,13 +1,15 @@
-# Aurion 15.2.32
+# Aurion 15.3.11
 
 ## Pour vos clients : un seul fichier
 Envoyez **Aurion-Setup.bat** (il contient l'intégralité d'Aurion). Le client double-clique dessus :
 1. Aurion s'extrait dans `%LOCALAPPDATA%\Aurion` (aucun droit administrateur) ;
-2. Node.js, une base PostgreSQL **dédiée à Aurion** et le moteur LibreOffice nécessaire aux PDF sont préparés automatiquement (aucun mot de passe, aucune saisie) ;
+2. Node.js, une base PostgreSQL **dédiée à Aurion** et, si le téléchargement en ligne aboutit, LibreOffice pour les conversions DOCX/ODT en PDF sont préparés automatiquement ; l’installation de LibreOffice est facultative et Aurion continue en cas d’échec ;
 3. une icône **Aurion** est créée sur le Bureau et dans le menu Démarrer ;
 4. une fenêtre propose « Lancer Aurion maintenant ? » : un clic sur **Oui** ouvre l'application en plein écran.
 
 Une connexion Internet est nécessaire pendant l'installation. Windows SmartScreen peut afficher un avertissement (« éditeur inconnu ») tant que le fichier n'est pas signé numériquement : « Informations complémentaires » → « Exécuter quand même ».
+
+Le MSI LibreOffice n’est pas embarqué dans l’archive de sources ni dans le fichier de configuration autonome : l’installateur le télécharge directement depuis le dépôt stable officiel, vérifie sa signature Authenticode avant extraction et propose une poursuite sans ce moteur si le téléchargement ou l’installation échoue. La génération PDF native reste disponible selon le modèle ; les conversions de modèles DOCX/ODT nécessitent LibreOffice.
 
 ## Au quotidien
 Icône **Aurion** : arrête proprement le serveur et PostgreSQL, les relance, applique les mises à jour de la base, puis ouvre Aurion en plein écran (**F11** pour quitter / rétablir le plein écran).
@@ -22,6 +24,8 @@ La messagerie et l'agenda se configurent **dans Aurion** (Paramètres → Messag
 
 ## Pour vous (développeur)
 - Construire le fichier à distribuer : `tools\Build-Setup.bat` → `dist-setup\Aurion-Setup.bat`. Vos dossiers `branding\` et `assets\aurion-presentation.png` sont intégrés automatiquement.
+- Vérifier le contenu et l’extraction réelle du setup (Windows) : `npm run test:setup-package`. Ce contrôle n’exécute pas l’installation complète de Node.js, PostgreSQL et LibreOffice.
+- Tester les règles de paiement/échéancier : `npm run test:business`. Tester l’accessibilité des notifications : `npm run test:ui-a11y`.
 - Installer depuis les sources (sans le fichier unique) : `INSTALL-DEPUIS-LES-SOURCES.bat`.
 - `npm run dev` (dossier racine) reste réservé au développement. `npm run check` compile, vérifie les types et exécute les tests de fumée ciblés. `npm test` lance la suite complète de régression, dont plusieurs anciens tests statiques doivent encore être réconciliés avec les implémentations plus récentes.
 - Si vous modifiez `backend/src/services/pricing.ts` : `npm run sync-pricing` régénère la copie navigateur (un test vérifie qu'elles sont identiques).

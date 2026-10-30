@@ -21,7 +21,7 @@ export async function bind(){
   root.innerHTML=`
    <section class="panel stack"><h2>Profil</h2>
     <div class="account-id"><div class="account-avatar">${avatarMarkup}</div><div><b>${e(u.email)}</b><small class="muted">${e(acc.organization?.name||'')} · rôle ${e(acc.role)} · compte créé le ${fdate(u.createdAt)}</small></div></div>
-    <form id="acc-form" class="stack"><label class="field"><span>Nom complet</span><input id="fullName" value="${e(u.fullName)}" placeholder="Prénom Nom" maxlength="160"></label><button class="btn primary" type="submit">Enregistrer</button></form>
+    <form id="acc-form" class="stack"><label class="field"><span>Nom complet</span><input id="fullName" value="${e(u.fullName)}" placeholder="Prénom Nom" maxlength="160"></label><div class="grid-2"><label class="field"><span>Téléphone mobile</span><input id="mobilePhone" type="tel" autocomplete="tel" value="${e(u.mobilePhone||'')}" placeholder="06 00 00 00 00" maxlength="60"></label><label class="field"><span>Téléphone fixe</span><input id="fixedPhone" type="tel" value="${e(u.fixedPhone||'')}" placeholder="01 00 00 00 00" maxlength="60"></label></div><small class="help">Ces coordonnées sont reprises dans le parcours et préremplissent la signature professionnelle lorsqu’elle est configurée.</small><button class="btn primary" type="submit">Enregistrer</button></form>
     <form id="avatar-form" class="stack"><label class="field"><span>Avatar personnalisé</span><input id="avatar-file" type="file" accept="image/png,image/jpeg,image/webp"></label><small class="help">PNG, JPEG ou WebP · 3 Mo maximum.</small><button class="btn secondary" type="submit">${u.avatarUrl?'Remplacer l’avatar':'Téléverser un avatar'}</button></form>
    </section>
    <section class="panel stack"><h2>Sécurité</h2>
@@ -82,7 +82,7 @@ export async function bind(){
   if(avatarObjectUrl){URL.revokeObjectURL(avatarObjectUrl);avatarObjectUrl='';}
   if(u.avatarUrl){try{const response=await api.accountAvatar();if(response.ok){const blob=await response.blob();avatarObjectUrl=URL.createObjectURL(blob);const img=$('#avatar-preview');if(img)img.src=avatarObjectUrl;}}catch{}}
   $('#download-all').onclick=()=>api.downloadAll();
-  $('#acc-form').onsubmit=async ev=>{ev.preventDefault();try{await api.updateAccount({fullName:$('#fullName').value.trim()});toast('Profil enregistré','success');await hooks.refresh('account')}catch(x){toast(x.message,'error')}};
+  $('#acc-form').onsubmit=async ev=>{ev.preventDefault();try{await api.updateAccount({fullName:$('#fullName').value.trim(),mobilePhone:$('#mobilePhone').value.trim(),fixedPhone:$('#fixedPhone').value.trim()});toast('Profil enregistré','success');await hooks.refresh('account')}catch(x){toast(x.message,'error')}};
   $('#avatar-form').onsubmit=async ev=>{ev.preventDefault();const file=$('#avatar-file').files?.[0];if(!file){toast('Choisissez une image.','error');return}try{
       await api.uploadAvatar(file);
       const response=await api.accountAvatar();

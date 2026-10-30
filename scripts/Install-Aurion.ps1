@@ -46,9 +46,14 @@ try {
     Step 'Composants (peut durer quelques minutes)'
     Install-Dependencies
 
-    Step 'Moteur de documents LibreOffice'
-    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Install-LibreOffice.ps1')
-    if ($LASTEXITCODE -ne 0) { throw 'Installation du moteur LibreOffice échouée.' }
+    Step 'Moteur de documents LibreOffice (facultatif)'
+    # LibreOffice est un moteur complementaire : un telechargement externe bloque ou echoue
+    # ne doit pas empecher l'installation du coeur d'Aurion. La tentative est bornee et journalisee.
+    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Install-LibreOffice.ps1') -Optional
+    if ($LASTEXITCODE -ne 0) {
+        $warnings += 'LibreOffice n''a pas pu etre installe automatiquement. Aurion poursuit son installation ; les fonctions qui exigent LibreOffice resteront indisponibles jusqu''a son installation. Consultez logs\aurion.log.'
+        Write-Log $warnings[-1] 'WARN'
+    }
 
     Step 'Compilation'
     Build-Backend

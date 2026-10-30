@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 if (-not $Root) { $Root = Split-Path -Parent $PSScriptRoot }
 if (-not $Out) { $Out = Join-Path (Join-Path $Root 'dist-setup') 'Aurion-Setup.bat' }
 $Root = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
-$exclude = '(^|/)(node_modules|dist|logs|data|runtime|storage|\.git|tools|dist-setup)(/|$)|(^|/)\.env$|\.zip$|\.log$|^Aurion-Setup\.bat$|^INSTALL-DEPUIS-LES-SOURCES\.bat$'
+$exclude = '(^|/)(node_modules|dist|logs|data|runtime|storage|\.git|tools|dist-setup)(/|$)|\.zip$|\.log$|^Aurion-Setup\.bat$|^INSTALL-DEPUIS-LES-SOURCES\.bat$'
 
 Add-Type -AssemblyName System.IO.Compression
 $ms = New-Object IO.MemoryStream
@@ -13,7 +13,9 @@ $zip = New-Object IO.Compression.ZipArchive($ms, [IO.Compression.ZipArchiveMode]
 $n = 0
 foreach ($f in Get-ChildItem -LiteralPath $Root -Recurse -File -Force) {
     $rel = $f.FullName.Substring($Root.Length).TrimStart('\', '/').Replace('\', '/')
-    if ($rel -match $exclude) { continue }
+    $leaf = [IO.Path]::GetFileName($rel)
+    $privateEnvFile = ($rel -match '(^|/)\.env(?:\..*)?$') -and ($leaf -ne '.env.example')
+    if ($rel -match $exclude -or $privateEnvFile) { continue }
     $entry = $zip.CreateEntry($rel, [IO.Compression.CompressionLevel]::Optimal)
     $s = $entry.Open(); $b = [IO.File]::ReadAllBytes($f.FullName); $s.Write($b, 0, $b.Length); $s.Dispose(); $n++
 }

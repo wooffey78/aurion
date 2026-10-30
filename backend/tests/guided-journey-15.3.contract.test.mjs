@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const read = p => readFileSync(resolve(process.cwd(), p), 'utf8');
+const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const read = p => readFileSync(resolve(projectRoot, p), 'utf8');
 
 test('migration 065 is additive and stores one server-side journey per organization', () => {
   const sql = read('backend/migrations/065_guided_journey_administrative_addresses.sql');
@@ -36,6 +38,16 @@ test('guided journey has dashboard escape, persistence, explicit completion and 
   assert.match(route, /purpose==='send'/);
   assert.match(route, /split\('\?'\)\[0\] === '\/administrative-mail\/oauth\/callback'/);
   assert.match(auth, /insert into onboarding_journeys/);
+});
+
+test('la situation « Je ne sais pas encore » est enregistrée sans masquer la configuration incomplète', () => {
+  const migration = read('backend/migrations/066_journey_unknown_business_status.sql');
+  const route = read('backend/src/routes/journey.ts');
+  const frontend = read('assets/js/pages/guided-onboarding.js');
+  assert.match(migration, /'existing','to_create','unknown'/);
+  assert.match(route, /\['existing','to_create','unknown'\]/);
+  assert.match(route, /businessStatus === 'to_create' \? !valuePresent\(activity\) : true/);
+  assert.match(frontend, /value="unknown"/);
 });
 
 test('administrative email send requires confirmation and never converts a read sync to a final decision automatically', () => {
@@ -83,8 +95,8 @@ test('mobile placeholder extensions are breakpoint-limited and service-worker ca
   const html = read('index.html');
   assert.match(main, /matchMedia\('\(max-width: 700px\)'\)/);
   assert.match(main, /mobileOriginalPlaceholders/);
-  assert.match(sw, /aurion-shell-v15\.3\.0-r1/);
-  assert.match(html, /15\.3\.0-r1/);
+  assert.match(sw, /aurion-shell-v15\.3\.10-r1/);
+  assert.match(html, /15\.3\.10-r1/);
 });
 
 test('dashboard checks only lightweight journey entry state and does not fetch the full draft', () => {

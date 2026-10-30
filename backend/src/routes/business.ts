@@ -17,7 +17,7 @@ import { lookupFrenchCompany, searchFrenchCompanies, normalizeSiret, normalizeSi
 import { savePrivateUpload } from '../services/storage.js';
 import { buildStructuredInvoice } from '../services/electronic-invoice.js';
 import { detectFiscalSettings, detectLegalFormFromProfile, LEGAL_FORMS } from '../services/fiscal-detection.js';
-import { calculateReminderPenalty, reminderTotal } from '../services/invoice-workflow.js';
+import { allocateInstallmentPayments, buildInstallmentPlan, calculateInvoicePayment, calculateReminderPenalty, isValidDateOnly, normalizePaymentDate, reminderTotal } from '../services/invoice-workflow.js';
 import { createInvoiceWarranty } from '../services/warranty.js';
 import { syncPrimaryActivityFromOrganization } from '../services/configuration-sync.js';
 import type { PenaltyMode } from '../services/invoice-workflow.js';
@@ -368,17 +368,23 @@ async function saveLegalFields(id:string,org:string,b:any){
   for(const [k,col,num] of map){if(b[k]===undefined)continue;vals.push(num?Math.min(365,Math.max(1,Number(b[k])||30)):(String(b[k]).trim()||null));sets.push(`${col}=$${vals.length}`)}
   if(!sets.length)return;vals.push(id,org);await query(`update activities set ${sets.join(',')},updated_at=now() where id=$${vals.length-1} and organization_id=$${vals.length}`,vals);
 }
-async function nextNumber(org:string,prefix:string){
+async function nextNumber(org:string,prefix:string,executor:SqlExecutor={query}){
   const year=new Date().getFullYear();
   const prefixes=prefix==='FAC'?[`FAC-${year}-%`,`FA-${year}-%`]:[`${prefix}-${year}-%`];
-  const r=await query(
-    `select coalesce(max(substring(number from '([0-9]+)$')::int),0)+1 n
-       from quotes
-      where organization_id=$1
-        and number like any($2::text[])`,
-    [org,prefixes],
+  const r=await executor.query(
+    `with existing as (
+       select coalesce(max(substring(number from '([0-9]+)$')::bigint),0)+1 next_value
+         from quotes where organization_id=$1 and number like any($4::text[])
+     ), allocated as (
+       insert into document_number_sequences(organization_id,prefix,year,last_value)
+       select $1::uuid,$2::varchar(10),$3::integer,next_value from existing
+       on conflict(organization_id,prefix,year) do update
+         set last_value=greatest(document_number_sequences.last_value+1,excluded.last_value),updated_at=now()
+       returning last_value
+     ) select last_value from allocated`,
+    [org,prefix,year,prefixes],
   );
-  return `${prefix}-${year}-${String(r.rows[0].n).padStart(4,'0')}`;
+  return `${prefix}-${year}-${String(r.rows[0].last_value).padStart(4,'0')}`;
 }
 async function pauseClientTimer(org:string,userId:string,clientId:string){
   await query(`update client_time_sessions set accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),paused_at=now(),status='paused',ended_at=null where organization_id=$1 and user_id=$2 and client_id=$3 and ended_at is null and status='running'`,[org,userId,clientId]);
@@ -1016,25 +1022,126 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     const parsedBody=invoiceConversionInputSchema.safeParse(r.body||{});
     if(!parsedBody.success)return reply.code(400).send({error:'INVALID_INPUT'});
     const id=(r.params as any).id,org=r.auth!.organizationId,b:any=parsedBody.data;
-    const q=await query('select id,client_id,document_type from quotes where id=$1 and organization_id=$2',[id,org]);if(!q.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
-    if(q.rows[0].document_type==='invoice')return reply.code(409).send({error:'ALREADY_INVOICE',message:'Ce document est déjà une facture.'});
-    const number=await nextNumber(org,'FAC');
+    const initial=(await query('select document_type from quotes where id=$1 and organization_id=$2',[id,org])).rows[0];
+    if(!initial)return reply.code(404).send({error:'NOT_FOUND'});
+    if(initial.document_type==='invoice')return reply.code(409).send({error:'ALREADY_INVOICE',message:'Ce document est déjà une facture.'});
     const dueAt=b.dueAt?String(b.dueAt):null;if(!dueAt)return reply.code(400).send({error:'INVALID_INPUT',message:'Une échéance de paiement est obligatoire pour activer les relances.'});
-    const reminderInterval=Math.min(365,Math.max(0,Number(b.reminderIntervalDays??0)));const due=new Date(`${dueAt}T00:00:00`);if(isNaN(due.getTime()))return reply.code(400).send({error:'INVALID_INPUT',message:'Échéance de paiement invalide.'});
+    if(!isValidDateOnly(dueAt))return reply.code(400).send({error:'INVALID_INPUT',message:'Échéance de paiement invalide.'});
+    const rawInterval=Number(String(b.reminderIntervalDays??0).replace(',','.'));
+    if(!Number.isInteger(rawInterval)||rawInterval<0)return reply.code(400).send({error:'INVALID_INPUT',message:'L’intervalle de relance doit être un nombre entier positif.'});
+    const reminderInterval=Math.min(365,rawInterval);
     const invoiceAddressSource=['client','intervention','free'].includes(String(b.invoiceAddressSource))?String(b.invoiceAddressSource):'client';
-    const billingAddress=invoiceAddressSource==='free'?String(b.billingAddress||'').trim()||null:(invoiceAddressSource==='intervention'?(await query('select intervention_address from clients where id=$1 and organization_id=$2',[q.rows[0].client_id,org])).rows[0]?.intervention_address||null:(await query('select address from clients where id=$1 and organization_id=$2',[q.rows[0].client_id,org])).rows[0]?.address||null);
-    if(invoiceAddressSource==='free'&&!billingAddress)return reply.code(400).send({error:'INVALID_INPUT',message:'Saisissez une adresse de facturation libre.'});
-    await query("update quotes set document_type='invoice',status='issued',number=$1,payment_status='unpaid',amount_paid=0,paid_at=null,invoice_address_source=$2,billing_address_snapshot=$3,due_at=$4::date,reminder_interval_days=$5::int,next_reminder_at=case when $5::int > 0 then ($4::date + interval '1 day')::timestamptz else null end,updated_at=now() where id=$6::uuid and organization_id=$7::uuid",[number,invoiceAddressSource,billingAddress,dueAt,reminderInterval,id,org]);
-    const converted=(await query('select activity_id,total_ttc from quotes where id=$1 and organization_id=$2',[id,org])).rows[0];
-    if(q.rows[0].client_id){const aid=(await query('select activity_id from quotes where id=$1 and organization_id=$2',[id,org])).rows[0]?.activity_id;if(aid) await resumeClientTimer(org,r.auth!.userId,q.rows[0].client_id,aid);}
-    const emailStatus=(r.body as any)?.sendEmail!==false?await emailDocument(org,id,'invoice',number,q.rows[0].client_id):'not_requested';
-    if(emailStatus==='sent' && q.rows[0].client_id) await stopClientTimer(org,r.auth!.userId,q.rows[0].client_id);
-    return {number,emailStatus};
+    const freeBillingAddress=String(b.billingAddress||'').trim()||null;
+    if(invoiceAddressSource==='free'&&!freeBillingAddress)return reply.code(400).send({error:'INVALID_INPUT',message:'Saisissez une adresse de facturation libre.'});
+    const converted=await withTransaction(async client=>{
+      const current=(await client.query('select id,client_id,activity_id,document_type from quotes where id=$1 and organization_id=$2 for update',[id,org])).rows[0];
+      if(!current)return {ok:false as const,status:404,error:'NOT_FOUND',message:'Devis introuvable.'};
+      if(current.document_type==='invoice')return {ok:false as const,status:409,error:'ALREADY_INVOICE',message:'Ce document est déjà une facture.'};
+      const billingAddress=invoiceAddressSource==='free'
+        ?freeBillingAddress
+        :(current.client_id
+          ?(await client.query(`select ${invoiceAddressSource==='intervention'?'intervention_address':'address'} from clients where id=$1 and organization_id=$2`,[current.client_id,org])).rows[0]?.[invoiceAddressSource==='intervention'?'intervention_address':'address']||null
+          :null);
+      const number=await nextNumber(org,'FAC',client);
+      const updated=await client.query("update quotes set document_type='invoice',status='issued',number=$1,payment_status='unpaid',amount_paid=0,paid_at=null,invoice_address_source=$2,billing_address_snapshot=$3,due_at=$4::date,reminder_interval_days=$5::int,next_reminder_at=case when $5::int > 0 then ($4::date + interval '1 day')::timestamptz else null end,updated_at=now() where id=$6::uuid and organization_id=$7::uuid and document_type<>'invoice' returning id",[number,invoiceAddressSource,billingAddress,dueAt,reminderInterval,id,org]);
+      if(!updated.rowCount)return {ok:false as const,status:409,error:'ALREADY_INVOICE',message:'Ce document a déjà été converti en facture.'};
+      return {ok:true as const,number,clientId:current.client_id,activityId:current.activity_id};
+    });
+    if(!converted.ok)return reply.code(converted.status).send({error:converted.error,message:converted.message});
+    if(converted.clientId&&converted.activityId)await resumeClientTimer(org,r.auth!.userId,converted.clientId,converted.activityId);
+    const emailStatus=b.sendEmail!==false?await emailDocument(org,id,'invoice',converted.number,converted.clientId):'not_requested';
+    if(emailStatus==='sent'&&converted.clientId)await stopClientTimer(org,r.auth!.userId,converted.clientId);
+    return {number:converted.number,emailStatus};
   });
   app.get('/invoices/:id/installments',async(r,reply)=>{const id=String((r.params as any).id),org=r.auth!.organizationId;const q=(await query("select id,number,total_ttc from quotes where id=$1 and organization_id=$2 and document_type='invoice'",[id,org])).rows[0];if(!q)return reply.code(404).send({error:'NOT_FOUND'});return {invoice:q,installments:(await query('select id,installment_number,due_at,amount_due,amount_paid,status from invoice_installments where quote_id=$1 and organization_id=$2 order by installment_number',[id,org])).rows};});
-  app.post('/invoices/:id/installments',async(r,reply)=>{const id=String((r.params as any).id),org=r.auth!.organizationId,b:any=r.body||{};const q=(await query("select id,total_ttc from quotes where id=$1 and organization_id=$2 and document_type='invoice'",[id,org])).rows[0];if(!q)return reply.code(404).send({error:'NOT_FOUND'});const total=Math.round(Number(q.total_ttc||0)*100)/100;let rows:any[]=[];if(Array.isArray(b.installments)&&b.installments.length){rows=b.installments.map((x:any,i:number)=>({n:i+1,date:String(x.dueAt||x.due_at||''),amount:Math.round(Number(x.amount??x.amountDue??0)*100)/100}));}else{const count=Math.max(1,Math.min(120,Number(b.count||0)));if(!count)return reply.code(400).send({error:'INVALID_INPUT',message:'Indiquez le nombre d’échéances.'});const start=new Date(`${String(b.startDate||'').slice(0,10)}T12:00:00`);if(isNaN(start.getTime()))return reply.code(400).send({error:'INVALID_INPUT',message:'Date de première échéance invalide.'});const interval=Math.max(0,Math.min(3650,Number(b.intervalDays??30)));const base=Math.floor((total/count)*100)/100;for(let i=0;i<count;i++){const d=new Date(start);d.setDate(d.getDate()+i*interval);rows.push({n:i+1,date:d.toISOString().slice(0,10),amount:i===count-1?Math.round((total-base*(count-1))*100)/100:base});}}if(rows.some(x=>!/^\d{4}-\d{2}-\d{2}$/.test(x.date)||!Number.isFinite(x.amount)||x.amount<0))return reply.code(400).send({error:'INVALID_INPUT',message:'Échéancier invalide.'});const sum=Math.round(rows.reduce((n,x)=>n+x.amount,0)*100)/100;if(Math.abs(sum-total)>0.01)return reply.code(400).send({error:'INSTALLMENTS_TOTAL_MISMATCH',message:`L’échéancier doit totaliser ${total.toFixed(2)} €.`});await query('delete from invoice_installments where quote_id=$1 and organization_id=$2',[id,org]);for(const x of rows)await query('insert into invoice_installments(organization_id,quote_id,installment_number,due_at,amount_due) values($1,$2,$3,$4::date,$5)',[org,id,x.n,x.date,x.amount]);return {ok:true,installments:(await query('select id,installment_number,due_at,amount_due,amount_paid,status from invoice_installments where quote_id=$1 and organization_id=$2 order by installment_number',[id,org])).rows};});
-  app.get('/invoices/:id/payments',async(r,reply)=>{const id=String((r.params as any).id),org=r.auth!.organizationId;const q=(await query("select id,number,total_ttc,payment_status,amount_paid,coalesce((select sum(penalty_amount) from invoice_reminders ir where ir.quote_id=quotes.id),0)::numeric total_penalty_amount from quotes where id=$1 and organization_id=$2 and document_type='invoice'",[id,org])).rows[0];if(!q)return reply.code(404).send({error:'NOT_FOUND'});return {invoice:q,payments:(await query('select id,amount,payment_method,paid_at,reference,note from invoice_payments where quote_id=$1 and organization_id=$2 order by paid_at desc',[id,org])).rows};});
-  app.post('/invoices/:id/payments',async(r,reply)=>{const parsedBody=invoicePaymentInputSchema.safeParse(r.body||{});if(!parsedBody.success)return reply.code(400).send({error:'INVALID_INPUT'});const id=String((r.params as any).id),org=r.auth!.organizationId,b:any=parsedBody.data;const q=(await query("select q.id,coalesce(q.activity_id,(select a.id from activities a where a.organization_id=q.organization_id and a.active=true order by a.created_at limit 1)) activity_id,q.number,q.total_ttc,q.payment_status,q.amount_paid,q.reminder_count,q.late_penalty_mode,q.late_penalty_value from quotes q where q.id=$1 and q.organization_id=$2 and q.document_type='invoice'",[id,org])).rows[0];if(!q)return reply.code(404).send({error:'NOT_FOUND'});if(!q.activity_id)return reply.code(400).send({error:'INVALID_INPUT',message:'Aucune activité valide n’est associée à cette facture.'});const amount=Math.round(Number(String(b.amount??'').replace(',','.'))*100)/100;if(!Number.isFinite(amount)||amount<=0)return reply.code(400).send({error:'INVALID_INPUT'});const penalties=(await query('select coalesce(sum(penalty_amount),0) total from invoice_reminders where quote_id=$1 and organization_id=$2',[id,org])).rows[0];const dueTotal=Number(q.total_ttc||0)+Number(penalties?.total||0);const remaining=Math.max(0,dueTotal-Number(q.amount_paid||0));if(remaining<=0)return reply.code(409).send({error:'ALREADY_PAID',message:'Cette facture est déjà entièrement payée.'});if(amount>remaining+0.005)return reply.code(400).send({error:'PAYMENT_TOO_HIGH',message:`Montant restant : ${remaining.toFixed(2)} €.`});const method=String(b.paymentMethod||'');if(!['transfer','card','cash','cheque','crypto'].includes(method))return reply.code(400).send({error:'INVALID_INPUT',message:'Choisissez un mode de paiement valide : espèces, chèque, carte, virement ou crypto.'});const reference=b.reference?String(b.reference).trim().slice(0,160)||null:null;const note=b.note?String(b.note).trim().slice(0,2000)||null:null;let paidAt=new Date();if(b.paidAt){const d=new Date(`${b.paidAt}`.length<=10?`${b.paidAt}T12:00:00`:b.paidAt);if(!isNaN(d.getTime())&&d.getTime()<=Date.now()+86400000)paidAt=d;}const pid=crypto.randomUUID();const paid=Number(q.amount_paid||0)+amount;const status=paid+0.005>=dueTotal?'paid':'partially_paid';const client=await db.connect();try{await client.query('begin');await client.query("insert into invoice_payments(id,organization_id,quote_id,amount,payment_method,paid_at,reference,note) values($1::uuid,$2::uuid,$3::uuid,$4::numeric,$5::varchar(20),$6::timestamptz,$7::varchar(160),$8::text)",[pid,org,id,amount,method,paidAt,reference,note]);const inst=(await client.query('select id,amount_due,amount_paid from invoice_installments where quote_id=$1 and organization_id=$2 and amount_paid<amount_due order by installment_number for update',[id,org])).rows;let remainingPayment=amount;for(const row of inst){if(remainingPayment<=0)break;const due=Math.max(0,Number(row.amount_due)-Number(row.amount_paid));const applied=Math.min(due,remainingPayment);const nextPaid=Number(row.amount_paid)+applied;await client.query("update invoice_installments set amount_paid=$1,status=$2,updated_at=now() where id=$3",[nextPaid,nextPaid+0.005>=Number(row.amount_due)?'paid':'partially_paid',row.id]);remainingPayment-=applied;}await client.query("update quotes set amount_paid=$1::numeric,payment_status=$2::varchar(20),paid_at=case when $2::varchar(20)='paid' then now() else paid_at end,status=case when $2::varchar(20)='paid' then 'paid' else status end,updated_at=now() where id=$3::uuid and organization_id=$4::uuid",[paid,status,id,org]);await client.query('commit');try{await query('insert into accounting_entries(organization_id,activity_id,entry_type,amount,entry_date,source_id,label) values($1::uuid,$2::uuid,$3::varchar(30),$4::numeric,current_date,$5::uuid,$6::varchar(240))',[org,q.activity_id,'payment',amount,id,`Paiement facture ${q.number}`]);}catch(e:any){r.log.error({err:e,invoiceId:id},'payment accounting entry failed');}return reply.code(201).send({id:pid,amount,paidAmount:paid,remaining:Math.max(0,dueTotal-paid),status});}catch(e:any){await client.query('rollback').catch(()=>{});r.log.error({err:e,invoiceId:id},'invoice payment failed');return reply.code(500).send({error:'PAYMENT_SAVE_FAILED',message:'Le paiement n’a pas pu être enregistré.'})}finally{client.release()}});
+  app.post('/invoices/:id/installments',async(r,reply)=>{
+    const id=String((r.params as any).id),org=r.auth!.organizationId,b:any=r.body||{};
+    const outcome=await withTransaction(async client=>{
+      const q=(await client.query("select id,total_ttc,amount_paid from quotes where id=$1 and organization_id=$2 and document_type='invoice' for update",[id,org])).rows[0];
+      if(!q)return {ok:false as const,status:404,error:'NOT_FOUND',message:'Facture introuvable.'};
+      let plan:ReturnType<typeof buildInstallmentPlan>;
+      try{
+        plan=buildInstallmentPlan(Number(q.total_ttc||0),{
+          installments:Array.isArray(b.installments)?b.installments:undefined,
+          count:b.count,startDate:b.startDate,intervalDays:b.intervalDays,
+        });
+      }catch(error:any){
+        const code=String(error?.message||'INVALID_INSTALLMENT_PLAN');
+        const message=code==='INSTALLMENTS_TOTAL_MISMATCH'
+          ?`L’échéancier doit totaliser ${Number(q.total_ttc||0).toFixed(2)} €.`
+          :code==='INSTALLMENT_LIMIT'
+            ?'Un échéancier ne peut pas dépasser 120 échéances.'
+            :'Vérifiez le nombre, les dates et les montants de chaque échéance.';
+        return {ok:false as const,status:400,error:code,message};
+      }
+      const paidPrincipal=Math.min(Number(q.total_ttc||0),Number(q.amount_paid||0));
+      const allocated=allocateInstallmentPayments(plan,paidPrincipal);
+      await client.query('delete from invoice_installments where quote_id=$1 and organization_id=$2',[id,org]);
+      for(const row of allocated){
+        await client.query('insert into invoice_installments(organization_id,quote_id,installment_number,due_at,amount_due,amount_paid,status) values($1,$2,$3,$4::date,$5,$6,$7)',[org,id,row.number,row.dueAt,row.amount,row.amountPaid,row.status]);
+      }
+      const installments=(await client.query('select id,installment_number,due_at,amount_due,amount_paid,status from invoice_installments where quote_id=$1 and organization_id=$2 order by installment_number',[id,org])).rows;
+      return {ok:true as const,installments};
+    });
+    if(!outcome.ok)return reply.code(outcome.status).send({error:outcome.error,message:outcome.message});
+    return {ok:true,installments:outcome.installments};
+  });
+  app.get('/invoices/:id/payments',async(r,reply)=>{
+    const id=String((r.params as any).id),org=r.auth!.organizationId;
+    const invoice=(await query("select id,number,total_ttc,payment_status,amount_paid,coalesce((select sum(penalty_amount) from invoice_reminders ir where ir.quote_id=quotes.id),0)::numeric total_penalty_amount from quotes where id=$1 and organization_id=$2 and document_type='invoice'",[id,org])).rows[0];
+    if(!invoice)return reply.code(404).send({error:'NOT_FOUND'});
+    const payments=(await query('select id,amount,payment_method,paid_at,reference,note from invoice_payments where quote_id=$1 and organization_id=$2 order by paid_at desc',[id,org])).rows;
+    return {invoice,payments};
+  });
+  app.post('/invoices/:id/payments',async(r,reply)=>{
+    const parsedBody=invoicePaymentInputSchema.safeParse(r.body||{});
+    if(!parsedBody.success)return reply.code(400).send({error:'INVALID_INPUT'});
+    const id=String((r.params as any).id),org=r.auth!.organizationId,b:any=parsedBody.data;
+    const amount=Math.round(Number(String(b.amount??'').replace(',','.'))*100)/100;
+    if(!Number.isFinite(amount)||amount<=0)return reply.code(400).send({error:'INVALID_INPUT',message:'Le montant du règlement doit être supérieur à zéro.'});
+    const method=String(b.paymentMethod||'');
+    if(!['transfer','card','cash','cheque','crypto'].includes(method))return reply.code(400).send({error:'INVALID_INPUT',message:'Choisissez un mode de paiement valide : espèces, chèque, carte, virement ou crypto.'});
+    let paidAt:Date;
+    try{paidAt=normalizePaymentDate(b.paidAt)}catch{return reply.code(400).send({error:'INVALID_INPUT',message:'La date du règlement est invalide ou située dans le futur.'});}
+    const reference=b.reference?String(b.reference).trim().slice(0,160)||null:null;
+    const note=b.note?String(b.note).trim().slice(0,2000)||null:null;
+    const paymentId=crypto.randomUUID();
+    try{
+      const outcome=await withTransaction(async client=>{
+        const q=(await client.query(`select q.id,q.number,q.total_ttc,q.amount_paid,
+            coalesce(q.activity_id,(select a.id from activities a where a.organization_id=q.organization_id and a.active=true order by a.created_at limit 1)) activity_id
+          from quotes q where q.id=$1 and q.organization_id=$2 and q.document_type='invoice' for update of q`,[id,org])).rows[0];
+        if(!q)return {ok:false as const,status:404,error:'NOT_FOUND',message:'Facture introuvable.'};
+        if(!q.activity_id)return {ok:false as const,status:400,error:'INVALID_INPUT',message:'Aucune activité valide n’est associée à cette facture.'};
+        const penaltyRow=(await client.query('select coalesce(sum(penalty_amount),0) total from invoice_reminders where quote_id=$1 and organization_id=$2',[id,org])).rows[0];
+        let calculation:ReturnType<typeof calculateInvoicePayment>;
+        try{calculation=calculateInvoicePayment(Number(q.total_ttc||0),Number(penaltyRow?.total||0),Number(q.amount_paid||0),amount)}catch(error:any){
+          const code=String(error?.message||'INVALID_PAYMENT_AMOUNT');
+          const alreadyPaid=code==='INVOICE_ALREADY_PAID';
+          return {ok:false as const,status:alreadyPaid?409:400,error:alreadyPaid?'ALREADY_PAID':code,message:alreadyPaid?'Cette facture est déjà entièrement payée.':code==='PAYMENT_TOO_HIGH'?`Montant restant : ${Math.max(0,Number(q.total_ttc||0)+Number(penaltyRow?.total||0)-Number(q.amount_paid||0)).toFixed(2)} €.`:'Le montant du règlement est invalide.'};
+        }
+        await client.query('insert into invoice_payments(id,organization_id,quote_id,amount,payment_method,paid_at,reference,note) values($1::uuid,$2::uuid,$3::uuid,$4::numeric,$5::varchar(20),$6::timestamptz,$7::varchar(160),$8::text)',[paymentId,org,id,calculation.amount,method,paidAt,reference,note]);
+        const installments=(await client.query('select id,amount_due,amount_paid from invoice_installments where quote_id=$1 and organization_id=$2 and amount_paid<amount_due order by installment_number for update',[id,org])).rows;
+        let remainingPayment=calculation.amount;
+        for(const row of installments){
+          if(remainingPayment<=0)break;
+          const due=Math.max(0,Number(row.amount_due)-Number(row.amount_paid));
+          const applied=Math.min(due,remainingPayment);
+          const nextPaid=Math.round((Number(row.amount_paid)+applied)*100)/100;
+          await client.query("update invoice_installments set amount_paid=$1,status=$2,updated_at=now() where id=$3 and organization_id=$4",[nextPaid,nextPaid+0.005>=Number(row.amount_due)?'paid':'partially_paid',row.id,org]);
+          remainingPayment=Math.round((remainingPayment-applied)*100)/100;
+        }
+        await client.query("update quotes set amount_paid=$1::numeric,payment_status=$2::varchar(20),paid_at=case when $2::varchar(20)='paid' then $3::timestamptz else paid_at end,status=case when $2::varchar(20)='paid' then 'paid' else status end,updated_at=now() where id=$4::uuid and organization_id=$5::uuid",[calculation.paidAmount,calculation.status,paidAt,id,org]);
+        await client.query("insert into accounting_entries(organization_id,activity_id,entry_type,amount,entry_date,source_id,label) values($1::uuid,$2::uuid,'payment',$3::numeric,($4::timestamptz)::date,$5::uuid,$6::varchar(240))",[org,q.activity_id,calculation.amount,paidAt,paymentId,`Paiement facture ${q.number}`]);
+        return {ok:true as const,calculation};
+      });
+      if(!outcome.ok)return reply.code(outcome.status).send({error:outcome.error,message:outcome.message});
+      return reply.code(201).send({id:paymentId,...outcome.calculation});
+    }catch(error:any){
+      r.log.error({err:error,invoiceId:id},'invoice payment transaction failed');
+      return reply.code(500).send({error:'PAYMENT_SAVE_FAILED',message:'Le règlement et son écriture comptable n’ont pas pu être enregistrés.'});
+    }
+  });
   app.patch('/invoices/:id/penalty',async(r,reply)=>{const id=String((r.params as any).id),org=r.auth!.organizationId,b:any=r.body||{};const q=(await query("select reminder_count,payment_status from quotes where id=$1 and organization_id=$2 and document_type='invoice'",[id,org])).rows[0];if(!q)return reply.code(404).send({error:'NOT_FOUND'});if(q.payment_status==='paid')return reply.code(409).send({error:'ALREADY_PAID',message:'Cette facture est déjà réglée.'});if(Number(q.reminder_count||0)!==3)return reply.code(409).send({error:'PENALTY_WINDOW',message:'La majoration se configure après la 3e relance et avant l’envoi de la 4e relance.'});const mode=['fixed','percent'].includes(String(b.mode))?String(b.mode):'none';const value=Math.max(0,Math.round(Number(String(b.value??'').replace(',','.'))*100)/100);if(mode==='none'||value===0){await query("update quotes set late_penalty_mode='none',late_penalty_value=0,updated_at=now() where id=$1 and organization_id=$2",[id,org]);return {mode:'none',value:0}};await query("update quotes set late_penalty_mode=$1,late_penalty_value=$2,updated_at=now() where id=$3 and organization_id=$4",[mode,value,id,org]);return {mode,value};});
   app.post('/invoices/:id/reminders',async(r,reply)=>{
     const id=String((r.params as any).id),org=r.auth!.organizationId,b:any=r.body||{};

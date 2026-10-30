@@ -4,7 +4,7 @@
   const busy=()=>document.activeElement?.matches?.('input,textarea,select,[contenteditable="true"]')||document.querySelector('#view form');
   const nativeFetch=window.fetch.bind(window);
   let lastKey='',etag='';
-  const BASE_POLL_MS=20000,MAX_POLL_MS=300000;
+  const BASE_POLL_MS=1000,MAX_POLL_MS=16000;
   let failureCount=0,pollTimer=0,polling=false;
   async function readVersion(){
     const headers=etag?{'If-None-Match':etag}:{};

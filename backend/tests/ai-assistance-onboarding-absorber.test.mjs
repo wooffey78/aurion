@@ -35,6 +35,9 @@ test('le bundle de marque conserve le logo réel et crée les déclinaisons d’
   const journey = read('../src/routes/journey.ts');
   const documents = read('../src/routes/documents.ts');
   for (const path of ['logo/logo-principal', 'logo/variantes/logo-fond-clair.svg', 'logo/variantes/logo-fond-sombre.svg', 'logo/variantes/logo-fond-accent.svg', 'logo/icone-carree.svg', 'favicon.svg', 'aperçu-identite-visuelle.html']) assert.ok(assets.includes(path), `asset du bundle absent : ${path}`);
+  assert.match(assets, /logo\/formats\/logo-\$\{size\}\.png/);
+  assert.match(assets, /logo\/favicon\.ico/);
+  assert.match(assets, /brand\/guide-identite\.pdf/);
   assert.match(journey, /addBrandLogoAssets/);
   assert.match(documents, /addBrandLogoAssets/);
   assert.match(assets, /not a claim that a raster logo was redrawn as vector artwork/);
@@ -65,4 +68,13 @@ test('la configuration Gmail et des clés IA est documentée sans secret réel',
   assert.match(docs, /GEMINI_API_KEY/);
   assert.match(docs, /ANTHROPIC_API_KEY/);
   assert.match(docs, /XAI_API_KEY/);
+});
+
+test('le diagnostic IA expose seulement la présence des clés serveur et les fonctionnalités correspondantes', () => {
+  const routes = read('../src/routes/ai-assistance.ts');
+  assert.match(routes, /app\.get\('\/ai\/status'/);
+  assert.match(routes, /keyPresent: Boolean\(process\.env\.OPENAI_API_KEY\?\.trim\(\)\)/);
+  assert.match(routes, /environmentVariable: 'ANTHROPIC_API_KEY'/);
+  assert.match(routes, /'document-analysis', 'onboarding-analysis', 'data-import'/);
+  assert.match(routes, /ne confirme ni sa validité, ni les droits du compte/);
 });

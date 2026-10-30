@@ -2,6 +2,7 @@
 # Compatible Windows PowerShell 5.1 et PowerShell 7+
 # Le MSI officiel est telecharge puis extrait dans runtime\libreoffice.
 # Aucun service LibreOffice n'est installe comme composant permanent du systeme.
+param([switch]$Optional)
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -19,6 +20,8 @@ function Get-LibreOfficeExecutable {
     return Get-ChildItem -LiteralPath $Root -Recurse -Filter 'soffice.exe' -File -ErrorAction SilentlyContinue |
         Select-Object -First 1
 }
+
+
 
 try {
     Write-Step 'Preparation du moteur LibreOffice integre a Aurion...'
@@ -57,12 +60,14 @@ try {
     Write-Step ('Telechargement de LibreOffice {0}. Cela peut prendre plusieurs minutes...' -f $ver)
 
     $downloaded = $false
-    for ($attempt = 1; $attempt -le 3 -and -not $downloaded; $attempt++) {
+    for ($attempt = 1; $attempt -le 2 -and -not $downloaded; $attempt++) {
         try {
             if (Test-Path -LiteralPath $msi) {
                 Remove-Item -LiteralPath $msi -Force -ErrorAction SilentlyContinue
             }
 
+            # Retour au telechargement HTTP direct, comme dans le comportement precedent.
+            # Pas de BITS ni de progression PowerShell pendant le transfert.
             Invoke-WebRequest -Uri $url -OutFile $msi -UseBasicParsing -TimeoutSec 3600
 
             if (-not (Test-Path -LiteralPath $msi)) {
@@ -77,15 +82,17 @@ try {
             $downloaded = $true
         }
         catch {
-            Write-Log ('Essai {0}/3 echoue : {1}' -f $attempt, $_.Exception.Message) 'WARN'
-            if ($attempt -lt 3) {
+            Write-Log ('Essai {0}/2 echoue : {1}' -f $attempt, $_.Exception.Message) 'WARN'
+            if (Test-Path -LiteralPath $msi) { Remove-Item -LiteralPath $msi -Force -ErrorAction SilentlyContinue }
+            if ($attempt -lt 2) {
+                Write-Step 'Nouvelle tentative dans 4 secondes...'
                 Start-Sleep -Seconds 4
             }
         }
     }
 
     if (-not $downloaded) {
-        throw 'Telechargement de LibreOffice impossible. Verifiez la connexion Internet.'
+        throw 'Telechargement de LibreOffice impossible apres deux tentatives. Aurion peut fonctionner sans ce moteur ; consultez logs\aurion.log et relancez l''installation de LibreOffice plus tard.'
     }
 
     Write-Step 'Verification de la signature numerique du MSI...'
@@ -144,11 +151,17 @@ catch {
         # Le journal n'est pas disponible : conserver l'erreur originale.
     }
 
-    try {
-        Show-ErrorDialog 'Aurion - LibreOffice' $message
+    if ($Optional) {
+        Write-Log ('Le moteur LibreOffice est facultatif et sera ignore pour cette installation : {0}' -f $message) 'WARN'
+        Write-Step 'LibreOffice non installe pour le moment. Aurion continue ; la generation de documents necessitant LibreOffice restera indisponible jusqu''a son installation.'
     }
-    catch {
-        Write-Error $message
+    else {
+        try {
+            Show-ErrorDialog 'Aurion - LibreOffice' $message
+        }
+        catch {
+            Write-Error $message
+        }
     }
 
     exit 1

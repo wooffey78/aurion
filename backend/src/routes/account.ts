@@ -129,11 +129,11 @@ export async function accountRoutes(app: FastifyInstance) {
 
     priv.get('/account', async request => {
       const a = request.auth!;
-      const u = (await query('select id,email,full_name,created_at,password_changed_at,avatar_key from users where id=$1', [a.userId])).rows[0];
+      const u = (await query('select id,email,full_name,phone_fixed,phone_mobile,created_at,password_changed_at,avatar_key from users where id=$1', [a.userId])).rows[0];
       const o = (await query('select id,name from organizations where id=$1', [a.organizationId])).rows[0];
       const acc = (await query(`select d.kind,d.version,d.title,d.is_draft,x.accepted_at from legal_acceptances x join legal_documents d on d.id=x.document_id where x.user_id=$1 order by x.accepted_at desc`, [a.userId])).rows;
       return {
-        user: { id: u.id, email: u.email, fullName: u.full_name || '', createdAt: u.created_at, passwordChangedAt: u.password_changed_at, avatarUrl: u.avatar_key ? '/account/avatar' : null },
+        user: { id: u.id, email: u.email, fullName: u.full_name || '', fixedPhone: u.phone_fixed || '', mobilePhone: u.phone_mobile || '', createdAt: u.created_at, passwordChangedAt: u.password_changed_at, avatarUrl: u.avatar_key ? '/account/avatar' : null },
         role: a.role, organization: o, legalAcceptances: acc, subscription: await subscriptionState(a.organizationId),
       };
     });
@@ -158,9 +158,12 @@ export async function accountRoutes(app: FastifyInstance) {
       return {ok:true,avatarUrl:'/account/avatar'};
     });
     priv.patch('/account', async (request, reply) => {
-      const parsed = z.object({ fullName: z.string().trim().max(160) }).safeParse(request.body);
+      const parsed = z.object({ fullName: z.string().trim().max(160), fixedPhone: z.string().trim().max(60).optional(), mobilePhone: z.string().trim().max(60).optional() }).safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: 'INVALID_INPUT' });
-      await query('update users set full_name=nullif($1,\'\') where id=$2', [parsed.data.fullName, request.auth!.userId]);
+      await query(`update users set full_name=nullif($1,''),
+        phone_fixed=case when $2::boolean then nullif($3,'') else phone_fixed end,
+        phone_mobile=case when $4::boolean then nullif($5,'') else phone_mobile end
+        where id=$6`, [parsed.data.fullName, parsed.data.fixedPhone !== undefined, parsed.data.fixedPhone || '', parsed.data.mobilePhone !== undefined, parsed.data.mobilePhone || '', request.auth!.userId]);
       return { ok: true };
     });
     priv.post('/account/change-password', { config: { rateLimit: { max: 8, timeWindow: '15 minutes' } } }, async (request, reply) => {

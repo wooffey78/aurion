@@ -2,7 +2,7 @@ import nodemailer, { type SendMailOptions } from 'nodemailer';
 import { query } from '../db.js';
 import { AurionError } from './errors.js';
 import { encryptSecret, decryptSecret } from './secrets.js';
-import { connection, gmailSend } from './google.js';
+import { connection, gmailSend, googleOAuthSetupStatus } from './google.js';
 import { companyDisplayName } from './company.js';
 
 export type Security = 'ssl' | 'starttls' | 'none';
@@ -98,13 +98,13 @@ export async function saveSettings(orgId: string, s: MailSettings, provider: str
 export async function deleteSettings(orgId: string) { await query('delete from mail_accounts where organization_id=$1', [orgId]); }
 
 export async function mailStatus(orgId: string) {
-  const r = await query('select provider,email,smtp_host,smtp_port,security,from_name,verified_at from mail_accounts where organization_id=$1', [orgId]);
+  const r = await query('select provider,email,username,smtp_host,smtp_port,security,from_name,verified_at from mail_accounts where organization_id=$1', [orgId]);
   const a = r.rows[0];
   const g = await connection(orgId).catch(() => null);
   return {
     configured: !!a || !!g, method: a ? 'smtp' : g ? 'google' : null,
-    account: a ? { provider: a.provider, email: a.email, host: a.smtp_host, port: a.smtp_port, security: a.security, fromName: a.from_name, verifiedAt: a.verified_at } : null,
-    google: { configured: !!process.env.GOOGLE_CLIENT_ID, connected: !!g, email: g?.row?.google_email || null },
+    account: a ? { provider: a.provider, email: a.email, username: a.username || a.email, host: a.smtp_host, port: a.smtp_port, security: a.security, fromName: a.from_name, verifiedAt: a.verified_at } : null,
+    google: { ...googleOAuthSetupStatus(), connected: !!g, email: g?.row?.google_email || null },
   };
 }
 

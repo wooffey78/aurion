@@ -24,3 +24,12 @@ test('service worker does not cache private API responses and falls back only fo
   assert.ok(prefixes, 'static prefixes should be explicitly enumerated');
   assert.doesNotMatch(prefixes[1], /api|suppliers|clients|auth/i);
 });
+
+test('le manifeste PWA fournit des icônes de lancement distinctes 192, 512 et maskable', () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.webmanifest'), 'utf8'));
+  assert.equal(manifest.icons.some(icon => icon.sizes === '192x192' && icon.purpose === 'any'), true);
+  assert.equal(manifest.icons.some(icon => icon.sizes === '512x512' && icon.purpose === 'any'), true);
+  assert.equal(manifest.icons.some(icon => icon.sizes === '512x512' && icon.purpose === 'maskable'), true);
+  for (const icon of manifest.icons) assert.ok(fs.existsSync(path.join(root, icon.src.replace('./', ''))), `icône manquante : ${icon.src}`);
+  assert.match(worker, /aurion-maskable-512\.png/);
+});

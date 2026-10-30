@@ -20,14 +20,14 @@ test('étape 6 : devis et factures utilisent le même endpoint de sauvegarde ave
   assert.match(route,/status=documentType==='invoice'\?'issued':'draft'/);
 });
 
-test('étape 6 : insertion SQL devis/facture aligne 50 colonnes et 50 paramètres',()=>{
+test('étape 6 : insertion SQL devis/facture aligne 52 colonnes et 52 paramètres',()=>{
   const start=route.indexOf("insert into quotes(");
   const end=route.indexOf('])',start);
   const sql=route.slice(start,end);
   assert.ok(start>=0);
   const columns=route.slice(start,end+1).match(/insert into quotes\(([\s\S]*?)\)\s*values/);
   assert.ok(columns);
-  assert.equal(columns[1].split(',').length,50);
+  assert.equal(columns[1].split(',').length,52);
   const params=route.slice(route.indexOf('values(',start),end).match(/\$\d+/g)||[];
-  assert.equal(new Set(params).size,50);
+  assert.equal(new Set(params).size,52);
 });

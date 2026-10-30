@@ -6,6 +6,20 @@ import { config } from '../config.js';
 import { query } from '../db.js';
 
 const SCOPES=['openid','email','profile','https://www.googleapis.com/auth/gmail.send','https://www.googleapis.com/auth/calendar'];
+/** Configuration is complete only when OAuth can return to the app and tokens can be encrypted. */
+export function googleOAuthSetupStatus(){
+ const missing:string[]=[];
+ if(!config.GOOGLE_CLIENT_ID.trim())missing.push('GOOGLE_CLIENT_ID');
+ if(!config.GOOGLE_CLIENT_SECRET.trim())missing.push('GOOGLE_CLIENT_SECRET');
+ if(!config.GOOGLE_REDIRECT_URI.trim())missing.push('GOOGLE_REDIRECT_URI');
+ if(config.GOOGLE_TOKEN_ENCRYPTION_KEY.trim().length<32)missing.push('GOOGLE_TOKEN_ENCRYPTION_KEY (32 caractères minimum)');
+ try{
+  const redirect=new URL(config.GOOGLE_REDIRECT_URI);
+  if(!['http:','https:'].includes(redirect.protocol)||redirect.pathname!=='/integrations/google/callback'||redirect.username||redirect.password||redirect.search||redirect.hash)missing.push('GOOGLE_REDIRECT_URI (chemin /integrations/google/callback)');
+  if(config.NODE_ENV==='production'&&redirect.protocol!=='https:')missing.push('GOOGLE_REDIRECT_URI HTTPS');
+ }catch{if(config.GOOGLE_REDIRECT_URI.trim()&&!missing.includes('GOOGLE_REDIRECT_URI'))missing.push('GOOGLE_REDIRECT_URI invalide');}
+ return {configured:missing.length===0,missingConfiguration:missing};
+}
 function key(){const material=config.GOOGLE_TOKEN_ENCRYPTION_KEY.trim();if(material.length<32)throw new Error('GOOGLE_TOKEN_ENCRYPTION_KEY_MISSING');return crypto.createHash('sha256').update(material).digest();}
 export function encrypt(value:string){const k=key();const iv=crypto.randomBytes(12);const c=crypto.createCipheriv('aes-256-gcm',k,iv);const enc=Buffer.concat([c.update(value,'utf8'),c.final()]);return `${iv.toString('base64')}.${c.getAuthTag().toString('base64')}.${enc.toString('base64')}`}
 export function decrypt(value:string){const k=key();try{const fields=String(value||'').split('.');if(fields.length!==3||fields.some(x=>!x))return '';const [iv,tag,data]=fields.map(x=>Buffer.from(x,'base64'));const d=crypto.createDecipheriv('aes-256-gcm',k,iv);d.setAuthTag(tag);return Buffer.concat([d.update(data),d.final()]).toString('utf8')}catch{return ''}}

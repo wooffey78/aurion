@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import crypto from 'node:crypto';
 import { query } from '../db.js';
-import { authorizationUrl, saveTokens, validateGoogleConnection } from '../services/google.js';
+import { authorizationUrl, saveTokens, validateGoogleConnection, googleOAuthSetupStatus } from '../services/google.js';
 import { sendOrgMail, mailConfigured } from '../services/mail.js';
 import { AurionError } from '../services/errors.js';
 import { loadAppointment, syncAppointment } from '../services/calendar.js';
@@ -10,8 +10,8 @@ import { renderDocument, fileFromKey } from '../services/document-renderer.js';
 import { createInvoiceWarranty } from '../services/warranty.js';
 
 export async function integrationRoutes(app:FastifyInstance){
-  app.get('/integrations/google/status',{preHandler:app.requireAuth},async r=>{return {...await validateGoogleConnection(r.auth!.organizationId),configured:!!process.env.GOOGLE_CLIENT_ID,calendarId:process.env.GOOGLE_CALENDAR_ID||'primary'}});
-  app.get('/integrations/google/start',{preHandler:app.requireAuth},async r=>{if(!process.env.GOOGLE_CLIENT_ID)return {configured:false};const state=crypto.randomBytes(32).toString('base64url');await query('insert into google_oauth_states(state,organization_id,expires_at) values($1,$2,now()+interval \'10 minutes\')',[state,r.auth!.organizationId]);return {configured:true,url:await authorizationUrl(state)}});
+  app.get('/integrations/google/status',{preHandler:app.requireAuth},async r=>{return {...await validateGoogleConnection(r.auth!.organizationId),...googleOAuthSetupStatus(),calendarId:process.env.GOOGLE_CALENDAR_ID||'primary'}});
+  app.get('/integrations/google/start',{preHandler:app.requireAuth},async(r,reply)=>{const setup=googleOAuthSetupStatus();if(!setup.configured)return reply.code(503).send({error:'GOOGLE_OAUTH_NOT_CONFIGURED',message:'La connexion Google nécessite les identifiants OAuth, l’URL de retour et une clé de chiffrement des jetons.',missingConfiguration:setup.missingConfiguration});const state=crypto.randomBytes(32).toString('base64url');await query('insert into google_oauth_states(state,organization_id,expires_at) values($1,$2,now()+interval \'10 minutes\')',[state,r.auth!.organizationId]);return {configured:true,url:await authorizationUrl(state)}});
   app.get('/integrations/google/callback',async(r,reply)=>{const q:any=r.query;const s=await query('select organization_id from google_oauth_states where state=$1 and expires_at>now()',[q.state]);if(!s.rowCount)return reply.code(400).send('Lien Google expiré.');const client=await (await import('../services/google.js')).oauthClient();const {tokens}=await client.getToken(String(q.code));await saveTokens(s.rows[0].organization_id,tokens);await query('delete from google_oauth_states where state=$1',[q.state]);return reply.type('text/html; charset=utf-8').send('<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Aurion</title><body><main><h1>Aurion</h1><h2>Google connecté à Aurion.</h2><p>Vous pouvez fermer cette fenêtre.</p></main></body></html>')});
   app.delete('/integrations/google',{preHandler:app.requireAuth},async r=>{await query('delete from google_connections where organization_id=$1',[r.auth!.organizationId]);return {ok:true}});
   app.post('/communications/email/document',{preHandler:app.requireAuth},async(r,reply)=>{

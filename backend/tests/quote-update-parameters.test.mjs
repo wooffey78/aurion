@@ -53,7 +53,7 @@ test('PATCH /quotes/:id garde exactement autant de paramètres liés que le SQL'
   assert.ok(arrayEnd > arrayStart);
   const arrayBody = source.slice(arrayStart + 1, arrayEnd);
   assert.equal(topLevelElements(arrayBody), Math.max(...placeholders));
-  assert.equal(Math.max(...placeholders), 40);
+  assert.equal(Math.max(...placeholders), 44);
   assert.match(sql, /mileage_mode=\$8/);
   assert.doesNotMatch(arrayBody, /mileageMode\s*,[\s\S]*mileageMode/);
 });

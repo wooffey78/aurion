@@ -22,9 +22,9 @@ test('les boutons d’accueil ouvrent les pages d’authentification par navigat
   assert.ok(router.includes("if(entry==='register')return '/auth'"));
   assert.ok(router.includes("if(entry==='login')return '/login'"));
   assert.ok(!main.includes("document.addEventListener('click', event =>"));
-  assert.ok(shell.includes('main.js?v=15.3.0-r1'));
-  assert.ok(shell.includes('app.css?v=15.3.0-r1'));
-  assert.ok(sw.includes('aurion-shell-v15.3.0-r1'));
+  assert.ok(shell.includes('main.js?v=15.3.11-r1'));
+  assert.ok(shell.includes('app.css?v=15.3.11-r1'));
+  assert.ok(sw.includes('aurion-shell-v15.3.11-r1'));
 });
 
 test('la suppression de facture reste disponible même si elle est déjà réglée', () => {
@@ -46,8 +46,8 @@ test('l’interface et l’installation utilisent le thème clair et les centrag
   assert.match(css, /\.landing-hero \.button-row\{justify-content:center/);
   assert.match(css, /\.page-head\{align-items:center!important;text-align:center/);
   assert.match(css, /\.top-actions #fs-toggle\{margin:0 auto\}/);
-  assert.match(manifest, /"theme_color":"#ffffff"/);
-  assert.match(manifest, /"background_color":"#ffffff"/);
+  assert.match(manifest, /"theme_color":"#e8f0fb"/);
+  assert.match(manifest, /"background_color":"#e8f0fb"/);
 });
 
 test('le build racine installe les dépendances backend absentes avant TypeScript', () => {
