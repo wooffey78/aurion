@@ -1280,7 +1280,7 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     const configurationState=(await query(`select configuration_incomplete from organizations where id=$1`,[org])).rows[0];
     if(configurationState && configurationState.configuration_incomplete!==false){
       await query(`insert into dashboard_journal_events(organization_id,event_type,title,description,severity,source,internal_path,dedupe_key)
-        values($1,'configuration_incomplete','Configuration à compléter','Certains éléments restent à renseigner ou à vérifier. Reprenez le parcours guidé ou modifiez les paramètres manuellement.','action','dashboard','/onboarding?step=2','legacy-configuration-incomplete')
+        values($1,'configuration_incomplete','Configuration à compléter','Certains éléments restent à renseigner ou à vérifier. Reprenez le parcours guidé ou modifiez les paramètres manuellement.','action','dashboard','/onboarding','legacy-configuration-incomplete')
         on conflict(organization_id,dedupe_key) do nothing`,[org]);
     } else {
       await query(`update dashboard_journal_events set resolved_at=coalesce(resolved_at,now()) where organization_id=$1 and event_type='configuration_incomplete' and resolved_at is null`,[org]);
