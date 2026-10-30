@@ -11,9 +11,10 @@ import*as docs from'./dash/docs.js';
 import*as settings from'./dash/settings.js';
 import*as account from'./dash/account.js';
 import{home,clients,agenda,accounting,treasury,support,admin}from'./dash/other.js';
+import{companyLookup}from'./company-lookup.js';
 
-const VIEWS={home,clients,catalog,suppliers,quote,invoices:docs,agenda,accounting,treasury,support,settings,account,admin};
-const NAV=[['home','Tableau de bord','⌂'],['clients','Clients','♙'],['catalog','Catalogue métier','◈'],['suppliers','Fournisseurs','▱'],['invoices','Devis & factures','▧'],['agenda','Agenda','◷'],['accounting','Comptabilité & trésorerie','∑'],['support','Support Aurion','?'],['settings','Paramètres','⚙']];
+const VIEWS={home,clients,catalog,suppliers,quote,invoices:docs,agenda,accounting,treasury,support,companyLookup,settings,account,admin};
+const NAV=[['home','Tableau de bord','⌂'],['clients','Clients','♙'],['catalog','Catalogue métier','◈'],['suppliers','Fournisseurs','▱'],['invoices','Devis & factures','▧'],['agenda','Agenda','◷'],['accounting','Comptabilité & trésorerie','∑'],['support','Support Aurion','?'],['companyLookup','Recherche entreprise','⌕'],['settings','Paramètres','⚙']];
 
 // Garde-fous de rafraîchissement : ne jamais remplacer l’écran en pleine interaction.
 let metricsRefreshInProgress = false;
@@ -41,6 +42,7 @@ const DATASETS={
   accounting:['accounting','treasury','quotes','sav'],
   treasury:['treasury','accounting','quotes','sav'],
   settings:['templates','mail'],
+  companyLookup:[],
   home:['clients','quotes','appointments'], 
 };
 const ALL_DATASETS=[...new Set(Object.values(DATASETS).flat())];
@@ -49,7 +51,7 @@ async function load(extras=null,viewId=S.view){
   const safe=(p,d)=>Promise.resolve(p).catch(x=>{if(x?.status===401)throw x;return d});
   const full=extras===null;
   const wanted=new Set(full?ALL_DATASETS:[...(DATASETS[viewId]||[]),...(extras||[]).filter(k=>k!=='company')]);
-  const needConfig=full||extras?.includes('company')||['home','settings','quote','catalog'].includes(viewId)||!S.company||Date.now()-lastConfigLoadedAt>120000;
+  const needConfig=full||extras?.includes('company')||['home','settings','quote','catalog','companyLookup'].includes(viewId)||!S.company||Date.now()-lastConfigLoadedAt>120000;
   if(needConfig){
     const [company,activities]=await Promise.all([
       safe(api.organization(),S.company||{name:'Entreprise'}),
