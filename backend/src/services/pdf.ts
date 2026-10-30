@@ -2,13 +2,12 @@ import type PDFKit from 'pdfkit';
 const pdfkit=async()=>(await import('pdfkit')).default as unknown as typeof PDFKit;
 import { query } from '../db.js';
 import { clientSummary } from './clients.js';
-import { existsSync, readFileSync } from 'node:fs';
-import { fileFromKey } from './storage.js';
+import { readPrivateObject } from './storage.js';
 
 function money(v:any){return `${Number(v||0).toFixed(2).replace('.',',')} €`}
 function esc(v:any){return String(v??'')}
-async function makePdf(title:string,org:any,rows:Array<[string,string]>,total?:string){const PDFDocument=await pdfkit();return new Promise<Buffer>((resolve,reject)=>{const doc=new PDFDocument({size:'A4',margin:48});const chunks:Buffer[]=[];doc.on('data',(c:Buffer)=>chunks.push(c));doc.on('end',()=>resolve(Buffer.concat(chunks)));doc.on('error',reject);const left=48,right=547,width=499;
- doc.roundedRect(left,42,width,96,12).fill('#0b1220');let logoDrawn=false;if(org.logo_key){const fp=fileFromKey(org.logo_key);if(existsSync(fp)){try{doc.image(readFileSync(fp),left+14,54,{fit:[77.5,71.4],align:'center',valign:'center'});logoDrawn=true}catch{}}}
+async function makePdf(title:string,org:any,rows:Array<[string,string]>,total?:string){const PDFDocument=await pdfkit();const logoBuffer:Buffer|null=org.logo_key?await readPrivateObject(org.logo_key).catch(()=>null):null;return new Promise<Buffer>((resolve,reject)=>{const doc=new PDFDocument({size:'A4',margin:48});const chunks:Buffer[]=[];doc.on('data',(c:Buffer)=>chunks.push(c));doc.on('end',()=>resolve(Buffer.concat(chunks)));doc.on('error',reject);const left=48,right=547,width=499;
+ doc.roundedRect(left,42,width,96,12).fill('#0b1220');let logoDrawn=false;if(logoBuffer){try{doc.image(logoBuffer,left+14,54,{fit:[77.5,71.4],align:'center',valign:'center'});logoDrawn=true}catch{}}
  const tx=left+(logoDrawn?106:18);doc.fillColor('#fff').font('Helvetica-Bold').fontSize(21).text(esc(org.name)||'Entreprise',tx,58,{width:365});doc.font('Helvetica').fontSize(9).fillColor('#cbd5e1').text(esc(org.activity)||'',tx,86,{width:365});if(org.siret)doc.text(`SIRET : ${esc(org.siret)}`,tx,101,{width:365});
  doc.fillColor('#111827').font('Helvetica-Bold').fontSize(20).text(title,left,164);doc.font('Helvetica').fontSize(9).fillColor('#64748b').text(`Émis le ${new Date().toLocaleDateString('fr-FR')}`,left,190);let y=220;
  doc.roundedRect(left,y,width,50,8).fill('#f1f5f9');doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(10).text('DÉSIGNATION',left+14,y+10,{width:300});doc.text('VALEUR',right-125,y+10,{width:110,align:'right'});y+=50;
@@ -20,6 +19,7 @@ export async function quotePdf(organizationId:string,id:string){const q=await qu
 export async function clientPdf(organizationId:string,id:string){
   const sum=await clientSummary(organizationId,id);if(!sum)throw new Error('NOT_FOUND');
   const o=(await query('select name,activity,siret,logo_key from organizations where id=$1',[organizationId])).rows[0]||{};
+  const logoBuffer:Buffer|null=o.logo_key?await readPrivateObject(o.logo_key).catch(()=>null):null;
   const c=sum.client as any;
   const eur=(n:any)=>{const [a,b]=Math.abs(Number(n||0)).toFixed(2).split('.');return `${a!.replace(/\B(?=(\d{3})+(?!\d))/g,'\u00A0')},${b}\u00A0€`};
   const fd=(d:any)=>new Date(d).toLocaleDateString('fr-FR');
@@ -33,7 +33,7 @@ export async function clientPdf(organizationId:string,id:string){
     const label=(t:string,x:number,y:number,w:number)=>doc.font('Helvetica-Bold').fontSize(7.5).fillColor(muted).text(t.toUpperCase(),x,y,{width:w,characterSpacing:1.3});
     const need=(y:number,h:number)=>{if(y+h>770){doc.addPage();return 56}return y};
     // en-tête
-    let tx=L;if(o.logo_key){try{const f=fileFromKey(o.logo_key);if(existsSync(f)){doc.image(readFileSync(f),L,52,{fit:[52,52]});tx=L+68}}catch{/* logo illisible */}}
+    let tx=L;if(logoBuffer){try{doc.image(logoBuffer,L,52,{fit:[52,52]});tx=L+68}catch{/* logo illisible */}}
     doc.font('Helvetica-Bold').fontSize(16).fillColor(ink).text(o.name||'Entreprise',tx,56,{width:260});
     doc.font('Helvetica').fontSize(9.5).fillColor(muted);if(o.activity)doc.text(o.activity,tx,doc.y+2,{width:260});
     doc.font('Helvetica-Bold').fontSize(14).fillColor(accent).text('FICHE CLIENT',R-220,56,{width:220,align:'right'});

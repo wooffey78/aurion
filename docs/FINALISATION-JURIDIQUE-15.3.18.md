@@ -1,6 +1,6 @@
 # Finalisation juridique — Aurion 15.3.18
 
-Les documents 2.2 sont intégrés dans `docs/` et reproduits dans `legal/`. Ils ne sont pas définitifs ni validés juridiquement. Le marché B2B/B2C est confirmé par l’éditeur. L’inscription et la souscription payante restent bloquées tant que les documents nécessaires ne sont pas publiés.
+Document historique de la version 15.3.18. La préparation juridique actuelle est décrite dans [FINALISATION-JURIDIQUE-15.3.19.md](FINALISATION-JURIDIQUE-15.3.19.md). Les documents ne sont pas définitifs ni validés juridiquement. Le marché B2B/B2C est confirmé par l’éditeur. L’inscription et la souscription payante restent bloquées tant que les documents nécessaires ne sont pas publiés.
 
 ## Informations communiquées par l’éditeur
 

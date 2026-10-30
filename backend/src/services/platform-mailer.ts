@@ -9,11 +9,16 @@ import { makeTransport, normalizeSettings, sendOrgMail } from './mail.js';
  */
 export function platformMailerConfigured() { return !!config.PLATFORM_SMTP_HOST; }
 
+export async function sendConfiguredPlatformMail(mail: { to: string; subject: string; text: string; attachments?: Array<{ filename: string; content: Buffer }> }) {
+  if (!config.PLATFORM_SMTP_HOST) throw new Error('PLATFORM_SMTP_NOT_CONFIGURED');
+  const s = normalizeSettings({ email: config.PLATFORM_SMTP_FROM || config.PLATFORM_SMTP_USER, password: config.PLATFORM_SMTP_PASS, username: config.PLATFORM_SMTP_USER || config.PLATFORM_SMTP_FROM, host: config.PLATFORM_SMTP_HOST, port: config.PLATFORM_SMTP_PORT, security: config.PLATFORM_SMTP_SECURITY, provider: 'custom', fromName: 'Aurion' });
+  const t = makeTransport(s);
+  try { await t.sendMail({ from: { name: 'Aurion', address: s.email }, ...mail }); } finally { t.close(); }
+}
+
 export async function sendPlatformMail(userId: string, mail: { to: string; subject: string; text: string; attachments?: Array<{ filename: string; content: Buffer }> }) {
   if (config.PLATFORM_SMTP_HOST) {
-    const s = normalizeSettings({ email: config.PLATFORM_SMTP_FROM || config.PLATFORM_SMTP_USER, password: config.PLATFORM_SMTP_PASS, username: config.PLATFORM_SMTP_USER || config.PLATFORM_SMTP_FROM, host: config.PLATFORM_SMTP_HOST, port: config.PLATFORM_SMTP_PORT, security: config.PLATFORM_SMTP_SECURITY, provider: 'custom', fromName: 'Aurion' });
-    const t = makeTransport(s);
-    try { await t.sendMail({ from: { name: 'Aurion', address: s.email }, ...mail }); } finally { t.close(); }
+    await sendConfiguredPlatformMail(mail);
     return 'platform' as const;
   }
   const m = (await query('select organization_id from organization_members where user_id=$1 limit 1', [userId])).rows[0];

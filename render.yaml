@@ -1,10 +1,12 @@
-# Render Blueprint for Aurion's web process only. It deliberately does NOT create a database.
-# Supply DATABASE_URL for a dedicated Aurion PostgreSQL database before deploying.
+# Cible commerciale : service Frankfurt existant `aurion` (observé en lecture seule le 30/10/2026).
+# Ne pas créer un troisième service. Synchroniser ce blueprint appliquera une configuration au service existant.
+# Neon et OVH Object Storage restent des services externes et ne sont pas créés par ce blueprint.
 services:
   - type: web
-    name: aurion-web
+    name: aurion
     runtime: node
-    plan: free
+    region: frankfurt
+    plan: starter
     buildCommand: npm ci --prefix backend --include=dev --no-audit --no-fund && npm run build
     startCommand: npm --prefix backend start
     healthCheckPath: /health/db
@@ -17,7 +19,31 @@ services:
       - key: COOKIE_SECURE
         value: "true"
       - key: AURION_AI_PROVIDER
-        value: managed
+        sync: false
+      - key: AURION_STORAGE_BACKEND
+        value: s3
+      - key: AURION_S3_ENDPOINT
+        value: https://s3.de.io.cloud.ovh.net
+      - key: AURION_S3_REGION
+        value: de
+      - key: AURION_S3_BUCKET
+        sync: false
+      - key: AURION_S3_ACCESS_KEY
+        sync: false
+      - key: AURION_S3_SECRET_KEY
+        sync: false
+      - key: PLATFORM_SMTP_HOST
+        value: smtp-relay.brevo.com
+      - key: PLATFORM_SMTP_PORT
+        value: "587"
+      - key: PLATFORM_SMTP_SECURITY
+        value: starttls
+      - key: PLATFORM_SMTP_USER
+        sync: false
+      - key: PLATFORM_SMTP_PASS
+        sync: false
+      - key: PLATFORM_SMTP_FROM
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: AURION_MIGRATION_DATABASE_URL
@@ -30,6 +56,8 @@ services:
         sync: false
       - key: APP_BASE_URL
         sync: false
+      - key: AURION_PUBLIC_ORIGIN
+        value: https://aurion-2hye.onrender.com
       - key: GOOGLE_REDIRECT_URI
         sync: false
       - key: GOOGLE_TOKEN_ENCRYPTION_KEY
@@ -50,3 +78,5 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      - key: BILLING_VAT_RATE_BPS
+        value: "0"

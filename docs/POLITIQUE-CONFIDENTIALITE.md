@@ -1,129 +1,98 @@
-# Politique de confidentialité et annexe de traitement — Aurion
+# Politique de confidentialité et annexe de sous-traitance — Aurion
 
-> **PROJET DE DOCUMENT — NE PAS UTILISER POUR UNE COMMERCIALISATION.** Le texte reflète l’examen statique du dépôt Aurion 15.3.18. Les durées de conservation, les lieux de traitement, les fournisseurs effectivement configurés et l’identité du responsable restent à confirmer. Compléter ces informations, le registre des traitements et les procédures opérationnelles, puis faire valider avant publication.
+> **DOSSIER DE PRÉPARATION — NE PAS PUBLIER EN L’ÉTAT.** Version 2.3, préparée le 30 octobre 2026 à partir du code 15.3.19 et des décisions de l’éditeur. La bascule du domaine canonique vers Francfort, le passage au plan payant, les contrats/DPA des fournisseurs, la migration des fichiers, les sauvegardes, les durées et les procédures d’effacement n’ont pas été exécutés ni audités. Les mentions d’hébergement décrivent une cible choisie, pas une configuration commerciale achevée.
 
-**Version projet : 2.2 — Date de rédaction : 30 octobre 2026 — Contact données personnelles : {{AURION_PRIVACY_CONTACT_EMAIL}}**
+**Responsable déclaré : Coulibaly Damien, entrepreneur individuel, nom commercial Easyweb-dev. Adresse communiquée : 5 Rue Jacques Prevert, 85300 Challans, France. Contact données personnelles : easyfixit.reparation@gmail.com.** SIREN déduit du SIRET communiqué 88848569500033 : 888485695. Ces informations ne sont pas vérifiées au RNE/Sirene. Elles ne remplacent pas la qualification juridique du responsable pour chaque traitement.
 
-## 1. Responsable et rôles
+## 1. À qui cette politique s’applique
 
-Aurion est édité par {{AURION_LEGAL_PUBLISHER_NAME}}, {{AURION_LEGAL_PUBLISHER_FORM}}, SIREN {{AURION_LEGAL_PUBLISHER_SIREN}}, siège {{AURION_LEGAL_PUBLISHER_ADDRESS}}. Pour toute question concernant les données propres au compte Aurion : {{AURION_PRIVACY_CONTACT_EMAIL}}.
+Aurion est destiné aux professionnels et particuliers en France. L’Éditeur est responsable des traitements nécessaires à la gestion des comptes Aurion, la sécurité, le support, les commandes et ses obligations. Pour les dossiers et fichiers métier que le client professionnel saisit dans son espace, le client détermine en principe les finalités et agit comme responsable de traitement; l’Éditeur traite les données pour fournir le service et intervient comme sous-traitant. La qualification doit être réévaluée pour chaque intégration et usage propre à l’Éditeur.
 
-Pour la gestion des comptes Aurion, l’accès, la sécurité du service, le support et la facturation de l’offre, l’éditeur détermine les finalités et agit comme responsable du traitement. Pour les données métier importées par un Client — clients, prospects, fournisseurs, devis, factures, interventions, courriels et pièces jointes — le Client détermine en principe les finalités et agit comme responsable de traitement; l’éditeur agit comme sous-traitant lorsqu’il traite ces données afin de fournir Aurion.
+## 2. Données et usages
 
-Le rôle doit être déterminé pour chaque fonctionnalité et chaque finalité. Cette qualification doit être vérifiée lorsque les données sont utilisées pour une finalité propre à l’éditeur ou par un fournisseur d’intégration.
+Le service peut traiter les catégories suivantes selon les modules activés :
 
-## 2. Données et personnes concernées
+- compte : prénom, nom, e-mail, téléphone si renseigné, mot de passe haché, rôles et préférences;
+- données professionnelles introduites par le client : coordonnées des clients et fournisseurs, SIREN/SIRET, devis, factures, achats, interventions, rendez-vous, garanties, échanges et historique;
+- fichiers : pièces jointes, documents, modèles, logos et documents générés;
+- connexions : configuration e-mail, autorisations OAuth et calendrier si l’utilisateur les active;
+- paiement de l’offre : identifiant de commande et statuts Stripe; les données de carte sont traitées par Stripe et ne doivent pas être stockées par Aurion;
+- sécurité et support : données de session, empreinte d’adresse IP selon l’opération, journaux techniques, demandes au support et informations nécessaires aux déclarations de rétractation.
 
-Selon les fonctions activées et les choix du Client, Aurion peut traiter :
+Finalités : ouvrir et administrer un compte, fournir les fonctionnalités, sauvegarder et restituer les données, traiter les paiements et factures de l’offre, envoyer les messages transactionnels, protéger le service, répondre au support, respecter les obligations légales et instruire une demande de rétractation.
 
-- les données de compte : nom, adresse e-mail, mot de passe sous forme hachée, rôles, organisation et préférences;
-- les données professionnelles de tiers saisies par le Client : identité, coordonnées, entreprise, SIREN/SIRET, échanges et historique de relation;
-- les données de gestion : devis, factures, paiements, taxes, achats, interventions, rendez-vous, garanties, pièces, modèles, paramètres et états d’avancement;
-- les contenus de courriels et de documents importés, ainsi que les informations extraites ou proposées par des automatismes et fonctions d’IA;
-- les données d’intégration : configuration de messagerie, autorisations OAuth, calendrier et statuts de paiement, dans la mesure où ces intégrations sont activées;
-- les données techniques et de sécurité : adresse IP utilisée pour la protection ou la preuve de certaines opérations, journaux d’accès, informations de session, événements d’erreur et demandes adressées au support.
+L’IA locale envisagée dans l’application Windows exécute Ollama et le modèle `qwen3.5:4b-q4_K_M` sur la machine Aurion locale; ces requêtes ne sont pas envoyées à un fournisseur IA distant par cette fonction. Cela ne décrit pas une session SaaS dont le serveur est hébergé sur Render. Dans le SaaS, le serveur ne peut pas accéder au Ollama installé chez un client; aucune IA distante n’est réputée autorisée dans cette cible avant le choix, les contrats et l’information du fournisseur. Google (OAuth, agenda ou messagerie) est facultatif et activé seulement à l’initiative du client après configuration.
 
-Les personnes concernées peuvent être les utilisateurs du Client, ses clients, prospects, fournisseurs, interlocuteurs administratifs ou autres personnes mentionnées dans les données qu’il dépose. Le service n’est pas conçu pour traiter des données de santé, des données biométriques, des données relatives aux infractions ou d’autres catégories particulières sans accord spécifique et analyse préalable.
+## 3. Bases juridiques et choix
 
-## 3. Finalités et bases juridiques
+Pour le compte, la fourniture, le paiement et le support de commande : exécution du contrat et mesures précontractuelles. Pour la sécurité, la prévention des abus, la continuité et la défense de droits : intérêts légitimes, après mise en balance et documentation. Pour les factures et obligations de conservation : obligation légale. Pour des traceurs non nécessaires : consentement préalable. Les clients professionnels restent responsables de la base légale, de l’information et de la minimisation des données de leurs propres contacts.
 
-Pour les traitements dont l’éditeur est responsable, les finalités sont la création et l’administration du compte, la fourniture du service, la gestion des commandes et paiements, la sécurité et la prévention des abus, le support et le respect des obligations légales. Les bases juridiques sont, selon le traitement, l’exécution du contrat, le respect d’une obligation légale ou l’intérêt légitime à sécuriser et maintenir le service.
+## 4. Destinataires et fournisseurs
 
-Pour les données métier, les finalités sont fixées par le Client : organisation de son activité, gestion commerciale, préparation de documents, suivi des interventions, traitement de courriels, assistance et calculs. L’éditeur ne réutilise pas ces données à des fins publicitaires propres. Toute nouvelle finalité doit faire l’objet d’une analyse juridique, d’une information et, si nécessaire, d’une base juridique propre.
+Les accès sont limités aux personnes autorisées et aux fournisseurs nécessaires à la fonction activée. **Fournisseurs retenus pour la cible commerciale (à contracter et vérifier avant ouverture) :**
 
-## 4. Intelligence artificielle et courriels
+| Service prévu | Données/finalité | Région ciblée | État au 30/10/2026 |
+|---|---|---|---|
+| Render — service applicatif Node | Requêtes applicatives, contenu en mémoire, journaux techniques | Frankfurt, Allemagne pour la cible commerciale | Service `aurion` déjà actif à Frankfurt en gratuit; un autre service `aurion-web` reste actif dans l’Oregon; domaine canonique à vérifier; plan payant et paramètres commerciaux non activés |
+| Neon — PostgreSQL | Comptes, données métier, commandes et demandes de rétractation | branche PostgreSQL dans l’UE, région actuelle à confirmer lors du choix de branche commerciale | Base existe; la cible et le contrat/DPA de production ne sont pas confirmés |
+| OVHcloud Object Storage — S3 | Fichiers privés, pièces et rendus | `de`, Francfort | Code S3 préparé; bucket, clés, chiffrement, sauvegarde et migration non effectués |
+| Brevo — SMTP transactionnel | E-mails de sécurité, accusés de réception, confirmations | prestataire français/UE; région de traitement et DPA à confirmer au compte | choix technique proposé; compte, domaine expéditeur, SPF/DKIM/DMARC et credentials non configurés; quota gratuit annoncé 300 envois/jour avec marque Brevo |
+| Stripe Payments Europe | Paiement et état de commande | EEE selon contrat et configuration Stripe | Stripe est le prestataire retenu; compte, mode de production, commission, DPA et flux exacts à valider |
+| Google APIs, optionnelles | OAuth, agenda ou messagerie selon activation du client | déterminée par le produit Google et le compte | aucune connexion active par défaut dans la cible; DPA, scopes, lieux et transferts à documenter avant activation |
+| IA distante, optionnelle | prompts et pièces éventuellement envoyées | non choisie | désactivée/non autorisée pour les données de clients tant que prestataire, version, région, rétention et conditions ne sont pas inscrits ici |
 
-Le Client choisit les contenus de courriels, documents ou textes soumis à l’extraction, au classement ou à l’interprétation automatisée. Il doit limiter les données transmises à ce qui est nécessaire, disposer d’une base légale et informer les personnes lorsque cela est requis.
+Les entités contractantes exactes et coordonnées officielles, les rôles RGPD, les sous-traitants ultérieurs, les finalités, régions, durées et garanties de transfert doivent être copiés des contrats/DPA signés. Render est une société américaine; une région d’exécution allemande ne suffit pas, à elle seule, à exclure tout accès ou transfert depuis un pays tiers. Aucune garantie de transfert n’est déclarée sans examen du contrat, du DPA et des mécanismes effectivement applicables.
 
-Le code comporte un mode local Ollama qui interroge un moteur local lorsqu’il est installé et accessible; le service examiné ne prévoit pas de repli cloud automatique lorsque ce mode échoue. Le blueprint Render configure un mode géré, mais les fichiers audités ne permettent pas d’identifier le fournisseur distant réellement utilisé, son pays, sa conservation ou ses garanties. Ces éléments doivent être ajoutés à la liste des sous-traitants avant de proposer ce mode avec des données réelles. Les résultats sont des suggestions à vérifier par un professionnel et ne doivent pas produire seuls une décision ou une transmission.
+## 5. Hébergement et flux
 
-## 5. Destinataires et sous-traitants ultérieurs
+**Cible retenue pour l’application SaaS :** service Render payant à Francfort, base Neon en région UE et objets privés OVHcloud `de` à Francfort. Render a déjà un service `aurion` actif à Francfort et un `aurion-web` actif dans l’Oregon. Au contrôle du 30 octobre 2026, les deux étaient gratuits, reliés à `main` et déployés sur le même commit 15.3.18; le domaine canonique n’est pas confirmé. Passer Frankfurt en payant, vérifier les données et services, puis basculer le domaine. Tant que cette bascule et la désactivation du trafic Oregon ne sont pas achevées, **ne pas présenter la production comme exclusivement hébergée à Francfort**.
 
-Les accès sont limités aux personnes habilitées et aux prestataires nécessaires à l’exploitation ou activés par le Client. Les fournisseurs susceptibles d’intervenir, selon la configuration effective, sont :
+Les sauvegardes secondaires chiffrées dans l’UE ne sont pas encore opérationnelles. Définir le lieu et la rétention, séparer les clés, automatiser une sauvegarde cohérente base/fichiers et réussir un exercice de restauration avant données réelles. Le stockage principal OVH S3 ne constitue pas à lui seul une sauvegarde indépendante.
 
-| Fournisseur ou service | Rôle potentiel | État à vérifier avant publication |
-| --- | --- | --- |
-| Render | Hébergement de l’application | Le service `aurion-web` en Oregon (États-Unis) est l’application canonique et répond à `/health/db`; le service `aurion` à Francfort redirige vers cette production. Le backend traite donc les requêtes sur le service américain. Entité contractante, contact juridique et mécanisme/garanties de transfert à documenter avant publication |
-| Neon | Hébergement PostgreSQL | Région confirmée : AWS eu-central-1 (UE). Entité contractante, adresse juridique et garanties à renseigner |
-| Stripe | Paiement par carte | Usage déclaré par l’éditeur; activation en production, rôles, entité et transferts à confirmer |
-| Google | Connexion OAuth, calendrier ou messagerie, si activés | Services précis, régions et transferts à confirmer |
-| Service SMTP ou messagerie choisi/configuré | Envoi ou synchronisation de courriels | Nom, rôle, région et conditions à préciser pour chaque offre |
-| Fournisseur d’IA distante | Analyse ou génération | Usage distant déclaré par l’éditeur; le fournisseur, les données transmises, la région, la rétention et les garanties restent à définir |
+## 6. Durées de conservation et suppression
 
-La liste effective, les contacts, les finalités, les lieux de traitement, les transferts et les garanties applicables doivent être publiés sous {{AURION_SUBPROCESSORS}} et tenus à jour. Cette liste partielle est une déclaration de configuration vérifiée uniquement pour l’hébergement Render et Neon; les autres prestataires restent à confirmer. Les transferts hors Espace économique européen ne peuvent intervenir qu’avec une base et des garanties conformes au chapitre V du RGPD.
+Les durées exactes ne sont pas encore documentées ou implémentées par catégorie. **Aucune durée de purge complète ne peut être annoncée à la date de cette version.** Avant commercialisation, l’Éditeur doit publier des durées concrètes et justifiées et mettre en place le traitement correspondant pour PostgreSQL, les objets, les exports, journaux, prestataires et sauvegardes. La fermeture de compte ou le passage en lecture seule ne prouve pas l’effacement. La demande de rétractation est enregistrée dans PostgreSQL avec un état d’envoi de reçu; une durée opérationnelle et une purge doivent être fixées avant ouverture B2C.
 
-## 6. Hébergement et durée de conservation
+À documenter dans le registre : compte/organisations; données métier et pièces; devis, factures et preuves comptables; e-mails et jetons OAuth; demandes support; paiement; demandes consommateurs; journaux sécurité; sauvegardes. En cas de suppression, les données conservées au titre d’une obligation légale ou pour défendre un droit doivent être isolées, limitées, justifiées et effacées à l’échéance applicable.
 
-La configuration Render observée le 30 octobre 2026 montre que `aurion-web` en Oregon (États-Unis) est l’application canonique : le service exécute le backend Node et répond au contrôle de santé PostgreSQL. Le service `aurion` à Francfort redirige vers cette production. La base Neon est en région AWS eu-central-1 (UE). Les appels applicatifs sont donc traités sur l’hôte américain; les flux exacts vers les modèles d’IA, la messagerie et les autres intégrations restent à vérifier. L’entité contractante Render, le mécanisme juridique et les garanties de transfert doivent être établis avant toute publication ou commercialisation avec des données personnelles.
+## 7. Sécurité
 
-La version examinée utilise Neon pour la base de données et enregistre les fichiers téléversés dans le répertoire local du service applicatif. La documentation Render précise que le disque local d’un service gratuit ne fournit pas une persistance fiable entre redémarrages ou redéploiements. Tant que les pièces ne sont pas migrées vers un stockage durable et que la restauration n’est pas testée, l’éditeur ne peut pas garantir leur conservation.
+Le code 15.3.19 utilise notamment Argon2id pour les mots de passe, cookies configurables Secure/HttpOnly, contrôles d’accès par organisation, chiffrement applicatif de secrets d’intégration et stockage S3 privé en mode de production obligatoire. Ces observations du code ne démontrent pas l’activation de chaque réglage, l’absence de vulnérabilité ni une certification. Avant la vente : limiter les accès fournisseur, activer HTTPS, clés distinctes, politique de moindre privilège, chiffrement OVH au repos, rotation et stockage des secrets, alertes, sauvegardes, journal d’incident, antivirus/document quarantine et restauration testée. Ne pas inclure de secrets dans les journaux ou les ZIP.
 
-| Catégorie | Règle technique observée | Information à finaliser |
-| --- | --- | --- |
-| Données métier de l’espace | Accès en lecture seule après expiration de la période; le code prévoit ensuite une échéance d’accès de 60 jours supplémentaires | La purge effective de la base, des fichiers et des sauvegardes n’est pas démontrée; définir et implémenter la suppression et la restitution |
-| Compte et authentification | Conservation pendant que le compte existe et traitement de jetons temporaires avec échéance | Fixer la durée après fermeture, les délais de sécurité et les exceptions |
-| Paiement et justificatifs de l’offre Aurion | Traitement selon le moyen effectivement activé | Définir les durées légales, l’archivage et les accès aux factures |
-| Journaux de sécurité et support | Collecte technique et traitement des demandes | Définir une durée précise par catégorie |
-| Paramètres d’intégrations et courriels synchronisés | Conservés pendant l’activation de la connexion et l’utilisation des fonctions concernées | Définir suppression à la déconnexion et à la clôture; confirmer les durées des fournisseurs |
-| Sauvegardes | Dépendent des configurations des hébergeurs et des fichiers | Publier fréquence, rétention, localisation et test de restauration |
+En cas de violation, l’Éditeur documente l’incident, informe le responsable de traitement client sans délai indu lorsqu’il agit comme sous-traitant et coopère. Le responsable de traitement apprécie les notifications CNIL et personnes concernées requises.
 
-**Cette section n’est pas suffisante pour une publication tant que les durées en attente ne sont pas fixées et que la suppression de bout en bout n’est pas prouvée.** Le passage en lecture seule ou le blocage d’accès ne constitue pas en soi une suppression.
+## 8. Droits et demandes
 
-## 7. Sécurité et violations de données
+Les personnes peuvent demander l’accès, la rectification, l’effacement, la limitation, l’opposition et la portabilité dans les conditions légales. Adresse : **easyfixit.reparation@gmail.com**. Une vérification proportionnée de l’identité peut être demandée. Les personnes peuvent saisir la CNIL. Pour les contacts métier contenus dans l’espace d’un client, s’adresser d’abord à ce client; l’Éditeur l’assiste selon le contrat de sous-traitance.
 
-Le code examiné utilise notamment le hachage Argon2id pour les mots de passe, des cookies de session HttpOnly/Secure selon la configuration et des contrôles d’accès par organisation. Cela ne constitue pas une certification ni la preuve d’un audit indépendant. Les fichiers sont actuellement stockés sur le disque du service applicatif, avec le risque de durabilité décrit ci-dessus.
+## 9. Cookies et stockage local
 
-L’éditeur documente ses mesures techniques et organisationnelles dans une annexe de sécurité tenue à jour. En cas de violation affectant des données traitées pour le compte du Client, l’éditeur l’informe sans délai indu, communique les éléments raisonnablement disponibles et coopère à la réponse. Le responsable de traitement décide des notifications à la CNIL et aux personnes concernées qui lui incombent. Le point de contact opérationnel est {{AURION_PRIVACY_CONTACT_EMAIL}}.
+Les cookies strictement nécessaires à la session et à la sécurité sont listés dans `COOKIES.md`. Le stockage local du navigateur contient des préférences et l’e-mail du dernier compte. Le code vérifié n’a pas fait apparaître de service publicitaire ou d’audience; un contrôle du site réel demeure requis. Google ou autres services ne sont activés qu’à l’initiative du client. Tout traceur non exempté nécessite une information, un choix préalable et un retrait aussi simple.
 
-## 8. Droits des personnes
+## 10. Annexe de sous-traitance — Article 28 RGPD
 
-Pour les données dont l’éditeur est responsable, les personnes peuvent exercer les droits prévus par le RGPD, selon leur applicabilité, en contactant {{AURION_PRIVACY_CONTACT_EMAIL}}. Une vérification proportionnée de l’identité peut être demandée. Une réclamation peut être adressée à la CNIL.
+### Objet, durée, nature et finalité
 
-Pour les données métier enregistrées par un Client, la personne concernée s’adresse au Client responsable de traitement. L’éditeur l’assiste dans la mesure prévue par le contrat et l’article 28 du RGPD. Le Client demeure responsable de l’information des personnes, de la base juridique, des durées métier et du traitement de leurs demandes.
+L’Éditeur héberge, sauvegarde, classe, restitue et rend accessibles les données métier, produit les documents demandés, assure la sécurité et exécute les intégrations activées. La durée suit le contrat et les instructions, puis les durées de restitution, suppression et sauvegarde à déterminer avant publication.
 
-## 9. Cookies et stockage du navigateur
+### Instructions et confidentialité
 
-Les cookies et stockages locaux nécessaires à l’authentification et au fonctionnement sont décrits dans la politique cookies. L’examen du dépôt n’a pas mis en évidence d’outil publicitaire ou de mesure d’audience; cette observation doit être vérifiée sur le site réellement déployé et après toute activation d’un service tiers. Tout traceur non exempté doit être bloqué avant consentement, avec un refus aussi simple que l’acceptation et une possibilité de retrait.
+L’Éditeur traite les données métier sur instructions documentées, s’assure que les personnes autorisées sont soumises à confidentialité et ne les utilise pas pour sa publicité ou l’entraînement de modèles d’IA. Le client garantit que ses instructions et données sont licites.
 
-## 10. Modifications
+### Sécurité, assistance et audits
 
-La présente politique est mise à jour en cas de modification importante des données, finalités, durées, fournisseurs ou transferts. Les changements substantiels sont portés à la connaissance des utilisateurs et des Clients selon les règles applicables.
+L’Éditeur fournit les informations raisonnablement disponibles sur les mesures techniques, assiste le client pour les demandes, violations, analyses d’impact et consultations préalables dans la mesure requise, et permet les audits selon des modalités proportionnées. Les preuves de ces mesures doivent être constituées avant publication.
 
-# Annexe — Clauses de traitement de données au titre de l’article 28 du RGPD
+### Sous-traitants ultérieurs et transferts
 
-## A. Objet, durée, nature et finalités
+Les prestataires de la section 4 sont une liste cible et ne constituent pas encore une autorisation contractuelle exhaustive. Le client doit recevoir les informations de changement et le moyen d’exercer ses droits prévus au contrat. Aucun transfert hors EEE ne sera déclaré couvert sans base légale et garanties contrôlées pour le fournisseur, l’entité, le service et le flux concernés.
 
-L’éditeur traite les données métier pour fournir l’espace Aurion, stocker et restituer les informations, produire les documents demandés, exécuter les intégrations activées, assister le Client, protéger le service et traiter les incidents. Le traitement dure pendant la relation contractuelle, puis le temps nécessaire à la restitution, à la suppression effective et aux sauvegardes selon des délais à renseigner avant publication.
+### Fin de service
 
-## B. Personnes concernées et données
+Au choix du client et selon les obligations légales applicables, l’Éditeur restitue ou supprime les données personnelles après la fin du service, puis efface les copies selon le calendrier de sauvegarde publié. Cette capacité doit encore être vérifiée dans le code et lors d’un exercice réel avant de transformer cette annexe en engagement définitif.
 
-Les catégories et personnes concernées figurent aux sections 2 et 4. Le Client détermine les données saisies et s’abstient d’importer des catégories particulières sans instruction documentée, analyse juridique et mesures adaptées.
+## Références
 
-## C. Instructions du Client
-
-L’éditeur traite les données uniquement sur instructions documentées du Client, y compris pour les transferts, sauf obligation légale applicable; dans ce cas, il en informe le Client avant le traitement, sauf interdiction légale. L’éditeur avertit le Client s’il estime qu’une instruction viole le RGPD ou une autre règle de protection des données.
-
-## D. Obligations de l’éditeur sous-traitant
-
-L’éditeur s’engage à :
-
-1. veiller à ce que les personnes autorisées à traiter les données soient soumises à la confidentialité;
-2. appliquer des mesures techniques et organisationnelles adaptées au risque et fournir leur description actualisée;
-3. respecter les conditions applicables à l’autorisation et au recours à des sous-traitants ultérieurs, informer préalablement le Client de tout ajout ou remplacement et lui permettre de présenter une objection motivée;
-4. assister le Client, compte tenu de la nature du traitement, pour répondre aux demandes des personnes et respecter les obligations relatives à la sécurité, aux violations, aux analyses d’impact et aux consultations préalables;
-5. notifier au Client toute violation de données personnelles sans délai indu et lui transmettre les éléments utiles à sa documentation et à ses notifications;
-6. mettre à sa disposition les informations nécessaires pour démontrer le respect de l’article 28 et permettre des audits raisonnables, sous réserve de la confidentialité et de la sécurité des autres clients;
-7. au choix du Client après la fin du service, restituer ou supprimer les données personnelles et supprimer les copies existantes, sauf obligation légale de conservation; les durées techniques et de sauvegarde doivent être convenues et documentées avant publication;
-8. ne pas transférer des données hors EEE sans instruction ou mécanisme de transfert conforme et information du Client.
-
-## E. Obligations du Client responsable de traitement
-
-Le Client documente ses instructions, choisit une base légale, informe les personnes, définit les durées métier, configure les accès, vérifie les contenus et destinataires et traite les demandes qui lui sont adressées. Il ne dépose que les données nécessaires et dispose des droits requis pour les intégrer à Aurion et les faire traiter par les fournisseurs activés.
-
-## F. Sous-traitants ultérieurs et transferts
-
-La liste, les fonctions, les pays et mécanismes de transfert doivent être ajoutés par l’éditeur avant la publication. L’autorisation générale du Client ne s’applique qu’aux fournisseurs effectivement identifiés, soumis à des obligations au moins équivalentes et utilisés pour les finalités décrites. Toute nouvelle utilisation est notifiée avant qu’elle ne commence.
-
-## G. Mesures de sécurité et documentation
-
-Une annexe technique distincte doit préciser les mesures réellement déployées : contrôle des accès, sauvegardes et restauration, chiffrement au repos et en transit, journalisation, protection des secrets, gestion des vulnérabilités, continuité et suppression. Ne pas présenter une mesure comme effective sans preuve et configuration vérifiée.
+- [CNIL — gérer la sous-traitance](https://www.cnil.fr/fr/securite-gerer-la-sous-traitance)
+- [RGPD, article 28 — sous-traitant](https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=fr)
+- [RGPD, chapitre V — transferts](https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=fr)

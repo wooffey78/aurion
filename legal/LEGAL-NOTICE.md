@@ -1,39 +1,42 @@
 # Mentions légales — Aurion
 
-> **PROJET DE PAGE — NE PAS PUBLIER AVANT COMPLÉTION.** Les champs d’identité et les coordonnées des hébergeurs doivent être vérifiés avec les documents d’immatriculation et les contrats en vigueur. Mentions établies à partir de l’examen statique du dépôt Aurion 15.3.18.
+> **DOSSIER DE PRÉPARATION — NE PAS PUBLIER AVANT VÉRIFICATION.** Version 2.3 pour Aurion 15.3.19, préparée le 30 octobre 2026. Les informations d’identité ci-dessous proviennent exclusivement des réponses de l’éditeur; elles n’ont pas été contrôlées sur un justificatif RNE/Sirene. L’hébergement décrit est la cible future et non la production vérifiée. Les coordonnées exactes des entités contractantes devront être insérées après commande des services.
 
-**Version projet : 2.2 — Mise à jour : 30 octobre 2026**
+## Éditeur du service
 
-## Éditeur
+- Nom et prénom déclarés : **Coulibaly Damien**
+- Statut déclaré : **entrepreneur individuel — régime micro-entreprise**
+- Nom commercial déclaré : **Easyweb-dev**
+- Adresse communiquée : **5 Rue Jacques Prevert, 85300 Challans, France**
+- SIRET communiqué : **88848569500033**
+- SIREN dérivé du SIRET : **888485695** (à confirmer par justificatif officiel)
+- TVA : l’éditeur déclare ne pas être assujetti; vérifier l’éligibilité au régime de franchise et la mention exacte applicable avant la première facture.
+- Directeur de publication déclaré : **Coulibaly Damien**
+- Contact général, support, rétractation et vie privée : [easyfixit.reparation@gmail.com](mailto:easyfixit.reparation@gmail.com)
+- Téléphone communiqué : **07 81 51 33 21**
 
-Aurion est édité par **{{AURION_LEGAL_PUBLISHER_NAME}}**, {{AURION_LEGAL_PUBLISHER_FORM}}, au capital de [À compléter si applicable], dont le siège est {{AURION_LEGAL_PUBLISHER_ADDRESS}}. Nom commercial déclaré : Easyweb-dev [À confirmer par justificatif d’immatriculation].
+L’adresse et le numéro communiqués doivent être comparés à un justificatif officiel et au justificatif d’immatriculation avant publication. Le numéro SIRET passe un contrôle de format et de clé, ce qui ne confirme ni l’existence de l’établissement ni son adresse officielle.
 
-- SIREN : {{AURION_LEGAL_PUBLISHER_SIREN}}
-- SIRET du siège : {{AURION_LEGAL_PUBLISHER_SIRET}}
-- Immatriculation au RCS ou au registre des métiers : [À compléter selon la forme et l’activité, ou indiquer explicitement si non applicable]
-- TVA intracommunautaire : {{AURION_LEGAL_PUBLISHER_VAT}}
-- Directeur ou directrice de la publication : {{AURION_LEGAL_DIRECTOR}}
-- Contact : {{AURION_LEGAL_PUBLISHER_EMAIL}}
+La mention de l’immatriculation et les registres compétents doivent être complétés d’après le justificatif officiel. Ne pas afficher une dénomination sociale ou un capital social de société : l’éditeur déclare une entreprise individuelle.
 
-## Hébergement
+## Hébergement — cible choisie, pas encore opérationnelle
 
-- Application : service hébergé sur Render. Raison sociale contractante, adresse postale et numéro de téléphone : {{AURION_HOST_NAME}}, {{AURION_HOST_ADDRESS}}, {{AURION_HOST_CONTACT}}.
-- Base de données : service Neon. Raison sociale contractante, adresse postale et numéro de téléphone : [À compléter à partir du contrat Neon; préciser si la même entité que l’hébergeur ci-dessus ou un hébergeur distinct].
+- Application Aurion : service Render `aurion` existant en région Frankfurt, Allemagne, à mettre sur plan payant et à rendre canonique. L’entité contractante, l’adresse et le téléphone sont à reprendre des conditions de service du compte éditeur.
+- Base PostgreSQL : Neon, région européenne à confirmer dans le projet commercial et son contrat.
+- Fichiers privés : OVHcloud Object Storage, région Frankfurt `de`. Le nom légal de l’entité contractante et le point de contact seront repris du contrat OVHcloud.
+- E-mails transactionnels : Brevo, sous réserve de création et de validation du compte, de domaine et de l’expéditeur.
+- Paiements : Stripe Payments Europe, sous réserve des conditions du compte marchand.
 
-Ces informations doivent désigner les entités qui hébergent effectivement le site ou les données, et non uniquement leurs marques commerciales.
+**État observé le 30 octobre 2026 :** Render a un service Aurion actif en Oregon et un autre à Francfort, tous deux gratuits et sur le même déploiement 15.3.18. Le domaine canonique n’est pas confirmé comme pointant vers Francfort. Cette mention ne permet donc pas de déclarer que le service commercial est déjà exclusivement hébergé dans l’UE.
 
-## Propriété intellectuelle
+## Propriété intellectuelle et responsabilité éditoriale
 
-Les éléments propres à Aurion sont protégés par les droits applicables. Les composants tiers restent soumis aux droits et licences de leurs titulaires. Toute réutilisation non autorisée est interdite, sous réserve des exceptions légales et licences applicables.
+Aurion comprend du code et des composants tiers régis par leurs licences respectives. Les utilisateurs vérifient les résultats, calculs et documents produits. Aurion 15.3.19 ne transmet pas les factures à une Plateforme Agréée et n’accomplit pas l’e-reporting fiscal.
 
-## Responsabilité éditoriale
+## Données personnelles et traceurs
 
-Les contenus et calculs d’Aurion sont des outils de gestion et d’aide. Ils ne remplacent pas la vérification des données, documents, calculs et obligations du professionnel utilisateur. L’éditeur ne garantit pas la transmission d’une facture à une plateforme agréée par l’émission d’un PDF ou d’un fichier structuré.
-
-## Données personnelles et cookies
-
-Les traitements sont décrits dans la politique de confidentialité et son annexe de sous-traitance. L’usage des cookies et stockages du navigateur est décrit dans la politique cookies. Contact données personnelles : {{AURION_PRIVACY_CONTACT_EMAIL}}.
+Les traitements et sous-traitants prévus sont décrits dans la politique de confidentialité version 2.3. Contact données personnelles : [easyfixit.reparation@gmail.com](mailto:easyfixit.reparation@gmail.com). Les cookies et stockages locaux sont décrits dans la politique cookies.
 
 ## Droit applicable
 
-Les règles applicables sont déterminées par le statut du visiteur ou du client et les textes impératifs. Les présentes mentions ne restreignent aucun droit que la loi rend impératif.
+Les règles de compétence et de droit applicable sont celles prévues par la loi. Aucune mention ne retire aux consommateurs les protections impératives attachées à leur lieu de résidence.

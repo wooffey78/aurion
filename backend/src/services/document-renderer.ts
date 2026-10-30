@@ -6,7 +6,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { query } from '../db.js';
-import { fileFromKey, privateRoot, STORAGE_BASE } from './storage.js';
+import { fileFromKey, privateRoot, STORAGE_BASE, readPrivateObject, writePrivateObject, privateObjectExists, materializePrivateObject } from './storage.js';
 import { buildPdf, buildDocx, buildOdt, starterModel, formatEuro, formatQty, type DocModel } from './document-layout.js';
 export { starterModel, buildDocx, buildOdt };
 import { profileFor, defaultCgvFor } from './profiles.js';
@@ -49,7 +49,7 @@ export async function documentData(organizationId:string,quoteId:string){
  const mentions=computeMentions({kind:isInvoice?'invoice':'quote',profileCode:profile.code,company:{name:displayName,siret:x.siret,siren:x.siren},activity:{legal_form:effectiveLegalForm,payment_terms:x.payment_terms,insurance_info:x.insurance_info,mediator_info:x.mediator_info,legal_notes:x.legal_notes,quote_validity_days:x.quote_validity_days,vat_rate:x.vat_rate??x.activity_vat_rate2}});
  const title=isInvoice?'FACTURE':'DEVIS'; const reminderLabel=isInvoice&&Number(x.reminder_count||0)>0?`${title} · ${Number(x.reminder_count)>=4?'4e':Number(x.reminder_count)===3?'3e':Number(x.reminder_count)===2?'2e':'1ère'} relance`:title;
  let logo:DocModel['company']['logo']=null;
- if(x.logo_key){try{const f=fileFromKey(x.logo_key);const e=path.extname(f).toLowerCase();if(existsSync(f)&&['.png','.jpg','.jpeg'].includes(e))logo={data:readFileSync(f),type:e==='.png'?'png':'jpg'}}catch{}}
+ if(x.logo_key){try{const e=path.extname(String(x.logo_key)).toLowerCase();if(['.png','.jpg','.jpeg'].includes(e))logo={data:await readPrivateObject(x.logo_key),type:e==='.png'?'png':'jpg'}}catch{}}
  const cgv=x.cgv_snapshot||x.activity_cgv||defaultCgvFor(profile.code,profile.title);
  const model:DocModel={
   kind:isInvoice?'invoice':'quote',title:isInvoice?profile.doc.invoiceTitle:profile.doc.quoteTitle,reminderLabel,number:x.number||'',date:dateFr(x.created_at),
@@ -61,7 +61,7 @@ export async function documentData(organizationId:string,quoteId:string){
   warranty:x.warranty_text||'',reminderPenalty:Number(x.total_penalty_amount||0)>0?money(x.total_penalty_amount):'',mileage:{km:formatQty(x.mileage_km),rate:formatEuro(x.mileage_client_rate??x.mileage_rate),total:formatEuro(x.mileage_total),visible:x.mileage_mode==='client_price'},totalTtc:formatEuro(Number(x.total_ttc||0)+Number(x.total_penalty_amount||0)),cgv,theme,legal:mentionLines(mentions),
  };
  const itemsText=items.map(i=>`${i.quantity} × ${i.label}`).join('\n');
- return {row:x,model,mentions,values:{COMPANY_NAME:displayName,LEGAL_FORM:effectiveLegalForm,PAYMENT_TERMS:(mentions.find(m=>m.key==='payment')?.text)||'',VALIDITY:(mentions.find(m=>m.key==='validity')?.text)||'',VAT_NOTICE:(mentions.find(m=>m.key==='vat')?.text)||'',INSURANCE:(mentions.find(m=>m.key==='insurance')?.text)||'',MEDIATOR:(mentions.find(m=>m.key==='mediator')?.text)||'',COMPANY_ACTIVITY:effectiveCompanyActivity,COMPANY_ADDRESS:x.company_address||'',COMPANY_POSTAL_CODE:x.company_postal_code||'',COMPANY_CITY:x.company_city||'',COMPANY_WEBSITE:x.company_website||'',SIRET:x.siret||'',SIREN:x.siren||'',DOCUMENT_TITLE:title,DOCUMENT_NUMBER:x.number||'',DATE:dateFr(x.created_at),CLIENT_NAME:x.client_name||'',CLIENT_EMAIL:x.client_email||'',CLIENT_PHONE:x.client_phone||'',CLIENT_ADDRESS:x.billing_address_snapshot||x.client_address||'',INTERVENTION_ADDRESS:x.intervention_address_snapshot||'',INTERVENTION:x.intervention||'',SERIAL_NUMBER:x.serial_number||'',IMEI:x.imei||'',PRODUCT:x.product||itemsText.replace(/\n/g,' ; '),ITEMS:itemsText,PART_COST_HT:money(x.part_cost),SHIPPING_HT:money(x.shipping_cost),MILEAGE_KM:formatQty(x.mileage_km),MILEAGE_RATE:money(x.mileage_client_rate??x.mileage_rate),MILEAGE_TOTAL:money(x.mileage_total),LABOR_HT:money(x.margin??x.labor_cost),TOTAL_HT:money(x.total_ht),VAT_RATE:Number(x.vat_rate||0).toLocaleString('fr-FR'),VAT:money(x.total_tva),TOTAL_TTC:money(Number(x.total_ttc||0)+Number(x.total_penalty_amount||0)),LATE_PENALTY:Number(x.total_penalty_amount||0)>0?money(x.total_penalty_amount):'',URSSAF_RATE:Number(x.urssaf_rate||0).toLocaleString('fr-FR'),WARRANTY:x.warranty_text||'',CGV:cgv,STATUS:(Number(x.reminder_count||0)>0?`Relance ${Number(x.reminder_count)>=4?'4e':Number(x.reminder_count)===3?'3e':Number(x.reminder_count)===2?'2e':'1ère'} envoyée`:'Facture envoyée')+(Number(x.total_penalty_amount||0)>0?` · Majorations cumulées : ${money(x.total_penalty_amount)}`:''),LEGAL_NOTES:mentions.filter(m=>m.text).map(m=>m.text).join('\n'),LOGO_PATH:x.logo_key?fileFromKey(x.logo_key):''}};
+ return {row:x,model,mentions,values:{COMPANY_NAME:displayName,LEGAL_FORM:effectiveLegalForm,PAYMENT_TERMS:(mentions.find(m=>m.key==='payment')?.text)||'',VALIDITY:(mentions.find(m=>m.key==='validity')?.text)||'',VAT_NOTICE:(mentions.find(m=>m.key==='vat')?.text)||'',INSURANCE:(mentions.find(m=>m.key==='insurance')?.text)||'',MEDIATOR:(mentions.find(m=>m.key==='mediator')?.text)||'',COMPANY_ACTIVITY:effectiveCompanyActivity,COMPANY_ADDRESS:x.company_address||'',COMPANY_POSTAL_CODE:x.company_postal_code||'',COMPANY_CITY:x.company_city||'',COMPANY_WEBSITE:x.company_website||'',SIRET:x.siret||'',SIREN:x.siren||'',DOCUMENT_TITLE:title,DOCUMENT_NUMBER:x.number||'',DATE:dateFr(x.created_at),CLIENT_NAME:x.client_name||'',CLIENT_EMAIL:x.client_email||'',CLIENT_PHONE:x.client_phone||'',CLIENT_ADDRESS:x.billing_address_snapshot||x.client_address||'',INTERVENTION_ADDRESS:x.intervention_address_snapshot||'',INTERVENTION:x.intervention||'',SERIAL_NUMBER:x.serial_number||'',IMEI:x.imei||'',PRODUCT:x.product||itemsText.replace(/\n/g,' ; '),ITEMS:itemsText,PART_COST_HT:money(x.part_cost),SHIPPING_HT:money(x.shipping_cost),MILEAGE_KM:formatQty(x.mileage_km),MILEAGE_RATE:money(x.mileage_client_rate??x.mileage_rate),MILEAGE_TOTAL:money(x.mileage_total),LABOR_HT:money(x.margin??x.labor_cost),TOTAL_HT:money(x.total_ht),VAT_RATE:Number(x.vat_rate||0).toLocaleString('fr-FR'),VAT:money(x.total_tva),TOTAL_TTC:money(Number(x.total_ttc||0)+Number(x.total_penalty_amount||0)),LATE_PENALTY:Number(x.total_penalty_amount||0)>0?money(x.total_penalty_amount):'',URSSAF_RATE:Number(x.urssaf_rate||0).toLocaleString('fr-FR'),WARRANTY:x.warranty_text||'',CGV:cgv,STATUS:(Number(x.reminder_count||0)>0?`Relance ${Number(x.reminder_count)>=4?'4e':Number(x.reminder_count)===3?'3e':Number(x.reminder_count)===2?'2e':'1ère'} envoyée`:'Facture envoyée')+(Number(x.total_penalty_amount||0)>0?` · Majorations cumulées : ${money(x.total_penalty_amount)}`:''),LEGAL_NOTES:mentions.filter(m=>m.text).map(m=>m.text).join('\n'),LOGO_PATH:''}};
 }
 
 function replaceAcrossTextNodes(xml:string,values:DocData,tag:string){
@@ -114,13 +114,13 @@ export async function renderDocument(organizationId:string,quoteId:string,type:'
  // Réutilise les fichiers déjà générés tant que le document et le modèle n'ont pas changé.
  const previous=await query('select * from generated_documents where organization_id=$1 and quote_id=$2 and document_type=$3 order by created_at desc limit 1',[organizationId,quoteId,type]);
  const themeRow=(await query('select updated_at from document_themes where organization_id=$1',[organizationId])).rows[0];const stamp=Math.max(new Date(data.row.updated_at||0).getTime(),new Date(data.row.activity_updated_at||0).getTime(),new Date(data.row.organization_updated_at||0).getTime(),new Date(themeRow?.updated_at||0).getTime());
- if(previous.rowCount){const g=previous.rows[0];if(g.template_id===(tpl?.id||null)&&new Date(g.created_at).getTime()>=stamp&&g.docx_key&&g.odt_key&&g.pdf_key&&existsSync(fileFromKey(g.docx_key))&&existsSync(fileFromKey(g.odt_key))&&existsSync(fileFromKey(g.pdf_key)))return {id:g.id,keys:{docx:g.docx_key,odt:g.odt_key,pdf:g.pdf_key},row:data.row}}
+ if(previous.rowCount){const g=previous.rows[0];if(g.template_id===(tpl?.id||null)&&new Date(g.created_at).getTime()>=stamp&&g.docx_key&&g.odt_key&&g.pdf_key&&await privateObjectExists(g.docx_key)&&await privateObjectExists(g.odt_key)&&await privateObjectExists(g.pdf_key))return {id:g.id,keys:{docx:g.docx_key,odt:g.odt_key,pdf:g.pdf_key},row:data.row}}
  const base=`${(data.row.number||type).replace(/[^A-Za-z0-9_-]/g,'_')}-${Date.now()}`;
  const docx=path.join(root,`${base}.docx`),odt=path.join(root,`${base}.odt`),pdf=path.join(root,`${base}.pdf`);
  const canConvert=!!findSoffice();
  // 1) Modèle personnalisé de l'utilisateur (DOCX/ODT) : ses variables sont remplacées, sa mise en page est conservée.
  if(tpl){
-  const tp=fileFromKey(tpl.storage_key);
+  const tp=await materializePrivateObject(tpl.storage_key);
   if(tpl.mime_type.includes('wordprocessingml'))await templateDocx(tp,data.values,docx);
   else if(tpl.mime_type.includes('opendocument'))await templateOdt(tp,data.values,odt);
   else throw new Error('TEMPLATE_FORMAT_UNSUPPORTED');
@@ -135,6 +135,7 @@ export async function renderDocument(organizationId:string,quoteId:string,type:'
  if(!existsSync(odt))await fs.writeFile(odt,buildOdt(data.model));
  if(!existsSync(pdf))await fs.writeFile(pdf,await buildPdf(data.model));
  const genId=cryptoRandom();const keys={docx:`private/${organizationId}/${path.basename(docx)}`,odt:`private/${organizationId}/${path.basename(odt)}`,pdf:`private/${organizationId}/${path.basename(pdf)}`};
+ await Promise.all([[keys.docx,docx],[keys.odt,odt],[keys.pdf,pdf]].map(async([key,local])=>writePrivateObject(String(key),await fs.readFile(String(local)))));
  await query(`insert into generated_documents(id,organization_id,activity_id,quote_id,document_type,template_id,docx_key,odt_key,pdf_key) values($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[genId,organizationId,data.row.activity_id,quoteId,type,tpl?.id||null,keys.docx,keys.odt,keys.pdf]);
  return {id:genId,keys,row:data.row};
 }

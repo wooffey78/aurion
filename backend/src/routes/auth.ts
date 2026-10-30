@@ -6,7 +6,7 @@ import { config } from "../config.js";
 import { hashPassword, verifyPassword } from "../services/passwords.js";
 import { registerSchema, loginSchema } from "../services/validation.js";
 import { signAccessToken } from "../plugins/auth.js";
-import { legalDocumentsReadyForContracts, recordAcceptances } from "../services/account.js";
+import { legalDocumentsReadyForContracts, localEvaluationSignupAllowed, recordAcceptances } from "../services/account.js";
 import { createRefreshSession, rotateRefreshSession, revokeRefreshSession, revokeAllRefreshSessions, REFRESH_SECONDS } from '../services/native-sessions.js';
 import { registrationOptions, verifyRegistration, authenticationOptions, verifyAuthentication, issueWebAuthnSession } from '../services/webauthn.js';
 
@@ -51,6 +51,11 @@ async function googleLoginClient(){
 }
 
   app.get('/auth/google/status', async () => ({ configured: googleLoginConfigured() }));
+  app.get('/auth/registration-status', async () => {
+    const published = await legalDocumentsReadyForContracts();
+    const localEvaluation = !published && localEvaluationSignupAllowed();
+    return { available: published || localEvaluation, localEvaluation, reason: published || localEvaluation ? null : 'LEGAL_DOCUMENTS_UNPUBLISHED' };
+  });
 
   app.get('/auth/google/start', { config: { rateLimit: { max: 8, timeWindow: '15 minutes' } } }, async (request, reply) => {
     if (!googleLoginConfigured()) return reply.code(503).send({ error: 'GOOGLE_LOGIN_NOT_CONFIGURED', message: 'La connexion Google n’est pas configurée.' });
@@ -183,7 +188,7 @@ async function googleLoginClient(){
       if (!parsed.success) {
         return reply.code(400).send({ error: "INVALID_INPUT" });
       }
-      if (!(await legalDocumentsReadyForContracts())) {
+      if (!(await legalDocumentsReadyForContracts()) && !localEvaluationSignupAllowed()) {
         return reply.code(503).send({ error: "LEGAL_DOCUMENTS_UNPUBLISHED", message: "La création de compte est temporairement indisponible : les documents contractuels ne sont pas publiés." });
       }
 

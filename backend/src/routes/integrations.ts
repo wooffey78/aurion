@@ -6,7 +6,8 @@ import { sendOrgMail, mailConfigured } from '../services/mail.js';
 import { AurionError } from '../services/errors.js';
 import { loadAppointment, syncAppointment } from '../services/calendar.js';
 import { signatureForEmail, emailBodyHtml } from '../services/signature.js';
-import { renderDocument, fileFromKey } from '../services/document-renderer.js';
+import { renderDocument } from '../services/document-renderer.js';
+import { readPrivateObject } from '../services/storage.js';
 import { createInvoiceWarranty } from '../services/warranty.js';
 
 export async function integrationRoutes(app:FastifyInstance){
@@ -21,7 +22,7 @@ export async function integrationRoutes(app:FastifyInstance){
     if(!(await mailConfigured(org)))throw new AurionError('MAIL_NOT_CONFIGURED','La messagerie n’est pas configurée. Ouvrez Paramètres → Messagerie & agenda pour renseigner votre adresse e-mail (une seule fois).');
     const d=await renderDocument(org,b.documentId,type);
     if(!d.row.client_email)return reply.code(400).send({error:'CLIENT_EMAIL_MISSING'});
-    const pdf=await import('node:fs/promises').then(fs=>fs.readFile(fileFromKey(d.keys.pdf)));
+    const pdf=await readPrivateObject(d.keys.pdf);
     const label=type==='invoice'?'facture':'devis';const body=b.message||`Bonjour ${d.row.client_name||''},\n\nVeuillez trouver votre ${label} ${d.row.number} en pièce jointe.`;const sig=await signatureForEmail(org,d.row.activity_id,type);
     await sendOrgMail(org,{to:d.row.client_email,subject:`${type==='invoice'?'Facture':'Devis'} ${d.row.number}`,text:body+sig.text,html:emailBodyHtml(body,sig.html),attachments:[...(sig.inlineAttachments||[]),{filename:`${d.row.number}.pdf`,content:pdf}]});
     await query('update quotes set sent_at=now(),updated_at=now() where id=$1 and organization_id=$2',[b.documentId,org]);

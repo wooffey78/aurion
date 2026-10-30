@@ -1,4 +1,4 @@
-﻿# Aurion - installation automatique. Lancé par Aurion-Setup.bat. AUCUNE saisie, AUCUN droit administrateur requis.
+# Aurion - installation automatique. Lancé par Aurion-Setup.bat. AUCUNE saisie, AUCUN droit administrateur requis.
 param([switch]$NoLaunch)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Aurion-Common.ps1')
@@ -9,19 +9,62 @@ function Step([string]$m) { $script:n++; Write-Step ("[{0}/{1}] {2}" -f $script:
 function Get-AurionOllamaPath {
     $command = Get-Command 'ollama.exe' -ErrorAction SilentlyContinue
     if ($command) { return $command.Source }
-    $candidate = Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'
-    if (Test-Path -LiteralPath $candidate) { return $candidate }
+    $candidates = @()
+    if ($env:LOCALAPPDATA) {
+        $candidates += Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'
+        $candidates += Join-Path $env:LOCALAPPDATA 'Ollama\ollama.exe'
+    }
+    if ($env:ProgramFiles) { $candidates += Join-Path $env:ProgramFiles 'Ollama\ollama.exe' }
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+    }
     return $null
+}
+
+function Test-AurionOllamaReady {
+    $health = Invoke-Http 'http://127.0.0.1:11434/api/tags' 3
+    return $health.Status -eq 200
+}
+
+function Start-AurionOllamaServer([string]$OllamaPath) {
+    if (Test-AurionOllamaReady) { return $true }
+    $serverLog = Join-Path $script:LogDir 'aurion-ollama-server.log'
+    $serverErrorLog = Join-Path $script:LogDir 'aurion-ollama-server-error.log'
+    Remove-Item -LiteralPath $serverLog,$serverErrorLog -Force -ErrorAction SilentlyContinue
+    try {
+        # Ollama's CLI only manages models while its local HTTP service is listening.
+        # Start it detached so a tray/service child cannot hold the setup process open.
+        Start-Process -FilePath $OllamaPath -ArgumentList 'serve' -WindowStyle Hidden `
+            -RedirectStandardOutput $serverLog -RedirectStandardError $serverErrorLog | Out-Null
+    } catch {
+        # Ollama may have started between the health check and the launch attempt.
+        if (-not (Test-AurionOllamaReady)) { throw }
+    }
+    for ($attempt = 0; $attempt -lt 45; $attempt++) {
+        if (Test-AurionOllamaReady) { return $true }
+        Start-Sleep -Seconds 2
+    }
+    $detail = Get-TailText $serverLog 8
+    $errorDetail = Get-TailText $serverErrorLog 8
+    if ($errorDetail) { $detail += "`n" + $errorDetail }
+    if ($detail) { Write-Log ("Ollama ne répond pas encore. " + $detail) 'WARN' }
+    return $false
 }
 
 function Install-AurionLocalAI {
     if (-not $script:IsWin) { return }
-    $model = 'qwen3.5:4b'
+    $envMap = Read-EnvFile
+    $model = [string]$envMap['AURION_LOCAL_LLM_MODEL']
+    if ([string]::IsNullOrWhiteSpace($model)) { $model = 'qwen3.5:4b-q4_K_M' }
+    if ($model -notmatch '^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,120}$') {
+        $model = 'qwen3.5:4b-q4_K_M'
+        Write-Log 'Nom de modèle IA local invalide; Qwen3.5-4B Q4_K_M est utilisé.' 'WARN'
+    }
     $ollama = Get-AurionOllamaPath
     $installedNow = $false
 
     if (-not $ollama) {
-        $message = "Aurion peut installer Ollama pour activer son IA locale, puis télécharger Qwen3.5-4B (3,3 à 4 Go).`n`nCela demande une connexion Internet et plusieurs Go libres. L'installation d'Ollama se fait pour votre compte Windows, sans droit administrateur. Le modèle fonctionne sur ce PC et n'active aucun repli cloud.`n`nInstaller Ollama et télécharger le modèle maintenant ?"
+        $message = "Aurion peut installer Ollama pour activer son IA locale, puis télécharger le modèle $model.`n`nCela demande une connexion Internet et plusieurs Go libres. L'installation d'Ollama se fait pour votre compte Windows, sans droit administrateur. Le modèle fonctionne sur ce PC et n'active aucun repli cloud.`n`nInstaller Ollama et télécharger le modèle maintenant ?"
         if (-not (Show-YesNoDialog 'Aurion - IA locale' $message)) {
             Write-Log "Installation Ollama/Qwen refusée ou différée par l’utilisateur." 'WARN'
             return
@@ -36,11 +79,18 @@ function Install-AurionLocalAI {
                 throw "La signature Authenticode de l’installateur Ollama est invalide ou son éditeur ne correspond pas à Ollama Inc."
             }
             Write-Step "Installation d’Ollama (éditeur vérifié)"
-            $process = Start-Process -FilePath $installer -ArgumentList '/VERYSILENT /NORESTART /SUPPRESSMSGBOXES' -Wait -PassThru
+            # Wait for the installer process itself, not a long-lived Ollama child process.
+            $process = Start-Process -FilePath $installer -ArgumentList '/VERYSILENT /NORESTART /SUPPRESSMSGBOXES' -PassThru
+            if (-not $process.WaitForExit(600000)) {
+                try { $process.Kill() } catch {}
+                throw "Le programme d'installation Ollama a dépassé le délai de 10 minutes."
+            }
+            $process.Refresh()
             if ($process.ExitCode -ne 0) { throw "L’installation Ollama a échoué (code $($process.ExitCode))." }
             $ollama = Get-AurionOllamaPath
             if (-not $ollama) { throw 'Ollama est installé mais son exécutable est introuvable dans le compte Windows.' }
             $env:Path = (Split-Path -Parent $ollama) + [IO.Path]::PathSeparator + $env:Path
+            $process.Dispose()
             $installedNow = $true
         } catch {
             $script:LocalAIWarning = "Ollama n’a pas pu être installé ; Aurion continue sans IA locale. Consultez logs\aurion.log."
@@ -51,13 +101,19 @@ function Install-AurionLocalAI {
         }
     }
 
+    if (-not (Start-AurionOllamaServer $ollama)) {
+        $script:LocalAIWarning = "Ollama est installé, mais son service local n’a pas démarré. Aurion continue sans IA locale. Consultez logs\aurion-ollama-server.log."
+        Write-Log $script:LocalAIWarning 'WARN'
+        return
+    }
+
     $listed = Invoke-Native $ollama @('list')
-    if ($listed.Code -eq 0 -and $listed.Output -match '(?im)^\s*qwen3\.5:4b(?:\s|$)') {
+    if ($listed.Code -eq 0 -and $listed.Output -match '(?im)^\s*qwen3\.5:4b-q4_K_M(?:\s|$)') {
         Write-Log "Modèle IA local déjà installé : $model."
         return
     }
     if (-not $installedNow) {
-        $message = "Télécharger Qwen3.5-4B (3,3 à 4 Go) pour activer l’IA locale d’Aurion ?`n`nUne connexion Internet et plusieurs Go libres sont nécessaires. Aucun service cloud ne sera utilisé."
+        $message = "Télécharger le modèle local $model pour activer l’IA d’Aurion ?`n`nUne connexion Internet et plusieurs Go libres sont nécessaires. Aucun service cloud ne sera utilisé."
         if (-not (Show-YesNoDialog 'Aurion - Modèle IA local' $message)) {
             Write-Log "Téléchargement de $model différé par l’utilisateur ; Aurion reste installable." 'WARN'
             return
@@ -67,20 +123,25 @@ function Install-AurionLocalAI {
     try {
         Write-Step "Téléchargement du modèle IA $model (plusieurs Go)"
         $aiLog = Join-Path $script:LogDir 'aurion-ollama-model.log'
-        $oldPreference = $ErrorActionPreference
-        $ErrorActionPreference = 'Continue'
-        try {
-            & $ollama pull $model 2>&1 | ForEach-Object {
-                $line = "$_"
-                Write-Host $line
-                try { [IO.File]::AppendAllText($aiLog, $line + "`r`n", $script:Utf8NoBom) } catch {}
-            }
-            $pullExit = $LASTEXITCODE
-        } finally { $ErrorActionPreference = $oldPreference }
+        $pullErrorLog = Join-Path $script:LogDir 'aurion-ollama-model-error.log'
+        Remove-Item -LiteralPath $aiLog,$pullErrorLog -Force -ErrorAction SilentlyContinue
+        $pullProcess = Start-Process -FilePath $ollama -ArgumentList @('pull', $model) -PassThru `
+            -WindowStyle Hidden -RedirectStandardOutput $aiLog -RedirectStandardError $pullErrorLog
+        if (-not $pullProcess.WaitForExit(5400000)) {
+            try { $pullProcess.Kill() } catch {}
+            throw "Le téléchargement de $model a dépassé le délai de 90 minutes. Il peut être relancé plus tard."
+        }
+        $pullProcess.Refresh()
+        $pullExit = $pullProcess.ExitCode
+        $pullProcess.Dispose()
+        $tail = Get-TailText $aiLog 12
+        if ($tail) { Write-Host $tail }
+        $errorTail = Get-TailText $pullErrorLog 8
+        if ($errorTail) { Write-Log ("Sortie Ollama : " + $errorTail) 'WARN' }
         if ($pullExit -ne 0) { throw "ollama pull a échoué (code $pullExit). Voir logs\aurion-ollama-model.log." }
         Write-Log "Modèle IA local prêt : $model."
     } catch {
-        $script:LocalAIWarning = "Le modèle Qwen n’a pas pu être téléchargé ; Aurion continue sans IA locale. Relancez « ollama pull qwen3.5:4b » après installation."
+        $script:LocalAIWarning = "Le modèle $model n’a pas pu être téléchargé ; Aurion continue sans IA locale. Relancez « ollama pull $model » après installation."
         Write-Log ("Téléchargement du modèle local échoué : {0}" -f $_.Exception.Message) 'WARN'
     }
 }
@@ -114,6 +175,8 @@ try {
     $defaults = [ordered]@{
         NODE_ENV = 'development'; HOST = '127.0.0.1'; PORT = '4000'
         CORS_ORIGIN = 'http://127.0.0.1:4000,http://localhost:4000'
+        AURION_AI_PROVIDER = 'local'; AURION_OLLAMA_URL = 'http://127.0.0.1:11434'; AURION_LOCAL_LLM_MODEL = 'qwen3.5:4b-q4_K_M'
+        AURION_LOCAL_EVALUATION_MODE = 'true'
         JWT_ISSUER = 'aurion'; JWT_AUDIENCE = 'aurion-web'; COOKIE_SECURE = 'false'
         GOOGLE_CLIENT_ID = ''; GOOGLE_CLIENT_SECRET = ''; GOOGLE_REDIRECT_URI = 'http://127.0.0.1:4000/integrations/google/callback'
         GOOGLE_TOKEN_ENCRYPTION_KEY = (New-Secret 32); GOOGLE_CALENDAR_ID = 'primary'; MAIL_FROM_NAME = 'Aurion'; REMINDER_WORKER_INTERVAL_MS = '60000'

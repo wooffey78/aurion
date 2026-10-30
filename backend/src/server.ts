@@ -3,6 +3,7 @@ import {config} from './config.js';
 import {query,db} from './db.js';
 import {startReminderWorker} from './services/scheduler.js';
 import {ensureLegalDocuments} from './services/account.js';
+import {migrateLocalPrivateStorageToS3} from './services/storage.js';
 
 async function waitForDatabase(){
   const max=20;
@@ -19,6 +20,8 @@ async function waitForDatabase(){
 
 try{
   await waitForDatabase();
+  const storageMigration=await migrateLocalPrivateStorageToS3();
+  if(storageMigration.copied)console.log(`[AURION STORAGE] ${storageMigration.copied} fichier(s), ${storageMigration.bytes} octet(s) copiés vers S3.`);
   await ensureLegalDocuments().catch(e=>console.error('[AURION] documents légaux non initialisés :',e?.message||e));
   const app=await buildApp();
   await app.listen({host:config.HOST,port:config.PORT});

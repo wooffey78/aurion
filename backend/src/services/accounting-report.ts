@@ -1,7 +1,6 @@
 import type PDFKit from 'pdfkit';
 import { query } from '../db.js';
-import { existsSync, readFileSync } from 'node:fs';
-import { fileFromKey } from './storage.js';
+import { readPrivateObject } from './storage.js';
 import { getTheme } from './theme.js';
 
 const pdfkit = async () => (await import('pdfkit')).default as unknown as typeof PDFKit;
@@ -11,6 +10,7 @@ const MONTHS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juill
 /** Export comptable : PDF consultable et téléchargeable, avec le détail mensuel et les totaux de l'année. */
 export async function accountingReportPdf(organizationId: string, activityId: string, year: number) {
   const org = (await query('select name,siret,activity,logo_key from organizations where id=$1', [organizationId])).rows[0] || {};
+  const logoBuffer: Buffer | null = org.logo_key ? await readPrivateObject(org.logo_key).catch(() => null) : null;
   const act = (await query('select name,legal_form,social_regime,vat_regime from activities where id=$1', [activityId])).rows[0];
   const contributions=(await query('select name,rate,basis,variable from activity_contributions where activity_id=$1 order by position,name',[activityId])).rows;
   const theme = await getTheme(organizationId);
@@ -45,7 +45,7 @@ export async function accountingReportPdf(organizationId: string, activityId: st
     const writeFiscalLine = (d:any, x:number, right:number, yy:number, text:string) => d.font('Helvetica').fontSize(8).fillColor(ink).text(text,x+10,yy,{width:right-x-20,lineBreak:false});
 
     let tx = L;
-    if (org.logo_key) { try { const f = fileFromKey(org.logo_key); if (existsSync(f)) { doc.image(readFileSync(f), L, 52, { fit: [52, 52] }); tx = L + 68; } } catch { /* logo illisible */ } }
+    if (logoBuffer) { try { doc.image(logoBuffer, L, 52, { fit: [52, 52] }); tx = L + 68; } catch { /* logo illisible */ } }
     doc.font('Helvetica-Bold').fontSize(16).fillColor(ink).text(org.name || 'Entreprise', tx, 56, { width: 280 });
     if (org.siret) doc.font('Helvetica').fontSize(9).fillColor(muted).text(`SIRET ${org.siret}`, tx, doc.y + 2, { width: 280 });
     doc.font('Helvetica-Bold').fontSize(14).fillColor(accent).text('EXPORT COMPTABLE', R - 240, 56, { width: 240, align: 'right' });

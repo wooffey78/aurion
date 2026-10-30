@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { config } from '../config.js';
 import { db, query } from '../db.js';
@@ -10,11 +10,10 @@ import {
 } from '../services/account.js';
 import { AurionError } from '../services/errors.js';
 import { revokeAllRefreshSessions } from '../services/native-sessions.js';
-import { savePrivateUpload, fileFromKey } from '../services/storage.js';
-import { readFile } from 'node:fs/promises';
-import { unlink } from 'node:fs/promises';
+import { savePrivateUpload, readPrivateObject, deletePrivateObject } from '../services/storage.js';
 import { activateStripeCheckout, verifyStripeWebhookSignature } from '../services/stripe-billing.js';
 import { calculateTtcCents } from '../services/money.js';
+import { platformMailerConfigured, sendConfiguredPlatformMail } from '../services/platform-mailer.js';
 
 const emailSchema = z.string().trim().email().max(254);
 const passwordSchema = z.string().min(12).max(256);
@@ -59,6 +58,45 @@ export async function accountRoutes(app: FastifyInstance) {
     const r = await query('select kind,version,title,body,is_draft,published_at from legal_documents where kind=$1 and is_current=true', [(request.params as any).kind]);
     if (!r.rowCount) return reply.code(404).send({ error: 'NOT_FOUND' });
     return r.rows[0];
+  });
+
+  // Parcours public de rétractation consommateur, accessible sans authentification.
+  app.post('/billing/withdrawal', { config: { rateLimit: { max: 3, timeWindow: '30 minutes' } } }, async (request, reply) => {
+    const parsed = z.object({
+      firstName: z.string().trim().min(1).max(100),
+      lastName: z.string().trim().min(1).max(100),
+      email: emailSchema,
+      contractReference: z.string().trim().min(8).max(1000),
+      contractDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      confirmationEmail: emailSchema,
+    }).strict().safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'INVALID_WITHDRAWAL_DETAILS', message: 'Vérifiez votre identité, l’adresse de réponse et les références détaillées du contrat.' });
+    const b = parsed.data;
+    if (b.email.toLowerCase() !== b.confirmationEmail.toLowerCase()) return reply.code(400).send({ error: 'EMAIL_CONFIRMATION_MISMATCH', message: 'Les deux adresses e-mail doivent être identiques.' });
+    const contractDate = new Date(`${b.contractDate}T00:00:00Z`);
+    if (Number.isNaN(contractDate.getTime()) || contractDate.toISOString().slice(0, 10) !== b.contractDate) return reply.code(400).send({ error: 'INVALID_CONTRACT_DATE' });
+    const submittedAt = new Date();
+    if (contractDate.getTime() > Date.UTC(submittedAt.getUTCFullYear(), submittedAt.getUTCMonth(), submittedAt.getUTCDate())) return reply.code(400).send({ error: 'CONTRACT_DATE_IN_FUTURE' });
+    const id = randomUUID();
+    const declarationText = `Je soussigné(e) ${b.firstName} ${b.lastName}, notifie ma décision de me rétracter du contrat Aurion identifié comme suit : ${b.contractReference}. Date de conclusion indiquée : ${b.contractDate}. Adresse de réponse demandée : ${b.email}.`;
+    await query(`insert into contract_withdrawal_requests(id,first_name,last_name,email,contract_reference,contract_date,declaration_text,submitted_at)
+      values($1,$2,$3,$4,$5,$6,$7,$8)`, [id, b.firstName, b.lastName, b.email, b.contractReference, b.contractDate, declarationText, submittedAt]);
+    let receiptSent = false;
+    try {
+      if (!platformMailerConfigured()) throw new Error('PLATFORM_SMTP_NOT_CONFIGURED');
+      await sendConfiguredPlatformMail({
+        to: b.email,
+        subject: 'Aurion — accusé de réception de votre déclaration de rétractation',
+        text: `Bonjour ${b.firstName} ${b.lastName},\n\nAurion accuse réception de votre déclaration de rétractation.\n\nDéclaration :\n${declarationText}\n\nEnvoyée le ${submittedAt.toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })} (heure de Paris).\nRéférence de suivi : ${id}\n\nCette confirmation constate la réception de votre déclaration et ne préjuge pas de son éligibilité ni du traitement du remboursement. Pour toute demande, répondez à cet e-mail ou écrivez à ${config.AURION_SUPPORT_EMAIL}.\n\nAurion`,
+      });
+      receiptSent = true;
+      await query("update contract_withdrawal_requests set receipt_sent_at=now(),receipt_delivery_status='sent',updated_at=now() where id=$1", [id]);
+    } catch (error: any) {
+      const code = String(error?.code || error?.message || 'MAIL_DELIVERY_FAILED').replace(/[^A-Z0-9_:-]/gi, '_').slice(0, 80);
+      await query("update contract_withdrawal_requests set receipt_delivery_status='failed',receipt_error_code=$2,updated_at=now() where id=$1", [id, code]);
+      request.log.error({ withdrawalId: id, code }, 'withdrawal receipt email could not be delivered');
+    }
+    return reply.code(201).send({ id, submittedAt: submittedAt.toISOString(), receiptSent, declaration: declarationText, supportEmail: config.AURION_SUPPORT_EMAIL });
   });
 
   // Stripe appelle cette route serveur-à-serveur : aucune session utilisateur n'est requise.
@@ -143,7 +181,7 @@ export async function accountRoutes(app: FastifyInstance) {
       try{
         const key=String(row.avatar_key);
         const mime=key.toLowerCase().endsWith('.png')?'image/png':key.toLowerCase().endsWith('.webp')?'image/webp':'image/jpeg';
-        const buf=await readFile(fileFromKey(key));
+        const buf=await readPrivateObject(key);
         return reply.header('Content-Type',mime).header('Cache-Control','private, max-age=0, no-store').send(buf);
       }catch{return reply.code(404).send({error:'NOT_FOUND',message:'Avatar introuvable.'});}
     });
@@ -154,7 +192,7 @@ export async function accountRoutes(app: FastifyInstance) {
       const newKey=`private/${request.auth!.organizationId}/${saved.safe}`;
       const old=(await query('select avatar_key from users where id=$1',[request.auth!.userId])).rows[0]?.avatar_key;
       await query('update users set avatar_key=$1 where id=$2',[newKey,request.auth!.userId]);
-      if(old){try{await unlink(fileFromKey(String(old)));}catch{}}
+      if(old){try{await deletePrivateObject(String(old));}catch{}}
       return {ok:true,avatarUrl:'/account/avatar'};
     });
     priv.patch('/account', async (request, reply) => {

@@ -1,35 +1,33 @@
 # Politique relative aux cookies et stockages du navigateur — Aurion
 
-> **PROJET DE DOCUMENT — NE PAS UTILISER POUR UNE COMMERCIALISATION.** Inventaire établi à partir du code du dépôt 15.3.18 le 30 octobre 2026. Vérifier les cookies réellement émis, les scripts tiers et les choix par navigateur sur le site de production avant publication.
+> **DOSSIER DE PRÉPARATION — NE PAS PUBLIER AVANT VÉRIFICATION NAVIGATEUR.** Version 2.3, Aurion 15.3.19, 30 octobre 2026. Inventaire statique du dépôt; contrôle navigateur en production encore à faire.
 
-**Éditeur : {{AURION_LEGAL_PUBLISHER_NAME}} — Contact : {{AURION_PRIVACY_CONTACT_EMAIL}} — Version projet : 2.2**
+Éditeur déclaré : Coulibaly Damien, EI, nom commercial Easyweb-dev. Contact : [easyfixit.reparation@gmail.com](mailto:easyfixit.reparation@gmail.com).
 
-## 1. Cookies nécessaires
+## Cookies de session et sécurité
 
-Le code examiné utilise les cookies suivants pour l’authentification et la protection de compte :
+| Nom | Finalité | Durée observée dans le code | Attributs observés |
+|---|---|---:|---|
+| `aurion_session` | Session de connexion | 30 minutes | HttpOnly, SameSite=Strict, Secure en production lorsque `COOKIE_SECURE=true` |
+| `aurion_refresh` | Renouvellement de session native | 30 jours | HttpOnly, SameSite=Strict, chemin `/auth`, Secure en production |
+| `aurion_google_login` | Protection de la transaction OAuth Google | 10 minutes | HttpOnly, SameSite=Lax, chemin du rappel, Secure selon configuration |
 
-| Nom | Fonction | Durée technique maximale observée | Accès |
-| --- | --- | --- | --- |
-| aurion_session | Maintenir la session Aurion | 30 minutes | HttpOnly; Secure si la configuration l’active; SameSite=Strict |
-| aurion_refresh | Renouveler une session native | 30 jours | HttpOnly; Secure si la configuration l’active; SameSite=Strict; chemin /auth |
-| aurion_google_login | Protéger une transaction de connexion Google contre la falsification | 10 minutes | HttpOnly; Secure selon configuration; SameSite=Lax; chemin de rappel Google |
+Ces cookies sont nécessaires à la connexion ou à la sécurité du service. Le navigateur peut les bloquer ou les supprimer, ce qui peut interrompre la connexion. La durée effective doit être revérifiée selon le navigateur et la configuration publiée.
 
-Ces cookies sont utilisés pour fournir une fonction expressément demandée et sécuriser l’accès. Leur blocage ou leur suppression peut déconnecter l’utilisateur ou empêcher la connexion.
+## Stockages locaux
 
-## 2. Stockage local dans le navigateur
+Le code utilise `localStorage` pour des préférences d’affichage, l’activité sélectionnée, l’e-mail du dernier compte et des révisions de synchronisation; l’application utilise aussi le cache du service worker pour ses ressources statiques. Ces données restent sur le terminal, mais peuvent contenir une adresse e-mail ou des préférences. Elles ne sont pas des cookies. Les supprimer peut effacer ces préférences ou déconnecter l’utilisateur. Le cache local ne supprime pas les informations hébergées dans son compte.
 
-Le dépôt utilise aussi le stockage local du navigateur pour mémoriser notamment l’adresse e-mail du dernier compte utilisé, l’activité sélectionnée, la préférence d’affichage de la proposition de clé d’accès et une révision de synchronisation. Ces éléments ne sont pas des cookies et restent sur le terminal, jusqu’à leur suppression par l’utilisateur ou le navigateur. Effacer le stockage local peut réinitialiser les préférences ou demander une nouvelle connexion.
+## Traceurs tiers et mesure d’audience
 
-Aurion peut être installable comme application web progressive. Le fonctionnement hors ligne et les éléments mis en cache doivent être vérifiés sur la version réellement déployée.
+L’examen statique du dépôt 15.3.19 n’a pas identifié de bibliothèque d’audience ou de publicité. Une connexion facultative à Google peut être activée par l’utilisateur et entraîne alors une communication avec Google. Aucun traceur non essentiel ne doit être activé avant le consentement applicable. Si une mesure d’audience ou un service marketing est ajouté, il faudra compléter cette politique et mettre en place un mécanisme de choix/refus et de retrait avant sa mise en production.
 
-## 3. Mesure d’audience, publicité et intégrations
+## Gérer ses choix
 
-L’examen du dépôt n’a pas révélé de bibliothèque de mesure d’audience ou de publicité. Cette vérification du code ne garantit pas l’absence d’un traceur ajouté par une configuration de production, un contenu externe ou une mise à jour. L’éditeur doit exécuter un contrôle navigateur de production avant publication et après toute modification d’intégration.
+L’utilisateur peut effacer cookies, stockage local et cache depuis les paramètres du navigateur. Cela n’efface pas son compte ou ses données Aurion; pour les demandes de données, écrire à [easyfixit.reparation@gmail.com](mailto:easyfixit.reparation@gmail.com).
 
-Tout traceur qui n’est pas strictement nécessaire doit être bloqué avant le consentement. Le visiteur doit pouvoir accepter, refuser aussi simplement, connaître les finalités et retirer son choix avec une facilité équivalente. Le consentement est enregistré selon les règles applicables.
+## À vérifier avant publication
 
-## 4. Gérer ou supprimer les données
-
-L’utilisateur peut supprimer les cookies et données de site dans les réglages de son navigateur. La suppression peut le déconnecter et effacer ses préférences locales. Les réglages du navigateur ne suppriment pas les données hébergées sur le compte Aurion.
-
-Pour les demandes relatives aux données personnelles : {{AURION_PRIVACY_CONTACT_EMAIL}}. Les choix concernant des traceurs non essentiels, s’ils sont ajoutés, devront être disponibles depuis un lien de gestion accessible à tout moment.
+- Contrôler en navigateur vierge les cookies et stockages réellement émis sur chaque chemin public, authentifié et Google.
+- Vérifier que le service worker ne conserve aucune réponse métier ou document privé en cache.
+- Confirmer qu’aucun tag, police distante, outil de support, paiement ou audience n’a été ajouté par la configuration de production.

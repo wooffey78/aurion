@@ -1,95 +1,84 @@
 # Conditions générales d’utilisation et de vente — Aurion
 
-> **PROJET — NON PUBLIABLE EN L’ÉTAT.** Le texte vise les clients professionnels et les consommateurs, conformément au périmètre déclaré par l’éditeur. Il décrit les fonctions et tarifs examinés dans le dépôt Aurion 15.3.18 et doit être complété par les données d’identité, le médiateur et les parcours consommateurs manquants, puis validé par un juriste avant publication.
+> **DOSSIER DE PRÉPARATION — NE PAS PUBLIER NI UTILISER POUR VENDRE EN L’ÉTAT.** Version 2.3 préparée le 30 octobre 2026 pour Aurion 15.3.19. Elle incorpore les choix communiqués par l’éditeur et distingue les fonctionnalités présentes du service encore à provisionner. L’identité, les fournisseurs, le médiateur, les conditions de vente B2C, les e-mails de preuve et la conformité de l’offre doivent être vérifiés avant publication; les présentes conditions doivent être relues par un professionnel du droit.
 
-**Version projet : 2.2 — Date de rédaction : 30 octobre 2026 — Entrée en vigueur : à compléter après validation**
+**Éditeur déclaré : Coulibaly Damien, entrepreneur individuel sous le régime micro-entreprise, nom commercial Easyweb-dev. Adresse communiquée : 5 Rue Jacques Prevert, 85300 Challans, France. SIRET communiqué : 88848569500033; SIREN déduit des neuf premiers chiffres : 888485695. TVA déclarée par l’éditeur : non assujetti. Contact : easyfixit.reparation@gmail.com — 07 81 51 33 21.** Ces données ne sont pas vérifiées au registre. La mention de non-assujettissement et la facturation sans TVA doivent être confirmées avant toute facture ou publication.
 
-## 1. Éditeur, service et clientèle
+## 1. Objet, éditeur et clientèle
 
-Aurion est un service logiciel en ligne destiné à la gestion et au lancement d’une activité. Selon les modules activés, il fournit des fonctions de création et de configuration d’entreprise, contacts, catalogue, devis, factures, interventions, rendez-vous, garanties et service après-vente, suivi de courriels et d’étapes, indicateurs, et assistance automatisée.
+Aurion est un logiciel de gestion d’activité accessible par le Web et, selon l’installation retenue, comme application web installable. Les fonctions peuvent comprendre la configuration d’une activité, les clients, fournisseurs, catalogue, devis, factures, interventions, rendez-vous, documents, échanges de courriels, suivis, tableaux de bord et suggestions automatisées. Les fonctions effectivement disponibles sont celles présentées dans la version et l’offre commandées.
 
-L’éditeur est **{{AURION_LEGAL_PUBLISHER_NAME}}**, {{AURION_LEGAL_PUBLISHER_FORM}}, SIREN {{AURION_LEGAL_PUBLISHER_SIREN}}, siège {{AURION_LEGAL_PUBLISHER_ADDRESS}}. SIRET du siège : {{AURION_LEGAL_PUBLISHER_SIRET}}. Contact : {{AURION_LEGAL_PUBLISHER_EMAIL}}.
+L’éditeur indiqué ci-dessus est ci-après « l’Éditeur ». Aurion s’adresse aux professionnels et, si l’offre est ouverte à cette catégorie, aux consommateurs. La qualité du client est déterminée d’après la finalité réelle de la commande; une case ou un libellé ne peut supprimer une protection légale.
 
-Le service est proposé aux professionnels et aux consommateurs. La qualité retenue doit être identifiée au moment de la commande. Les droits impératifs d’un consommateur ou d’un professionnel assimilé par la loi ne sont pas écartés par une qualification saisie dans le compte.
+## 2. Formation du contrat et compte
 
-## 2. Définitions et contrat
+Le contrat comprend le récapitulatif de commande, les présentes conditions, les informations précontractuelles et la politique de confidentialité. L’Éditeur remet la confirmation et les documents applicables sur support durable et conserve la version acceptée.
 
-« Éditeur » désigne l’entité indiquée à l’article 1. « Client professionnel » désigne la personne souscrivant pour les besoins de son activité. « Consommateur » désigne la personne physique contractant en dehors de son activité professionnelle, ainsi que toute personne bénéficiant légalement du régime de protection consommateur. « Utilisateur » désigne une personne autorisée à accéder à l’espace du Client. « Données du Client » désigne les informations, courriels et fichiers saisis, synchronisés, importés ou produits dans Aurion.
+Le Client fournit des données exactes, protège ses identifiants et habilite les utilisateurs de son espace. Il demeure responsable de la licéité des informations qu’il importe, de l’information des personnes, des bases juridiques, des destinataires et des documents envoyés. Il vérifie chaque donnée, calcul, taux, document et action avant utilisation externe.
 
-Le contrat se compose des présentes conditions, du récapitulatif de commande, des informations fournies avant paiement et de la politique de confidentialité et son annexe. La version applicable est remise sur support durable et enregistrée avec la preuve de commande et d’acceptation.
+## 3. Étendue et limites du service
 
-## 3. Compte, sécurité et contenus
+Aurion assiste la gestion et la préparation de démarches. Il ne dépose pas à la place du Client les formalités de création d’entreprise, ne fournit pas de conseil juridique, fiscal, social ou comptable, ne tient pas une comptabilité certifiée et ne garantit pas l’acceptation d’un dossier par une administration, une banque ou un organisme.
 
-Le Client renseigne des informations exactes et les met à jour. Le Client professionnel gère les habilitations de ses utilisateurs. Chaque Client protège ses moyens d’authentification et prévient l’Éditeur de tout accès suspect à {{AURION_LEGAL_PUBLISHER_EMAIL}}.
+Les suggestions d’IA, interprétations de courriels, extractions, estimations et textes générés sont des propositions à contrôler par l’utilisateur. Ils peuvent être inexacts ou incomplets. En mode Ollama, le modèle prévu est `qwen3.5:4b-q4_K_M` sur la machine qui exécute le serveur local. Une session Web sur l’hébergement Aurion ne peut pas utiliser implicitement le Ollama installé sur l’ordinateur du client. Le mode d’IA hébergé est désactivé tant qu’un fournisseur, ses conditions, ses régions et ses garanties n’ont pas été choisis et publiés.
 
-Le Client détermine la licéité des données qu’il importe, l’information des personnes concernées et la base juridique de ses traitements. Il vérifie les destinataires des courriels et documents qu’il envoie. Les données sensibles ne doivent pas être saisies sans nécessité, fondement juridique et mesures adaptés.
+Aurion 15.3.19 produit des données internes de préparation de facture au format JSON, mais ne transmet pas les factures ni les données de paiement ou de transaction à une Plateforme Agréée (PA). Un PDF ou JSON Aurion ne doit pas être présenté comme une facture électronique acheminée au sens de la réforme française.
 
-## 4. Fonctions, limites et intelligence artificielle
+## 4. Prix, essai, commande et paiement
 
-Les fonctions disponibles dépendent de la version, du plan, des intégrations activées et de la configuration. Aurion fournit des outils de gestion, calcul, extraction, classement, génération et suivi. Il n’accomplit pas à la place du Client les formalités d’immatriculation, déclarations fiscales ou sociales, tenue certifiée de comptabilité, ni la transmission réglementaire des factures.
+Les plans issus du choix antérieur de l’éditeur sont un essai de 60 jours sans carte enregistrée ni prélèvement automatique à son échéance, puis des périodes commandées ponctuellement au tarif affiché avant paiement : **14,00 € par mois** ou **151,20 € par an**, sans reconduction automatique constatée dans le code. La migration 072 de cette version aligne les montants enregistrés sur une taxe à 0 %. Les prix, le régime de TVA, le libellé HT/TTC et le traitement des commandes existantes doivent être vérifiés dans le récapitulatif Stripe réel avant ouverture des ventes. Le tarif affiché avant le paiement fait foi, sous réserve des règles impératives.
 
-Les résultats de calcul, prévisions, interprétations de courriels et suggestions d’IA sont des aides à vérifier. Ils peuvent être inexacts ou incomplets et ne constituent pas un conseil juridique, fiscal, social ou comptable. Le Client contrôle les données, destinataires, taux et documents avant toute décision ou transmission.
+Le règlement par carte est traité par Stripe si les identifiants et le compte marchand sont activés. Aucun paiement n’est réputé confirmé avant vérification auprès du prestataire. Le virement bancaire n’est proposé que si l’Éditeur a renseigné et vérifié les coordonnées affichées. Les moyens proposés sont indiqués avant la commande.
 
-Selon la configuration, l’IA peut utiliser Ollama local ou un fournisseur distant. Le fournisseur distant et ses conditions doivent être identifiés dans la politique de confidentialité avant toute utilisation commerciale avec des données réelles.
+Pour chaque commande B2C, l’écran récapitulatif doit afficher les caractéristiques essentielles, le prix total à payer, les éventuels frais, la durée, l’absence de renouvellement automatique, les moyens de paiement, le droit de rétractation et le bouton de commande non ambigu. L’Éditeur doit confirmer le contrat sur support durable.
 
-Le code examiné peut préparer des données structurées ou un fichier Factur-X; cela ne signifie pas qu’une facture a été acheminée ou déclarée auprès d’une plateforme agréée. L’intégration à une plateforme agréée n’est pas établie à la date de ce projet.
+Pour un client professionnel, les factures précisent la date d’échéance et les pénalités légalement requises. En cas de retard, les pénalités et l’indemnité forfaitaire de recouvrement de 40 € s’appliquent dans les conditions du Code de commerce; les frais supplémentaires justifiés sont réservés. Cette clause ne s’applique pas aux consommateurs.
 
-## 5. Essai, prix, commande et paiement
+## 5. Rétractation des consommateurs
 
-La base de production examinée contient un essai de 60 jours, sans carte requise ni prélèvement automatique à sa fin, ainsi que les plans suivants : période mensuelle à **14,00 € TTC** et période annuelle à **151,20 € TTC**. Ces montants et taxes doivent être confirmés dans l’écran de commande avant publication; le prix total TTC affiché au consommateur avant la commande fait foi.
+Le consommateur bénéficie du délai légal de rétractation applicable au contrat à distance, normalement de 14 jours à compter de sa conclusion pour le service concerné, sous réserve des exceptions prévues par la loi. Le formulaire gratuit est accessible depuis le lien **« Renoncer au contrat ici »**, visible sur la page d’accueil, l’écran de connexion et dans l’espace connecté pendant la période applicable, ainsi que par l’URL `/#/withdrawal`. La page propose le bouton **« Confirmer la rétractation »**, permet d’identifier le contrat, consigne le contenu, la date et l’heure de réception et fournit une référence de suivi.
 
-Chaque période payante donne lieu à une nouvelle commande et à un paiement ponctuel. Aucun renouvellement automatique n’est prévu dans le code examiné. Le paiement par carte est traité par Stripe lorsque ce moyen est configuré; le virement peut être proposé si le service est configuré et n’active l’accès payé qu’après validation de sa réception. Les moyens de paiement affichés lors de la commande sont les seuls disponibles.
+Depuis le 19 juin 2026, la loi impose une fonctionnalité gratuite, facile, directe et permanente pour les contrats conclus à distance par interface en ligne. Lorsqu’une déclaration est transmise par cette interface, un accusé de réception doit être communiqué sans délai sur support durable. Aurion envoie cet accusé à l’adresse fournie lorsque le service SMTP est opérationnel. **La version de préparation enregistre la déclaration même si l’e-mail échoue; tant que l’e-mail transactionnel et son suivi ne sont pas activés et vérifiés, la vente B2C reste fermée.** La demande de rétractation n’est pas rejetée pour une défaillance technique de l’e-mail.
 
-Avant la validation de la commande, le récapitulatif destiné au consommateur doit présenter les caractéristiques essentielles, le prix total toutes taxes comprises, la durée, le mode de paiement, les modalités de fourniture, le droit de rétractation et les coordonnées de réclamation. La commande est confirmée sur support durable. Ces écrans et documents doivent être vérifiés avant une ouverture B2C.
+L’Éditeur examine la demande, vérifie le contrat et l’éligibilité, répond au consommateur et effectue le remboursement dans le délai légal lorsqu’il est dû. La réception automatique ne signifie ni acceptation ni remboursement déjà exécuté. Le parcours de traitement interne et de remboursement doit être opérationnel avant l’ouverture B2C.
 
-Pour le Client professionnel, le paiement est exigible à la commande, sauf date différente indiquée sur la facture. En cas de retard, les pénalités sont dues de plein droit à compter du lendemain de l’échéance au taux de refinancement de la BCE le plus récent majoré de 10 points, sous réserve du minimum légal. L’indemnité forfaitaire pour frais de recouvrement est de **40 €**; les frais supérieurs peuvent être demandés sur justification. Ces sanctions professionnelles ne s’appliquent pas au consommateur.
+Lorsque le consommateur demande expressément que la prestation commence avant la fin du délai et que les conditions légales sont réunies, les conséquences d’une rétractation et toute éventuelle perte du droit ne s’appliquent que dans les formes et limites prévues par la loi. Aucune renonciation générale n’est imposée.
 
-## 6. Droit de rétractation et consommation
+## 6. Garanties, réclamations et médiation
 
-Le consommateur qui commande à distance dispose du délai légal de rétractation de **14 jours à compter de la conclusion du contrat**, selon les règles applicables à la prestation. Il peut adresser une déclaration dénuée d’ambiguïté ou utiliser le formulaire ci-dessous. Lorsque la loi le prévoit, l’Éditeur rembourse dans le délai légal. Si le consommateur demande expressément le commencement du service pendant le délai de rétractation, les conséquences financières d’une rétractation sont celles prévues par la loi; aucune renonciation générale au droit de rétractation n’est imposée.
+Les garanties légales applicables aux contenus et services numériques demeurent intégralement applicables. Le Client peut signaler une difficulté à **easyfixit.reparation@gmail.com** ou au **07 81 51 33 21**. Aucun délai de réponse garanti n’est promis dans la présente version.
 
-Pour tout contrat conclu par interface en ligne, l’éditeur doit fournir l’interface de rétractation directe exigée par la réglementation en vigueur, avec un accès facile, direct et permanent. **Cette fonction n’a pas été identifiée dans le dépôt Aurion 15.3.18 et doit être développée et vérifiée avant toute commande B2C.** La présente clause ne remplace pas cette fonction.
+Après une réclamation écrite préalable restée sans solution, un consommateur peut recourir gratuitement au médiateur de la consommation désigné par l’Éditeur, dans les conditions légales. **Médiateur candidat retenu pour la préparation : CM2C. L’adhésion de l’Éditeur, la compétence de CM2C pour cette offre SaaS, le rattachement sectoriel et les coordonnées à publier doivent être confirmés avant l’ouverture B2C.** Le tarif professionnel affiché par CM2C est de 48 € pour trois ans jusqu’à dix personnes et 36 € par médiation à distance; il est à recontrôler lors de l’adhésion. La médiation est gratuite pour le consommateur, mais payante pour le professionnel.
 
-### Formulaire type de rétractation
+## 7. Durée, résiliation et données
 
-À l’attention de {{AURION_LEGAL_PUBLISHER_NAME}}, {{AURION_LEGAL_PUBLISHER_ADDRESS}}, {{AURION_LEGAL_PUBLISHER_EMAIL}} :
+Les accès d’essai durent 60 jours. Une période payée est celle indiquée au récapitulatif. Le code examiné prévoit des périodes payées séparément, sans renouvellement automatique; cette modalité devra être vérifiée sur le parcours de commande réellement activé. Le Client peut demander la fermeture du compte à l’adresse de contact. Le délai de restitution, l’export final, l’effacement des données de production et la purge des sauvegardes ne sont pas encore garantis; ils doivent être mis en œuvre et publiés avant la commercialisation.
 
-Je vous notifie par la présente ma rétractation du contrat portant sur le service Aurion commandé le [date].
+Les contenus du Client restent sous ses droits. Il autorise les traitements et l’hébergement strictement nécessaires à la fourniture du service et selon les instructions documentées. Les rôles, sous-traitants, transferts, durées et droits sont décrits dans la politique de confidentialité et l’annexe de l’article 28 RGPD.
 
-- Nom du consommateur : [nom]
-- Adresse : [adresse]
-- Adresse e-mail du compte : [e-mail]
-- Date : [date]
-- Signature, uniquement en cas de notification sur papier : [signature]
+## 8. Disponibilité, propriété intellectuelle et responsabilité
 
-## 7. Garanties légales, réclamations et médiation
+Aurion est fourni avec des dépendances et intégrations tierces soumises à leurs propres conditions. Les droits portant sur Aurion restent à leurs titulaires respectifs; le Client conserve ses droits sur ses données. L’Éditeur met en œuvre des moyens raisonnables d’exploitation et de correction, sans disponibilité garantie ni SLA dans cette offre.
 
-Aucune disposition des présentes ne prive le consommateur des garanties légales impératives applicables aux services numériques ni des remèdes prévus par la loi. Les modalités de signalement d’un défaut, de mise en conformité et de recours doivent être communiquées avant la commande et adaptées au service effectivement fourni.
+Aucune clause n’exclut une garantie ou responsabilité qui ne peut légalement être exclue, ne limite les droits impératifs du consommateur, ni n’écarte l’accès aux juridictions compétentes. Les interruptions peuvent résulter d’opérations de maintenance, d’un incident ou de la défaillance d’un fournisseur.
 
-Toute réclamation est adressée à {{AURION_LEGAL_PUBLISHER_EMAIL}}. Après une réclamation écrite préalable, le consommateur peut saisir gratuitement le médiateur de la consommation effectivement désigné par l’éditeur :
+## 9. Données personnelles, modifications et loi
 
-**Médiateur : [à désigner et à confirmer dans la liste officielle]**
+La politique de confidentialité, son annexe de sous-traitance et la politique cookies complètent le contrat. Les fournisseurs prévus pour la cible commerciale sont Render à Francfort pour le serveur, Neon dans l’UE pour PostgreSQL, OVHcloud Object Storage `de` à Francfort pour les fichiers privés, Brevo SMTP pour les messages Aurion, et Stripe pour les paiements. Ils ne sont pas tous activés ou contractés à la date de ce dossier; une IA distante et Google restent optionnels et désactivés tant que leurs flux ne sont pas vérifiés.
 
-Adresse : [à compléter] — Site : [à compléter] — Compétence couvrant l’activité de l’éditeur : [à confirmer].
+Les modifications substantielles sont portées à la connaissance du Client et une nouvelle acceptation est recueillie lorsque la loi ou le contrat l’exige. Le droit français s’applique sans priver le consommateur des règles impératives de sa résidence.
 
-Aucune vente B2C ne doit être ouverte tant que l’éditeur n’a pas choisi un médiateur référencé, adhéré à son dispositif et publié ses coordonnées.
+## 10. Formulaire type
 
-## 8. Durée, fin d’accès et données
+À l’attention de Coulibaly Damien, entrepreneur individuel, nom commercial Easyweb-dev, 5 Rue Jacques Prevert, 85300 Challans, France, easyfixit.reparation@gmail.com :
 
-L’essai dure 60 jours. Une commande payante couvre la période choisie, mensuelle ou annuelle, sans renouvellement automatique prévu dans le code. Le Client peut ne pas souscrire une nouvelle période. Les modalités de fermeture du compte et d’export doivent être communiquées avant la commande.
+« Je vous notifie par la présente ma rétractation du contrat portant sur Aurion conclu le [date], référence [commande/paiement/facture]. Nom et prénom : [à remplir]. Adresse e-mail du compte : [à remplir]. Date : [à remplir]. Signature uniquement en cas de formulaire papier. »
 
-À expiration, l’espace peut passer en lecture seule. Le code prévoit un délai additionnel de 60 jours avant de refuser certaines consultations, mais cela ne prouve pas que la base, les fichiers et sauvegardes sont alors supprimés. L’Éditeur doit définir et mettre en œuvre une procédure de restitution et de suppression complète avant de promettre une durée de purge.
+**Entrée en vigueur : à fixer après vérification des informations, activation des services, levée des blocages de publication et revue juridique.**
 
-Le Client conserve ses droits sur ses contenus. Il autorise leur hébergement et traitement uniquement pour exécuter le contrat, les instructions et les opérations de sécurité.
+## Références
 
-## 9. Disponibilité, propriété intellectuelle et responsabilité
-
-L’Éditeur met en œuvre des moyens raisonnables pour exploiter le service et corriger les anomalies. Aucun niveau de disponibilité n’est garanti sans engagement distinct. Les opérations de maintenance, incidents ou fournisseurs tiers peuvent entraîner une interruption.
-
-Les droits sur Aurion et ses éléments propres restent à l’Éditeur; le Client conserve ses droits sur ses contenus. Chaque partie répond de ses obligations dans les limites prévues par la loi. Aucune clause ne limite une responsabilité qui ne peut légalement l’être. Aucune clause ne retire au consommateur son droit de saisir les juridictions compétentes selon la loi.
-
-## 10. Données personnelles, modification et version
-
-Les rôles du Client et de l’Éditeur, les données, durées, destinataires, prestataires et droits sont décrits dans la politique de confidentialité et son annexe de traitement. Les prestataires et lieux de traitement doivent y être identifiés avant publication.
-
-Les modifications substantielles sont portées à la connaissance du Client avant leur entrée en vigueur. Lorsque la loi ou le contrat l’exige, une nouvelle acceptation est recueillie et conservée avec la version correspondante.
+- [Code de la consommation, article L. 221-21](https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000053310520/2026-08-27)
+- [Service Public Entreprendre — rétractation en ligne](https://entreprendre.service-public.gouv.fr/vosdroits/F23455)
+- [Médiation de la consommation : obligations professionnelles](https://entreprendre.service-public.gouv.fr/vosdroits/F33338)
+- [Service Public — calendrier de la facture électronique](https://entreprendre.service-public.gouv.fr/vosdroits/F39785)

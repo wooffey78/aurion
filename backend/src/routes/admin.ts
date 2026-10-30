@@ -46,6 +46,28 @@ export async function adminRoutes(app:FastifyInstance){
   app.get('/admin/tickets',async()=> (await query(`select t.*,u.email user_email,o.name organization_name,
       coalesce((select json_agg(m order by m.created_at) from (select sm.id,sm.author_type,sm.message,sm.created_at,u2.email author_email from support_messages sm left join users u2 on u2.id=sm.author_user_id where sm.ticket_id=t.id) m),'[]') messages
       from support_tickets t join users u on u.id=t.user_id join organizations o on o.id=t.organization_id order by t.created_at desc limit 300`)).rows);
+  app.get('/admin/withdrawals',async()=>({requests:(await query(`select id,first_name,last_name,email,contract_reference,contract_date,declaration_text,submitted_at,status,receipt_delivery_status,receipt_sent_at,receipt_error_code,processed_at from contract_withdrawal_requests order by submitted_at desc limit 200`)).rows}));
+  app.post('/admin/withdrawals/:id/status',async(request,reply)=>{
+    const id=String((request.params as any).id||''),status=String((request.body as any)?.status||'');
+    if(!['reviewing','processed','rejected'].includes(status))return reply.code(400).send({error:'INVALID_INPUT'});
+    const result=await query(`update contract_withdrawal_requests set status=$2,processed_at=case when $2 in ('processed','rejected') then now() else processed_at end,updated_at=now() where id=$1 returning id,status,processed_at`,[id,status]);
+    if(!result.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
+    return {ok:true,request:result.rows[0]};
+  });
+  app.post('/admin/withdrawals/:id/resend-receipt',async(request,reply)=>{
+    const id=String((request.params as any).id||''),item=(await query('select * from contract_withdrawal_requests where id=$1',[id])).rows[0];
+    if(!item)return reply.code(404).send({error:'NOT_FOUND'});
+    try{
+      const {sendConfiguredPlatformMail}=await import('../services/platform-mailer.js');
+      await sendConfiguredPlatformMail({to:item.email,subject:'Aurion — accusé de réception de votre déclaration de rétractation',text:`Bonjour ${item.first_name} ${item.last_name},\n\nAurion accuse réception de votre déclaration de rétractation.\n\nDéclaration :\n${item.declaration_text}\n\nDate et heure d’envoi : ${new Date(item.submitted_at).toLocaleString('fr-FR',{timeZone:'Europe/Paris'})} (heure de Paris).\nRéférence : ${item.id}\n\nCette confirmation constate la réception de votre déclaration et ne préjuge pas de son éligibilité ni du remboursement.\n\nAurion`});
+      await query("update contract_withdrawal_requests set receipt_sent_at=now(),receipt_delivery_status='sent',receipt_error_code=null,updated_at=now() where id=$1",[id]);
+      return {ok:true};
+    }catch(error:any){
+      const code=String(error?.code||error?.message||'MAIL_DELIVERY_FAILED').replace(/[^A-Z0-9_:-]/gi,'_').slice(0,80);
+      await query("update contract_withdrawal_requests set receipt_delivery_status='failed',receipt_error_code=$2,updated_at=now() where id=$1",[id,code]);
+      return reply.code(503).send({error:'RECEIPT_DELIVERY_FAILED',code});
+    }
+  });
   app.delete('/admin/tickets/:id',async(r,reply)=>{const id=(r.params as any).id;const x=await query('delete from support_tickets where id=$1 returning id',[id]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true};});
   app.post('/admin/tickets/:id/status',async(r,reply)=>{
     const id=(r.params as any).id,next=String((r.body as any)?.status||'');

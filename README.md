@@ -1,4 +1,4 @@
-# Aurion 15.3.18
+# Aurion 15.3.19
 
 Application de gestion pour indépendants et petites entreprises, avec interface web/PWA et API Node.js/Fastify/PostgreSQL.
 
@@ -10,7 +10,7 @@ Application de gestion pour indépendants et petites entreprises, avec interface
 4. Appliquer les migrations selon la procédure décrite dans `backend/package.json`, puis lancer `npm start`.
 5. Contrôler `http://127.0.0.1:4000/health` et exécuter `npm run check`.
 
-Pour l’installation Windows autonome, suivre `README-INSTALLATION.md`. Pour Render et ses limites de stockage, lire `docs/DEPLOIEMENT-RENDER.md`. La configuration Render de référence est dans `render.yaml`.
+Pour l’installation Windows autonome, suivre `README-INSTALLATION.md`. Pour la cible commerciale Frankfurt, lire `docs/DEPLOIEMENT-RENDER.md` et `docs/PLAN-BASCULE-FRANKFURT-15.3.19.md`. `render.yaml` cible le service Frankfurt existant et demande un plan payant; il ne migre pas automatiquement sa configuration, Neon ou les fichiers.
 
 Le moteur IA local retenu et sa configuration Ollama sont décrits dans `docs/IA-LOCALE.md`.
 

@@ -1,5 +1,4 @@
-# Archive de brouillon — COOKIES.md
+<!-- Fichier historique conserve pour compatibilite. -->
+# Fichier juridique historique
 
-Ce fichier historique est remplacé par le projet de document version 2.2 dans [COOKIES.md](COOKIES.md).
-
-Le document cible reste un projet à compléter et faire valider. N’utiliser ni ce fichier d’archive ni le texte courant comme document définitif avant la levée des points de l’audit de commercialisation.
+Ce fichier historique est remplace par le dossier preparatoire version 2.3 dans [COOKIES.md](COOKIES.md). Le document lie n est pas definitif ni publiable avant validation des informations, fournisseurs, regions et revue juridique.

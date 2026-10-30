@@ -1,7 +1,7 @@
 import { query } from '../db.js';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { fileFromKey } from './storage.js';
+import { readPrivateObject } from './storage.js';
 import { companyDisplayName } from './company.js';
 
 export type SignaturePurpose = 'quote' | 'invoice' | 'professional';
@@ -97,7 +97,7 @@ export async function signatureForEmail(orgId: string, activityId?: string | nul
       try {
         const ext = path.extname(String(logoKey)).toLowerCase();
         if (['.png','.jpg','.jpeg'].includes(ext)) {
-          const content = await readFile(fileFromKey(String(logoKey)));
+          const content = await readPrivateObject(String(logoKey));
           if (content.length > 0 && content.length <= 5 * 1024 * 1024) {
             const contentType = ext === '.png' ? 'image/png' : 'image/jpeg';
             inlineAttachments.push({filename:`logo${ext}`,content,contentType,cid:'aurion-logo'});

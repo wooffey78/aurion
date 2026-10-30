@@ -5,7 +5,7 @@ import path from 'node:path';
 import AdmZip from 'adm-zip';
 import { db, query } from '../db.js';
 import { config } from '../config.js';
-import { fileFromKey, savePrivateUpload } from '../services/storage.js';
+import { readPrivateObject, savePrivateUpload } from '../services/storage.js';
 import { encrypt, decrypt, oauthClient, gmailSendAdministrative, googleOAuthSetupStatus } from '../services/google.js';
 import { signatureForEmail, emailBodyHtml } from '../services/signature.js';
 import { addBrandLogoAssets, addBrandGuideFiles, addBrandGuidePdf, brandBundleReadme } from '../services/brand-assets.js';
@@ -333,7 +333,7 @@ export async function journeyRoutes(app: FastifyInstance) {
         const d=(await query(`select original_name,mime_type,storage_key from documents where id=$1 and organization_id=$2 and status<>'deleted'`,[fileId,org])).rows[0];
         if(!d)return reply.code(409).send({error:'ATTACHMENT_NOT_FOUND',message:'Une pièce jointe n’est plus disponible. Préparez à nouveau cet e-mail.'});
         if(!['application/pdf','image/png','image/jpeg','image/webp','text/plain','text/csv','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.oasis.opendocument.text'].includes(d.mime_type))return reply.code(400).send({error:'ATTACHMENT_TYPE_BLOCKED'});
-        attachments.push({filename:path.basename(String(d.original_name)).replace(/[\r\n"\\]/g,'_').slice(0,180),content:await readFile(fileFromKey(d.storage_key)),contentType:d.mime_type});
+        attachments.push({filename:path.basename(String(d.original_name)).replace(/[\r\n"\\]/g,'_').slice(0,180),content:await readPrivateObject(d.storage_key),contentType:d.mime_type});
       }
       const lock=await query(`insert into administrative_mail_send_locks(organization_id,formality_id,status) values($1,$2,'sending') on conflict(formality_id) do nothing returning status`,[org,id]);
       if(!lock.rowCount)return reply.code(409).send({error:'EMAIL_SEND_ALREADY_ATTEMPTED',message:'Cette préparation a déjà été envoyée ou fait l’objet d’une tentative non confirmée. Enregistrez une nouvelle préparation après vérification avant de réessayer.'});
@@ -545,7 +545,7 @@ export async function journeyRoutes(app: FastifyInstance) {
     zip.addFile('signature/signature.html',Buffer.from(String(sig.signature_html||'<!-- Aucune signature HTML n’a encore été enregistrée. -->')));
     zip.addFile('signature/signature.txt',Buffer.from(String(sig.signature_text||'')));
     let logoBuffer:Buffer|undefined;
-    if(company.logo_key){try{const logo=await readFile(fileFromKey(company.logo_key));const ext=path.extname(String(company.logo_key)).toLowerCase();if(['.png','.jpg','.jpeg'].includes(ext)){addBrandLogoAssets(zip,logo,ext,theme.accent,theme.dark);logoBuffer=logo;}}catch{}}
+    if(company.logo_key){try{const logo=await readPrivateObject(company.logo_key);const ext=path.extname(String(company.logo_key)).toLowerCase();if(['.png','.jpg','.jpeg'].includes(ext)){addBrandLogoAssets(zip,logo,ext,theme.accent,theme.dark);logoBuffer=logo;}}catch{}}
     addBrandGuideFiles(zip,{companyName:company.name,activity:company.custom_activity||company.activity,website:company.website,accent:theme.accent,dark:theme.dark,font:theme.font,radius:theme.radius});
     await addBrandGuidePdf(zip,{companyName:company.name,activity:company.custom_activity||company.activity,website:company.website,accent:theme.accent,dark:theme.dark,font:theme.font,radius:theme.radius},logoBuffer);
     zip.addFile('README.md',Buffer.from(brandBundleReadme(company.name,zip.getEntries().map(entry=>entry.entryName)),'utf8'));

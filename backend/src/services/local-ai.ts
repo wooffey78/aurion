@@ -1,6 +1,6 @@
 type LocalAiMessage = { prompt: string; images?: string[]; maxTokens?: number };
 
-const DEFAULT_MODEL = 'qwen3.5:4b';
+const DEFAULT_MODEL = 'qwen3.5:4b-q4_K_M';
 const enabled = () => String(process.env.AURION_AI_PROVIDER || ((process.env.NODE_ENV || 'development') === 'development' ? 'local' : 'managed')).trim().toLowerCase() === 'local';
 
 function endpoint(path: string): string {

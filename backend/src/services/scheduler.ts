@@ -4,7 +4,8 @@ import { sendOrgMail } from './mail.js';
 import { AurionError } from './errors.js';
 import { signatureForEmail, emailBodyHtml } from './signature.js';
 import { issueAndEmailSubscriptionInvoice } from './subscription-invoice.js';
-import { renderDocument, fileFromKey } from './document-renderer.js';
+import { renderDocument } from './document-renderer.js';
+import { readPrivateObject } from './storage.js';
 import { readFile } from 'node:fs/promises';
 
 /** Rappels e-mail J-1 / J+1 envoyés depuis la messagerie configurée dans Aurion. */
@@ -22,7 +23,7 @@ export function startReminderWorker(log:any){
         if(!q.client_email){await query('update quotes set next_reminder_at=null,updated_at=now() where id=$1',[q.id]);continue}
         const next=Number(q.reminder_count||0)+1;
         try{
-          const d=await renderDocument(q.organization_id,q.id,'invoice');const pdf=await readFile(fileFromKey(d.keys.pdf));
+          const d=await renderDocument(q.organization_id,q.id,'invoice');const pdf=await readPrivateObject(d.keys.pdf);
           const labels=['1ère relance','2e relance','3e relance'];const label=labels[next-1]||`${next}e relance`;
           const body=`Bonjour ${q.client_name||''},\n\nVeuillez trouver votre facture ${q.number}, ${label.toLowerCase()}.\nMontant de la facture : ${Number(q.total_ttc||0).toFixed(2)} €.`;const sig=await signatureForEmail(q.organization_id,q.activity_id,'invoice');const text=body+sig.text;
           await sendOrgMail(q.organization_id,{to:q.client_email,subject:`Facture ${q.number} · ${label}`,text,html:emailBodyHtml(body,sig.html),attachments:[...(sig.inlineAttachments||[]),{filename:`${q.number}-${next}e-relance.pdf`,content:pdf}]});

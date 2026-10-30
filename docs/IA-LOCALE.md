@@ -1,13 +1,13 @@
-# IA locale d’Aurion 15.3.14
+# IA locale d’Aurion 15.3.19
 
 ## Modèle retenu pour le texte et la vision
 
-- **Qwen3.5-4B**, servi localement par **Ollama** (`qwen3.5:4b`). La fiche officielle Qwen indique Apache-2.0 ; Ollama publie le modèle quantifié autour de 3,3–4,0 Go. Sources : [Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B), [fiche Ollama et variantes](https://ollama.com/library/qwen3.5).
+- **Qwen3.5-4B Q4_K_M**, servi localement par **Ollama** (`qwen3.5:4b-q4_K_M`). La fiche officielle Qwen indique Apache-2.0 ; Ollama publie le modèle quantifié autour de 3,3–4,0 Go. Sources : [Qwen3.5-4B Q4_K_M](https://huggingface.co/Qwen/Qwen3.5-4B Q4_K_M), [fiche Ollama et variantes](https://ollama.com/library/qwen3.5).
 - Aurion en mode local utilise le modèle pour les suggestions du parcours, l’extraction dans les documents texte et images, le préclassement des imports, la catégorie des e-mails entrants que les règles ne reconnaissent pas et le résumé des démarches/journal.
 - L’inférence texte et images passe au serveur Ollama de la machine Aurion, limité à `127.0.0.1:11434`. L’absence d’Ollama ou du modèle ne déclenche aucun repli vers une API cloud. Les règles locales de classement des e-mails restent le secours sans IA.
-- Le statut de l’IA indique si le modèle est présent et son empreinte de registre Ollama (`digest`) lorsqu’elle est publiée par le moteur. Le tag recommandé est `qwen3.5:4b`; pour un audit reproductible, conserver également cette empreinte avec la version d’Ollama installée.
+- Le statut de l’IA indique si le modèle est présent et son empreinte de registre Ollama (`digest`) lorsqu’elle est publiée par le moteur. Le tag recommandé est `qwen3.5:4b-q4_K_M`; pour un audit reproductible, conserver également cette empreinte avec la version d’Ollama installée.
 
-Le setup Windows propose l’installation signée d’Ollama par utilisateur et le téléchargement du modèle, après confirmation indiquant la taille (3,3–4,0 Go). En cas de refus ou d’échec, installer Ollama depuis [le site officiel](https://ollama.com/download/windows), puis exécuter `ollama pull qwen3.5:4b`. Le backend Aurion local écoute par défaut en développement et sélectionne le mode local. En production Render, le mode est explicitement `managed`, car Render ne peut pas joindre le moteur Ollama de l’ordinateur du client.
+Le setup Windows vérifie la signature de l’installateur officiel, attend uniquement son processus (pas le service Ollama persistant), démarre `ollama serve` en arrière-plan si nécessaire, vérifie `http://127.0.0.1:11434/api/tags`, puis lance le téléchargement du modèle avec une limite de 90 minutes. Les journaux de service et de modèle sont séparés sous `logs/`. En cas de refus, d’erreur ou de dépassement du délai, l’étape reste facultative et Aurion poursuit son installation. Relancer manuellement `ollama pull qwen3.5:4b-q4_K_M` après avoir démarré Ollama. Le backend Aurion local écoute par défaut en développement et sélectionne le mode local. En production Render, le mode est explicitement `managed`, car Render ne peut pas joindre le moteur Ollama de l’ordinateur du client.
 
 ## Portée et garde-fous
 

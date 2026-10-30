@@ -90,15 +90,15 @@ const legalTokenLabel: Record<string,string> = {
 };
 /** Initialise les documents juridiques versionnés; une approbation explicite de version est requise pour publication. */
 export async function ensureLegalDocuments() {
-  const publicationApproved = process.env.AURION_LEGAL_PUBLICATION_APPROVAL === '2.2';
+  const publicationApproved = process.env.AURION_LEGAL_PUBLICATION_APPROVAL === '2.3';
   for (const s of LEGAL_SEEDS) {
     const f = path.join(BACKEND_ROOT, '..', 'docs', s.file);
     let body = existsSync(f) ? readFileSync(f, 'utf8') : `# ${s.title}\n\nTexte juridique indisponible.`;
     body = body.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_match, key: string) => String(process.env[key] || `[À renseigner : ${legalTokenLabel[key] || key}]`));
-    const hasUnresolvedContent = /\{\{[A-Z0-9_]+\}\}|\[(?:À compléter|À confirmer|À valider|À choisir|À désigner|À renseigner)[^\]]*\]|PROJET DE DOCUMENT|PROJET DE PAGE|PROJET À COMPLÉTER/i.test(body);
+    const hasUnresolvedContent = /\{\{[A-Z0-9_]+\}\}|\[(?:À compléter|À confirmer|À valider|À choisir|À désigner|À renseigner)[^\]]*\]|PROJET DE DOCUMENT|PROJET DE PAGE|PROJET À COMPLÉTER|DOSSIER DE PRÉPARATION|NE PAS PUBLIER/i.test(body);
     const isDraft = !publicationApproved || s.requiredEnv.some(key => !String(process.env[key] || '').trim()) || hasUnresolvedContent;
     await query('update legal_documents set is_current=false where kind=$1 and is_current=true',[s.kind]);
-    await query(`insert into legal_documents(kind,version,title,body,is_current,is_draft) values($1,'2.2',$2,$3,true,$4) on conflict(kind,version) do update set title=excluded.title,body=excluded.body,is_current=true,is_draft=excluded.is_draft`, [s.kind, s.title, body, isDraft]);
+    await query(`insert into legal_documents(kind,version,title,body,is_current,is_draft) values($1,'2.3',$2,$3,true,$4) on conflict(kind,version) do update set title=excluded.title,body=excluded.body,is_current=true,is_draft=excluded.is_draft`, [s.kind, s.title, body, isDraft]);
   }
 }
 export async function currentLegalDocs() {
@@ -107,6 +107,11 @@ export async function currentLegalDocs() {
 export async function legalDocumentsReadyForContracts() {
   const rows = (await query(`select kind from legal_documents where is_current=true and is_draft=false and kind in ('cgv','privacy','legal-notice','cookies')`)).rows;
   return new Set(rows.map((row: any) => row.kind)).size === 4;
+}
+/** Local installation-only workspace creation for evaluation; never enables production signups or paid subscriptions. */
+export function localEvaluationSignupAllowed() {
+  const localMode = String(process.env.AURION_LOCAL_EVALUATION_MODE ?? 'true').trim().toLowerCase() === 'true';
+  return process.env.NODE_ENV !== 'production' && localMode;
 }
 export async function recordAcceptances(client: { query: (q: string, v?: any[]) => Promise<any> }, userId: string, ip?: string) {
   await client.query(`insert into legal_acceptances(user_id,document_id,ip_hash) select $1,id,$2 from legal_documents where is_current=true and is_draft=false and kind in ('cgv','privacy')`, [userId, ipHash(ip)]);
