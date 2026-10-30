@@ -1,6 +1,6 @@
 {
   "name": "aurion-backend",
-  "version": "15.3.14",
+  "version": "15.3.15",
   "private": true,
   "type": "module",
   "engines": {

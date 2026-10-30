@@ -1,15 +1,5 @@
-# Politique cookies et traceurs — base de travail
+# Archive de brouillon — COOKIES.md
 
-La version locale actuelle ne charge aucun outil publicitaire ou analytique externe.
+Ce fichier historique est remplacé par le projet de document version 2.0 dans [COOKIES.md](COOKIES.md).
 
-En production :
-
-- les traceurs strictement nécessaires doivent être documentés ;
-- tout traceur soumis au consentement doit être bloqué avant choix ;
-- accepter et refuser doivent être proposés avec une facilité comparable ;
-- le retrait doit rester accessible ;
-- les finalités et fournisseurs doivent être décrits ;
-- les preuves de consentement doivent être conservées lorsque nécessaire ;
-- les préférences multi-appareils doivent être conçues conformément aux recommandations applicables.
-
-À compléter : liste réelle des cookies, durées, finalités, fournisseurs, transferts et mécanisme de gestion.
+Le document cible reste un projet à compléter et faire valider. N’utiliser ni ce fichier d’archive ni le texte courant comme document définitif avant la levée des points de l’audit de commercialisation.

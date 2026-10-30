@@ -6,7 +6,7 @@ import { config } from "../config.js";
 import { hashPassword, verifyPassword } from "../services/passwords.js";
 import { registerSchema, loginSchema } from "../services/validation.js";
 import { signAccessToken } from "../plugins/auth.js";
-import { recordAcceptances } from "../services/account.js";
+import { legalDocumentsReadyForSignup, recordAcceptances } from "../services/account.js";
 import { createRefreshSession, rotateRefreshSession, revokeRefreshSession, revokeAllRefreshSessions, REFRESH_SECONDS } from '../services/native-sessions.js';
 import { registrationOptions, verifyRegistration, authenticationOptions, verifyAuthentication, issueWebAuthnSession } from '../services/webauthn.js';
 
@@ -129,6 +129,7 @@ async function googleLoginClient(){
   app.post('/auth/vip-invite/accept', { config: { rateLimit: { max: 8, timeWindow: '15 minutes' } } }, async (request, reply) => {
     const body=request.body as any;const token=String(body?.token||'');const password=String(body?.password||'');const fullName=String(body?.fullName||'').trim();
     if(token.length<20||password.length<12||!body?.acceptLegal)return reply.code(400).send({error:'INVALID_INPUT',message:'Le lien, le mot de passe et l’acceptation des documents légaux sont obligatoires.'});
+    if (!(await legalDocumentsReadyForSignup())) return reply.code(503).send({error:'LEGAL_DOCUMENTS_UNPUBLISHED',message:'La création de compte est temporairement indisponible : les documents contractuels ne sont pas publiés.'});
     const tokenHash=crypto.createHash('sha256').update(token).digest('hex');
     const row=(await query('select * from admin_guest_invites where token_hash=$1 and accepted_at is null and expires_at>now()',[tokenHash])).rows[0];
     if(!row)return reply.code(400).send({error:'INVITE_INVALID',message:'Cette invitation est invalide ou expirée.'});
@@ -181,6 +182,9 @@ async function googleLoginClient(){
       const parsed = registerSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.code(400).send({ error: "INVALID_INPUT" });
+      }
+      if (!(await legalDocumentsReadyForSignup())) {
+        return reply.code(503).send({ error: "LEGAL_DOCUMENTS_UNPUBLISHED", message: "La création de compte est temporairement indisponible : les documents contractuels ne sont pas publiés." });
       }
 
       const email = parsed.data.email.toLowerCase();

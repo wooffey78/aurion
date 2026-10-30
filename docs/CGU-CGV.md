@@ -1,58 +1,91 @@
 # Conditions générales d’utilisation et de vente — Aurion
 
-**Version : 1.0 — Date de mise à jour : {{LEGAL_UPDATED_AT}}**
+> **PROJET DE DOCUMENT — NE PAS UTILISER POUR UNE COMMERCIALISATION.** Ce texte décrit le fonctionnement identifié dans Aurion 15.3.14. L’éditeur, les coordonnées, le périmètre professionnel, les prestataires et plusieurs modalités contractuelles restent à vérifier. Faire valider le texte par un juriste avant publication.
 
-## 1. Éditeur et objet
-Aurion est un logiciel de gestion en ligne destiné principalement aux professionnels. Il permet notamment de gérer les fiches clients et fournisseurs, le catalogue métier, les interventions, les devis, les factures, les règlements, les relances, les garanties/SAV, les rendez-vous, ainsi que des indicateurs de comptabilité et de trésorerie.
+**Version projet : 2.0 — Date de rédaction : 30 octobre 2026 — Date d’entrée en vigueur : à renseigner après validation**
 
-L’éditeur est **{{AURION_LEGAL_PUBLISHER_NAME}}**, {{AURION_LEGAL_PUBLISHER_FORM}}, immatriculé sous le SIREN {{AURION_LEGAL_PUBLISHER_SIREN}}, dont le siège est situé {{AURION_LEGAL_PUBLISHER_ADDRESS}}. Contact : {{AURION_LEGAL_PUBLISHER_EMAIL}}.
+## 1. Éditeur, objet et clientèle visée
 
-Les présentes conditions régissent l’accès au service et son utilisation. Les éventuelles conditions particulières figurant sur un bon de commande ou une proposition acceptée prévalent sur les présentes en cas de contradiction expresse.
+Aurion est un service logiciel en ligne destiné à aider des professionnels à organiser la création et la gestion de leur activité. Selon les modules activés, il propose notamment des fonctions de configuration d’entreprise, de contacts, catalogue, devis, factures, interventions, rendez-vous, garanties et service après-vente, gestion de courriels, indicateurs et assistance par intelligence artificielle.
 
-## 2. Définitions
-**Éditeur** : la personne ou société identifiée à l’article 1. **Client** : personne physique ou morale créant un compte pour les besoins de son activité. **Utilisateur** : personne autorisée par le Client à utiliser l’espace associé. **Données du Client** : données, documents et contenus déposés ou créés par le Client dans Aurion. **Service** : application Aurion, ses modules et ses fonctionnalités activés.
+Le service est édité par **{{AURION_LEGAL_PUBLISHER_NAME}}**, {{AURION_LEGAL_PUBLISHER_FORM}}, immatriculé sous le SIREN {{AURION_LEGAL_PUBLISHER_SIREN}}, dont le siège se situe {{AURION_LEGAL_PUBLISHER_ADDRESS}}. Contact : {{AURION_LEGAL_PUBLISHER_EMAIL}}.
 
-## 3. Inscription, compte et sécurité
-Le Client fournit des informations exactes et les maintient à jour. Il est responsable de la confidentialité de ses moyens d’authentification, de la gestion des droits de ses utilisateurs et des opérations effectuées depuis ses comptes, sauf preuve d’un manquement imputable à l’Éditeur. Toute suspicion d’utilisation non autorisée doit être signalée sans délai à {{AURION_LEGAL_PUBLISHER_EMAIL}}. L’Éditeur peut demander des informations raisonnables pour vérifier le droit d’accès et prévenir la fraude.
+Le présent projet est rédigé pour une offre réservée à des clients professionnels agissant pour les besoins de leur activité. Avant publication, l’éditeur doit confirmer ce périmètre et faire apparaître une déclaration de qualité professionnelle dans le parcours de commande. Si des consommateurs peuvent souscrire, ces conditions ne suffisent pas : des clauses et informations de consommation adaptées doivent être préparées.
 
-Le Client doit disposer des droits et autorisations nécessaires sur les coordonnées, documents et autres données qu’il importe. Il informe les personnes concernées lorsque la loi l’exige et ne saisit pas de données illicites ou manifestement étrangères à la finalité du Service.
+## 2. Définitions et documents contractuels
 
-## 4. Fonctionnalités et responsabilités métier
-Aurion fournit des outils de gestion et des estimations calculées à partir des données renseignées, des paramètres choisis et des règles configurées. Les résultats de calcul, rappels, prévisions, marges, cotisations estimées, taux fiscaux et suggestions sont des aides au pilotage ; ils ne constituent ni un conseil juridique, fiscal, social ou comptable personnalisé, ni une garantie de conformité d’une déclaration. Le Client vérifie ses devis, factures, mentions obligatoires, taux, prix, échéances et écritures avant émission ou transmission et reste responsable de ses obligations professionnelles.
+« Éditeur » désigne l’entité indiquée à l’article 1. « Client » désigne le professionnel qui souscrit ou utilise le service. « Utilisateur » désigne une personne autorisée par le Client. « Données du Client » désigne les informations, courriels et fichiers que le Client ou ses utilisateurs saisissent, synchronisent, importent ou produisent dans Aurion.
 
-Les calculs dépendent notamment des montants saisis, des règles légales applicables, des informations de catalogue et des données externes éventuellement disponibles. Les erreurs de saisie, registres externes indisponibles ou informations incomplètes peuvent influer sur les résultats. Une détection automatisée ne remplace pas la validation du Client.
+Le contrat comprend les présentes conditions, la commande et ses paramètres de prix, la politique de confidentialité et son annexe de traitement des données. Un bon de commande accepté prévaut sur les présentes pour les éléments qui y sont expressément modifiés. Les documents applicables doivent être présentés au Client avant la commande et leur version acceptée doit être conservée.
 
-## 5. Essai, prix et paiement
-À la date de la version, Aurion propose une période d’essai de 60 jours, sans saisie obligatoire d’une carte et sans prélèvement automatique en fin d’essai. Les tarifs proposés sont : **14,00 € TTC par mois** ou **151,20 € TTC par an**, soit une remise annuelle de 10 % par rapport à 168,00 € TTC. Le tarif annuel est payé pour une période annuelle ; il n’est pas un prélèvement mensuel. Les montants affichés lors de la souscription et sur la facture font foi pour la commande effectivement passée.
+## 3. Création et protection du compte
 
-Chaque période est réglée séparément par l’un des moyens de paiement effectivement proposé dans l’application. Aucun renouvellement automatique ni prélèvement récurrent ne doit être interprété comme autorisé par les présentes. Toute évolution tarifaire s’applique aux futures commandes après information préalable ; les sommes déjà payées restent régies par la commande correspondante.
+Le Client fournit des informations exactes, les met à jour, dispose des droits nécessaires pour inscrire ses utilisateurs et protège ses moyens d’authentification. Il attribue les rôles selon le besoin d’en connaître et retire sans délai les accès devenus inutiles. Le Client avertit l’Éditeur de toute suspicion d’accès non autorisé à {{AURION_LEGAL_PUBLISHER_EMAIL}}.
 
-Une commande devient effective après confirmation du paiement ou confirmation manuelle de réception du virement. Une facture relative à la période payée est mise à disposition lorsque le processus de facturation est activé. Les éventuels frais bancaires propres au Client restent à sa charge.
+Le Client demeure responsable de la licéité des contenus qu’il importe, de l’information des personnes concernées, de la base légale de ses traitements et de la vérification des destinataires de ses courriels ou documents. Il ne dépose pas de données manifestement illicites ni de données sensibles sans nécessité et cadre juridique approprié.
 
-## 6. Durée, fin d’accès et restitution
-Le Service est accessible pendant la période d’essai puis, le cas échéant, pendant la période payée. Le Client peut choisir de ne pas acheter une nouvelle période. À l’expiration, l’accès peut être limité en lecture seule puis les données supprimées à l’issue du délai annoncé dans l’application ou prévu par la politique de conservation, sous réserve des obligations légales de conservation et des sauvegardes techniques. Le Client est invité à exporter ses données avant l’expiration. Les fonctions d’export disponibles sont celles indiquées dans l’application.
+## 4. Description, limites et évolution du service
 
-En cas d’atteinte grave à la sécurité, de fraude, d’usage illicite ou de risque sérieux pour les autres utilisateurs, l’Éditeur peut suspendre temporairement les accès concernés, dans la mesure nécessaire et proportionnée, et informe le Client lorsque cela est possible. Une suspension ne libère pas le Client du paiement des sommes non contestées déjà dues.
+Les fonctions disponibles dépendent de la version, du plan souscrit, de la configuration et des services tiers activés. L’éditeur peut faire évoluer l’interface et corriger le service, en tenant compte des fonctions payées et en informant le Client lorsque la modification affecte substantiellement le service.
 
-## 7. Disponibilité, maintenance et assistance
-L’Éditeur met en œuvre des moyens raisonnables pour maintenir le Service accessible et corriger les anomalies signalées. Le Service peut être interrompu pour maintenance, mise à jour, incident d’hébergement, panne de réseau, événement de sécurité ou cause extérieure. Aucune disponibilité permanente sans interruption n’est garantie en l’absence d’un engagement de niveau de service écrit distinct. Le Client conserve ses propres justificatifs et sauvegardes lorsque ses obligations l’exigent et signale au support les anomalies reproductibles avec les informations utiles, sans transmettre de secrets d’authentification.
+Aurion fournit des outils de gestion, de calcul, de classement et de génération de documents. Il ne réalise pas à la place du Client les formalités d’immatriculation d’une entreprise, les déclarations fiscales ou sociales, la tenue certifiée d’une comptabilité, la transmission réglementaire de factures, ni la validation juridique d’un document. Les suggestions, prévisions, extractions, interprétations de courriels et résultats d’IA sont indicatifs et peuvent être incomplets ou inexacts. Le Client contrôle les données, destinataires, calculs, taux, mentions et documents avant toute décision ou émission.
+
+L’émission d’un document structuré ou d’un fichier Factur-X ne signifie pas qu’il a été transmis à une plateforme agréée. À la date de rédaction, l’intégration à une plateforme agréée n’a pas été établie dans le code examiné. Le Client vérifie ses obligations et utilise sa plateforme agréée ou son partenaire.
+
+## 5. Essai, plans, prix et paiement
+
+Le plan gratuit d’essai constaté est de 60 jours, sans carte bancaire obligatoire et sans prélèvement automatique à la fin de l’essai. La base de production examinée contient les plans suivants : **14,00 € TTC pour une période mensuelle** et **151,20 € TTC pour une période annuelle**. Le prix et la durée affichés sur l’écran de commande au moment de la souscription font foi; ils doivent être vérifiés avant toute publication de ces conditions.
+
+Le paiement constaté dans le code est ponctuel pour la période choisie, par carte via Stripe lorsque configuré, ou par virement lorsque cette option est configurée. Aurion ne crée pas de prélèvement récurrent automatique à la fin de l’essai. Le virement n’active la période payée qu’après vérification et validation de sa réception. Les moyens non activés dans l’application ne sont pas proposés.
+
+Les prix affichés précisent les taxes applicables. Les tarifs peuvent évoluer pour les commandes futures après information préalable. Une commande payée n’est pas modifiée rétroactivement. La facture est établie selon le processus effectivement disponible et les règles applicables; le Client vérifie les mentions de facturation qui lui incombent.
+
+Le paiement est exigible à la commande, sauf échéance différente expressément indiquée sur la facture. En cas de retard de paiement entre professionnels, des pénalités sont dues de plein droit dès le lendemain de la date d’échéance, sans rappel préalable, au taux de refinancement de la Banque centrale européenne le plus récent majoré de 10 points de pourcentage, sous réserve du taux minimal légal applicable. L’indemnité forfaitaire pour frais de recouvrement de **40 €** est due dans les conditions prévues par le Code de commerce. Une indemnisation complémentaire peut être demandée sur justification lorsque les frais de recouvrement réellement exposés dépassent ce montant.
+
+## 6. Durée, expiration, résiliation et restitution
+
+L’accès d’essai commence à la création de l’espace et dure 60 jours. Une période payée dure la durée mensuelle ou annuelle choisie; son renouvellement exige une nouvelle commande et un nouveau paiement. Le Client peut ne pas renouveler. Il peut également demander la clôture du compte à {{AURION_LEGAL_PUBLISHER_EMAIL}}. La procédure, le délai de prise d’effet et les conséquences financières doivent être confirmés par l’éditeur avant publication.
+
+À l’expiration, le service place l’espace en lecture seule. Le code prévoit un délai de 60 jours après la période d’accès avant de refuser certaines consultations; cela ne démontre pas la suppression effective des données et fichiers. L’éditeur doit définir, implémenter et documenter la restitution et la suppression avant de promettre une durée de purge. Le Client doit pouvoir exporter ses données dans les formats réellement disponibles avant l’échéance.
+
+L’éditeur peut suspendre un accès en cas de risque grave pour la sécurité, de fraude ou d’utilisation manifestement illicite, dans la mesure nécessaire et proportionnée. Il en informe le Client lorsque cela est possible et lui indique les mesures de rétablissement ou de recours disponibles.
+
+## 7. Disponibilité, assistance et maintenance
+
+L’éditeur met en œuvre des moyens raisonnables pour exploiter le service et répondre aux demandes reçues à {{AURION_LEGAL_PUBLISHER_EMAIL}}. Aucun taux de disponibilité ou délai de réponse n’est garanti sans engagement distinct. Des interruptions peuvent survenir en raison d’une maintenance, d’un incident, d’un réseau ou d’un fournisseur tiers.
+
+Avant publication, l’éditeur doit renseigner les horaires, délais cibles, niveau d’assistance et modalités d’escalade réellement assurés. Les offres hébergées sur une instance sans stockage persistant adapté ne doivent pas recevoir de pièces justificatives ou fichiers clients à conserver.
 
 ## 8. Données personnelles et sous-traitance
-Chaque Partie respecte les règles de protection des données qui lui sont applicables. Pour les données de personnes enregistrées par le Client dans le cadre de son activité, le Client détermine en principe les finalités et demeure responsable de traitement ; l’Éditeur agit comme sous-traitant dans la mesure où il traite ces données sur instruction du Client. Pour la gestion des comptes, de la facturation du Service, de la sécurité et du support propres à Aurion, l’Éditeur peut agir comme responsable de traitement. Les obligations du sous-traitant, la confidentialité, la sécurité, les sous-traitants ultérieurs, l’assistance aux demandes, les violations et la suppression/restitution sont précisées dans la politique de confidentialité et l’annexe de traitement applicable.
 
-## 9. Propriété intellectuelle et données du Client
-Le logiciel, son architecture, ses marques, son interface et ses éléments propres sont protégés par les droits applicables. Le Client conserve les droits qu’il détient sur les données qu’il importe ou crée. Pour la seule durée nécessaire au fonctionnement du Service, il autorise l’Éditeur à héberger, reproduire, transmettre et traiter ces données afin d’exécuter ses instructions et d’assurer la sécurité et le support du Service. Cette autorisation ne transfère pas la propriété des données.
+Le Client détermine les finalités et moyens des données métier qu’il enregistre dans Aurion et agit en principe comme responsable du traitement. L’Éditeur agit comme sous-traitant pour ces données dans la mesure où il les traite pour fournir le service. Pour la gestion de ses propres comptes, commandes, paiements, sécurité et demandes d’assistance, l’Éditeur peut agir comme responsable du traitement.
 
-Le Client s’interdit de porter atteinte au Service, de tenter d’accéder à des espaces tiers, de contourner les mesures de sécurité, d’utiliser Aurion pour commettre une infraction ou de copier les éléments protégés au-delà des autorisations légales.
+Les obligations applicables et les catégories de prestataires sont décrites dans la politique de confidentialité et son annexe. L’éditeur doit compléter la liste exacte des prestataires ultérieurs, leurs lieux de traitement et les transferts éventuels avant l’entrée en vigueur du contrat.
 
-## 10. Responsabilité
-Chaque Partie répond de ses obligations dans les limites permises par la loi. L’Éditeur ne répond pas des dommages résultant de données incorrectes fournies par le Client, de paramètres fiscaux non validés, d’une absence de sauvegarde propre du Client lorsqu’elle lui incombe, d’un défaut de connexion ou d’un service tiers non contrôlé par l’Éditeur. Les exclusions ne s’appliquent pas lorsque la loi interdit de les opposer, notamment en cas de faute lourde ou dolosive, de dommage corporel, ou pour toute responsabilité qui ne peut être légalement limitée. Le Client demeure seul responsable des actes de gestion, décisions commerciales, obligations fiscales, sociales et comptables réalisés à partir des informations affichées par Aurion.
+## 9. Intelligence artificielle et intégrations
 
-## 11. Confidentialité
-Chaque Partie protège les informations confidentielles de l’autre et les utilise uniquement pour exécuter la relation contractuelle. Cette obligation ne couvre pas les informations devenues publiques sans violation, déjà détenues légitimement ou devant être divulguées en application d’une obligation légale.
+Le Client choisit les courriels, documents ou textes qu’il soumet à une analyse automatisée. Il vérifie les résultats avant de les utiliser, de répondre à un tiers, de modifier une fiche, de prendre une décision ou d’émettre un document. Les fonctions d’IA ne fournissent pas de conseil professionnel et ne garantissent pas l’exactitude d’une interprétation.
 
-## 12. Réclamations, droit applicable et différends
-Toute réclamation peut être adressée à {{AURION_LEGAL_PUBLISHER_EMAIL}}. Les Parties recherchent d’abord une solution amiable. Sous réserve des dispositions impératives applicables, les présentes sont régies par le droit français. Les règles de compétence territoriale s’appliquent conformément au statut du Client et aux textes en vigueur ; aucune clause ne retire à un consommateur les droits impératifs que lui reconnaît la loi.
+Selon la configuration, les traitements peuvent être réalisés par un modèle local Ollama ou par un fournisseur d’IA distant. Le fournisseur distant, sa localisation, les données qui lui sont transmises et ses conditions de conservation doivent être indiqués dans la liste des sous-traitants avant publication. Les intégrations de messagerie, calendrier, paiement et registre d’entreprises peuvent aussi soumettre les données aux conditions de leurs propres fournisseurs.
 
-## 13. Modification des conditions
-La version applicable est celle présentée au Client au moment de sa commande ou de son acceptation. Les modifications substantielles sont portées à sa connaissance avant leur application et, lorsqu’une nouvelle acceptation est requise, le Client doit l’exprimer avant de poursuivre l’utilisation soumise à ces nouvelles conditions.
+## 10. Propriété intellectuelle et contenus
+
+L’Éditeur conserve ses droits sur Aurion, son logiciel, son interface et ses éléments propres. Le Client conserve les droits qu’il détient sur ses contenus. Il concède à l’Éditeur, pour la durée nécessaire à la fourniture du service, l’autorisation limitée de les héberger, traiter, transmettre et reproduire pour exécuter les instructions du Client, assurer le support et la sécurité. Cette autorisation ne transfère pas la propriété des données.
+
+Les éléments tiers et logiciels libres restent soumis à leurs licences respectives. Le Client ne tente pas de contourner les protections du service ni d’accéder à l’espace d’un tiers.
+
+## 11. Responsabilité
+
+Chaque Partie répond des dommages directs résultant de ses manquements, dans les limites prévues par le droit applicable. Aucune exclusion ne s’applique à une responsabilité qui ne peut être limitée, notamment en cas de faute lourde ou dolosive ou de dommage corporel.
+
+L’Éditeur n’assume pas les conséquences d’une saisie erronée, d’une validation omise par le Client, d’une indisponibilité extérieure ou d’un fournisseur tiers hors de son contrôle, sous réserve de ses obligations propres. Aucune clause ne peut exonérer l’Éditeur de ses obligations légales de sécurité, de traitement des données ou d’exécution du contrat. Le Client conserve les preuves nécessaires à son activité et contrôle les documents et calculs avant usage.
+
+## 12. Confidentialité, réclamations et litiges
+
+Chaque Partie protège les informations non publiques reçues de l’autre et ne les utilise que pour l’exécution du contrat, sauf obligation légale ou accord écrit contraire.
+
+Toute réclamation est envoyée à {{AURION_LEGAL_PUBLISHER_EMAIL}}. Les Parties recherchent d’abord une solution amiable. Le droit français s’applique sous réserve des règles impératives. Les juridictions compétentes sont déterminées par les règles applicables aux professionnels. Si l’offre est ouverte aux consommateurs, les mentions de médiation et les droits de ces derniers doivent être ajoutés ici avant publication; aucune médiation ne doit être présentée sans désignation effective d’un médiateur compétent.
+
+## 13. Modifications et version applicable
+
+La version applicable est celle remise avant la commande et acceptée par le Client. Toute modification substantielle est portée à sa connaissance avant son entrée en vigueur; lorsque la loi ou le contrat l’exige, une nouvelle acceptation est recueillie. L’éditeur conserve la version datée et la preuve de l’acceptation associée.

@@ -1,20 +1,35 @@
-# Politique relative aux cookies, traceurs et stockages du navigateur — Aurion
+# Politique relative aux cookies et stockages du navigateur — Aurion
 
-**Version : 1.0 — Date de mise à jour : {{LEGAL_UPDATED_AT}}**
+> **PROJET DE DOCUMENT — NE PAS UTILISER POUR UNE COMMERCIALISATION.** Inventaire établi à partir du code du dépôt 15.3.14 le 30 octobre 2026. Vérifier les cookies réellement émis, les scripts tiers et les choix par navigateur sur le site de production avant publication.
 
-Aurion est un logiciel de gestion professionnelle en ligne édité par {{AURION_LEGAL_PUBLISHER_NAME}}. Contact : {{AURION_PRIVACY_CONTACT_EMAIL}}.
+**Éditeur : {{AURION_LEGAL_PUBLISHER_NAME}} — Contact : {{AURION_PRIVACY_CONTACT_EMAIL}} — Version projet : 2.0**
 
-## 1. Fonctionnement nécessaire
-Pour sécuriser la connexion, maintenir une session, éviter les accès non autorisés et fournir les fonctionnalités demandées par l’utilisateur, le Service peut utiliser des cookies ou des mécanismes techniques de stockage. Ces éléments sont limités aux besoins nécessaires à la fourniture du Service, à l’authentification et à la sécurité. Leur blocage peut empêcher la connexion ou certaines fonctions de fonctionner.
+## 1. Cookies nécessaires
 
-## 2. Stockage local et application installable
-Aurion peut enregistrer dans le navigateur des préférences techniques et des informations nécessaires à son fonctionnement, notamment pour gérer l’activité sélectionnée, conserver temporairement des données de formulaire ou permettre l’installation comme application web progressive. Ces données peuvent être supprimées dans les réglages du navigateur. Une suppression peut entraîner une déconnexion ou nécessiter une nouvelle configuration.
+Le code examiné utilise les cookies suivants pour l’authentification et la protection de compte :
 
-## 3. Mesure d’audience, publicité et contenus tiers
-Aucun cookie publicitaire n’est nécessaire au fonctionnement actuel de l’application. Aucun traceur non essentiel ne doit être déposé ou lu avant le consentement préalable lorsqu’il est requis. Si une mesure d’audience, un contenu tiers ou une fonction nécessitant un consentement est ajouté, Aurion doit informer l’utilisateur, permettre un refus aussi accessible que l’acceptation, conserver la preuve du choix et offrir un moyen simple de le retirer.
+| Nom | Fonction | Durée technique maximale observée | Accès |
+| --- | --- | --- | --- |
+| aurion_session | Maintenir la session Aurion | 30 minutes | HttpOnly; Secure si la configuration l’active; SameSite=Strict |
+| aurion_refresh | Renouveler une session native | 30 jours | HttpOnly; Secure si la configuration l’active; SameSite=Strict; chemin /auth |
+| aurion_google_login | Protéger une transaction de connexion Google contre la falsification | 10 minutes | HttpOnly; Secure selon configuration; SameSite=Lax; chemin de rappel Google |
 
-## 4. Gérer ses choix
-Les cookies peuvent être gérés via les paramètres du navigateur. La suppression ou le blocage des éléments strictement nécessaires peut rendre impossible l’utilisation de l’espace connecté. Si Aurion ajoute des traceurs non essentiels, les choix devront pouvoir être consultés et modifiés depuis une interface dédiée.
+Ces cookies sont utilisés pour fournir une fonction expressément demandée et sécuriser l’accès. Leur blocage ou leur suppression peut déconnecter l’utilisateur ou empêcher la connexion.
 
-## 5. Contact et évolution
-Pour toute question : {{AURION_PRIVACY_CONTACT_EMAIL}}. La présente politique est mise à jour en cas de modification des technologies utilisées. Elle doit être vérifiée après toute installation d’outil d’analyse, de publicité ou d’intégration externe.
+## 2. Stockage local dans le navigateur
+
+Le dépôt utilise aussi le stockage local du navigateur pour mémoriser notamment l’adresse e-mail du dernier compte utilisé, l’activité sélectionnée, la préférence d’affichage de la proposition de clé d’accès et une révision de synchronisation. Ces éléments ne sont pas des cookies et restent sur le terminal, jusqu’à leur suppression par l’utilisateur ou le navigateur. Effacer le stockage local peut réinitialiser les préférences ou demander une nouvelle connexion.
+
+Aurion peut être installable comme application web progressive. Le fonctionnement hors ligne et les éléments mis en cache doivent être vérifiés sur la version réellement déployée.
+
+## 3. Mesure d’audience, publicité et intégrations
+
+L’examen du dépôt n’a pas révélé de bibliothèque de mesure d’audience ou de publicité. Cette vérification du code ne garantit pas l’absence d’un traceur ajouté par une configuration de production, un contenu externe ou une mise à jour. L’éditeur doit exécuter un contrôle navigateur de production avant publication et après toute modification d’intégration.
+
+Tout traceur qui n’est pas strictement nécessaire doit être bloqué avant le consentement. Le visiteur doit pouvoir accepter, refuser aussi simplement, connaître les finalités et retirer son choix avec une facilité équivalente. Le consentement est enregistré selon les règles applicables.
+
+## 4. Gérer ou supprimer les données
+
+L’utilisateur peut supprimer les cookies et données de site dans les réglages de son navigateur. La suppression peut le déconnecter et effacer ses préférences locales. Les réglages du navigateur ne suppriment pas les données hébergées sur le compte Aurion.
+
+Pour les demandes relatives aux données personnelles : {{AURION_PRIVACY_CONTACT_EMAIL}}. Les choix concernant des traceurs non essentiels, s’ils sont ajoutés, devront être disponibles depuis un lien de gestion accessible à tout moment.

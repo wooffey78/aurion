@@ -1,24 +1,5 @@
-# Déclaration d'accessibilité — brouillon
+# Archive de brouillon — DECLARATION-ACCESSIBILITE.md
 
-Aurion vise une expérience conforme aux principes WCAG 2.2 niveau AA.
+Ce fichier historique est remplacé par le projet de document version 2.0 dans [DECLARATION-ACCESSIBILITE.md](DECLARATION-ACCESSIBILITE.md).
 
-## État
-
-Cette archive est un prototype frontend et n'a pas fait l'objet d'un audit d'accessibilité indépendant. La conformité ne doit donc pas être revendiquée.
-
-## Mesures de conception
-
-- navigation clavier ;
-- focus visible ;
-- lien d'évitement ;
-- structure sémantique ;
-- labels de formulaires ;
-- messages d'état ;
-- alternatives textuelles ;
-- responsive ;
-- portrait/paysage ;
-- préférence de réduction des animations.
-
-## Audit à réaliser
-
-Tester avec clavier seul, lecteur d'écran, zoom, contraste, mobile, tablette et desktop. Publier ensuite un état réel, les non-conformités connues et le plan de correction.
+Le document cible reste un projet à compléter et faire valider. N’utiliser ni ce fichier d’archive ni le texte courant comme document définitif avant la levée des points de l’audit de commercialisation.

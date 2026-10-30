@@ -1,28 +1,37 @@
 # Mentions légales — Aurion
 
-**Dernière mise à jour : {{LEGAL_UPDATED_AT}}**
+> **PROJET DE PAGE — NE PAS PUBLIER AVANT COMPLÉTION.** Les champs d’identité et les coordonnées des hébergeurs doivent être vérifiés avec les documents d’immatriculation et les contrats en vigueur. Mentions établies à partir du dépôt Aurion 15.3.14.
 
-## Éditeur du service
-Aurion est édité par **{{AURION_LEGAL_PUBLISHER_NAME}}**, {{AURION_LEGAL_PUBLISHER_FORM}}, immatriculé sous le SIREN {{AURION_LEGAL_PUBLISHER_SIREN}} et le SIRET {{AURION_LEGAL_PUBLISHER_SIRET}}, dont le siège est situé {{AURION_LEGAL_PUBLISHER_ADDRESS}}.
+## Éditeur
 
-Numéro de TVA intracommunautaire : {{AURION_LEGAL_PUBLISHER_VAT}}.
-Directeur ou directrice de la publication : {{AURION_LEGAL_DIRECTOR}}.
-Contact : {{AURION_LEGAL_PUBLISHER_EMAIL}}.
+Aurion est édité par **{{AURION_LEGAL_PUBLISHER_NAME}}**, {{AURION_LEGAL_PUBLISHER_FORM}}, au capital de [À compléter si applicable], dont le siège est {{AURION_LEGAL_PUBLISHER_ADDRESS}}.
+
+- SIREN : {{AURION_LEGAL_PUBLISHER_SIREN}}
+- SIRET du siège : {{AURION_LEGAL_PUBLISHER_SIRET}}
+- Immatriculation au RCS ou au registre des métiers : [À compléter selon la forme et l’activité, ou indiquer explicitement si non applicable]
+- TVA intracommunautaire : {{AURION_LEGAL_PUBLISHER_VAT}}
+- Directeur ou directrice de la publication : {{AURION_LEGAL_DIRECTOR}}
+- Contact : {{AURION_LEGAL_PUBLISHER_EMAIL}}
 
 ## Hébergement
-Le déploiement applicatif actuel utilise Render Services, Inc. Les coordonnées complètes de l’entité contractante, de l’hébergement et du contact d’exploitation à retenir pour cette instance sont : {{AURION_HOST_NAME}}, {{AURION_HOST_ADDRESS}}, contact {{AURION_HOST_CONTACT}}. Ces informations doivent être confirmées à partir du contrat d’hébergement réellement applicable à l’instance.
 
-## Activité
-Aurion est un logiciel de gestion professionnelle multi-activités. Il regroupe notamment la gestion des clients et fournisseurs, du catalogue métier, des prestations et pièces, des devis et factures, des paiements, des relances, du SAV, des rendez-vous, et des indicateurs de trésorerie et de comptabilité.
+- Application : service hébergé sur Render. Raison sociale contractante, adresse postale et numéro de téléphone : {{AURION_HOST_NAME}}, {{AURION_HOST_ADDRESS}}, {{AURION_HOST_CONTACT}}.
+- Base de données : service Neon. Raison sociale contractante, adresse postale et numéro de téléphone : [À compléter à partir du contrat Neon; préciser si la même entité que l’hébergeur ci-dessus ou un hébergeur distinct].
+
+Ces informations doivent désigner les entités qui hébergent effectivement le site ou les données, et non uniquement leurs marques commerciales.
 
 ## Propriété intellectuelle
-La marque, l’identité visuelle, les interfaces et les éléments logiciels propres à Aurion sont protégés par les droits applicables. Sauf autorisation écrite ou exception prévue par la loi, toute reproduction, représentation, adaptation ou diffusion non autorisée est interdite. Les marques et composants tiers restent la propriété de leurs titulaires.
+
+Les éléments propres à Aurion sont protégés par les droits applicables. Les composants tiers restent soumis aux droits et licences de leurs titulaires. Toute réutilisation non autorisée est interdite, sous réserve des exceptions légales et licences applicables.
 
 ## Responsabilité éditoriale
-Les informations publiées sur le site et les estimations issues de l’application sont fournies à des fins de gestion. Elles ne remplacent pas les vérifications légales, fiscales, sociales ou comptables du professionnel utilisateur. Les mentions obligatoires figurant sur un document métier doivent être validées par l’entreprise qui émet ce document.
+
+Les contenus et calculs d’Aurion sont des outils de gestion et d’aide. Ils ne remplacent pas la vérification des données, documents, calculs et obligations du professionnel utilisateur. L’éditeur ne garantit pas la transmission d’une facture à une plateforme agréée par l’émission d’un PDF ou d’un fichier structuré.
 
 ## Données personnelles et cookies
-Les traitements de données et les mécanismes de stockage sont décrits dans la politique de confidentialité et la politique cookies accessibles depuis Aurion. Pour toute demande, écrire à {{AURION_PRIVACY_CONTACT_EMAIL}}.
+
+Les traitements sont décrits dans la politique de confidentialité et son annexe de sous-traitance. L’usage des cookies et stockages du navigateur est décrit dans la politique cookies. Contact données personnelles : {{AURION_PRIVACY_CONTACT_EMAIL}}.
 
 ## Droit applicable
-Sous réserve des règles impératives, le droit français s’applique. Les règles de compétence et les droits impératifs des utilisateurs sont déterminés par les textes applicables à leur situation.
+
+Les règles applicables sont déterminées par le statut du visiteur ou du client et les textes impératifs. Les présentes mentions ne restreignent aucun droit que la loi rend impératif.
