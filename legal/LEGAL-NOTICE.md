@@ -1,10 +1,12 @@
 # Mentions légales — Aurion
 
-> **PROJET DE PAGE — NE PAS PUBLIER AVANT COMPLÉTION.** Les champs d’identité et les coordonnées des hébergeurs doivent être vérifiés avec les documents d’immatriculation et les contrats en vigueur. Mentions établies à partir du dépôt Aurion 15.3.14.
+> **PROJET DE PAGE — NE PAS PUBLIER AVANT COMPLÉTION.** Les champs d’identité et les coordonnées des hébergeurs doivent être vérifiés avec les documents d’immatriculation et les contrats en vigueur. Mentions établies à partir de l’examen statique du dépôt Aurion 15.3.16.
+
+**Version projet : 2.1 — Mise à jour : 30 octobre 2026**
 
 ## Éditeur
 
-Aurion est édité par **{{AURION_LEGAL_PUBLISHER_NAME}}**, {{AURION_LEGAL_PUBLISHER_FORM}}, au capital de [À compléter si applicable], dont le siège est {{AURION_LEGAL_PUBLISHER_ADDRESS}}.
+Aurion est édité par **{{AURION_LEGAL_PUBLISHER_NAME}}**, {{AURION_LEGAL_PUBLISHER_FORM}}, au capital de [À compléter si applicable], dont le siège est {{AURION_LEGAL_PUBLISHER_ADDRESS}}. Nom commercial déclaré : Easyweb-dev [À confirmer par justificatif d’immatriculation].
 
 - SIREN : {{AURION_LEGAL_PUBLISHER_SIREN}}
 - SIRET du siège : {{AURION_LEGAL_PUBLISHER_SIRET}}

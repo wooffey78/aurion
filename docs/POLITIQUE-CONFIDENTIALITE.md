@@ -1,8 +1,8 @@
 # Politique de confidentialité et annexe de traitement — Aurion
 
-> **PROJET DE DOCUMENT — NE PAS UTILISER POUR UNE COMMERCIALISATION.** Le texte reflète les sources du dépôt Aurion 15.3.14. Les durées de conservation, les lieux de traitement, les fournisseurs effectivement configurés et l’identité du responsable restent à confirmer. Compléter ces informations, le registre des traitements et les procédures opérationnelles, puis faire valider avant publication.
+> **PROJET DE DOCUMENT — NE PAS UTILISER POUR UNE COMMERCIALISATION.** Le texte reflète l’examen statique du dépôt Aurion 15.3.16. Les durées de conservation, les lieux de traitement, les fournisseurs effectivement configurés et l’identité du responsable restent à confirmer. Compléter ces informations, le registre des traitements et les procédures opérationnelles, puis faire valider avant publication.
 
-**Version projet : 2.0 — Date de rédaction : 30 octobre 2026 — Contact données personnelles : {{AURION_PRIVACY_CONTACT_EMAIL}}**
+**Version projet : 2.1 — Date de rédaction : 30 octobre 2026 — Contact données personnelles : {{AURION_PRIVACY_CONTACT_EMAIL}}**
 
 ## 1. Responsable et rôles
 
@@ -43,18 +43,20 @@ Les accès sont limités aux personnes habilitées et aux prestataires nécessai
 
 | Fournisseur ou service | Rôle potentiel | État à vérifier avant publication |
 | --- | --- | --- |
-| Render | Hébergement de l’application | Entité contractante, région, adresse juridique et support à renseigner |
-| Neon | Hébergement PostgreSQL | Entité contractante, région, adresse juridique et garanties à renseigner |
-| Stripe | Paiement par carte, si activé | Activation en production, rôles et transferts à confirmer |
+| Render | Hébergement de l’application | Deux services de production sont actifs : aurion-web en Oregon (États-Unis) et aurion à Francfort (Allemagne). Confirmer le service canonique, les flux réels et les garanties de transfert depuis les États-Unis; entité contractante et contact juridique à renseigner |
+| Neon | Hébergement PostgreSQL | Région confirmée : AWS eu-central-1 (UE). Entité contractante, adresse juridique et garanties à renseigner |
+| Stripe | Paiement par carte | Usage déclaré par l’éditeur; activation en production, rôles, entité et transferts à confirmer |
 | Google | Connexion OAuth, calendrier ou messagerie, si activés | Services précis, régions et transferts à confirmer |
 | Service SMTP ou messagerie choisi/configuré | Envoi ou synchronisation de courriels | Nom, rôle, région et conditions à préciser pour chaque offre |
-| Fournisseur d’IA distante configuré | Analyse ou génération, si activé | Nom, données transmises, lieu, rétention et garanties à renseigner |
+| Fournisseur d’IA distante | Analyse ou génération | Usage distant déclaré par l’éditeur; le fournisseur, les données transmises, la région, la rétention et les garanties restent à définir |
 
 La liste effective, les contacts, les finalités, les lieux de traitement, les transferts et les garanties applicables doivent être publiés sous {{AURION_SUBPROCESSORS}} et tenus à jour. Cette liste générique ne vaut pas déclaration d’une configuration de production vérifiée. Les transferts hors Espace économique européen ne peuvent intervenir qu’avec une base et des garanties conformes au chapitre V du RGPD.
 
 ## 6. Hébergement et durée de conservation
 
-La version examinée utilise Neon pour la base de données et enregistre les fichiers téléversés dans le répertoire local du service applicatif. La documentation du déploiement précise que le disque local d’un service Render gratuit ne fournit pas une persistance fiable entre redémarrages ou redéploiements. Tant que les pièces ne sont pas migrées vers un stockage durable et que la restauration n’est pas testée, l’éditeur ne peut pas garantir leur conservation.
+La configuration Render observée le 30 octobre 2026 montre deux services web actifs : aurion-web en Oregon (États-Unis) et aurion à Francfort (Allemagne). Le projet Neon est en région AWS eu-central-1 (UE). Le service canonique et les flux effectivement utilisés doivent être confirmés. Si des données personnelles passent par le service de l’Oregon, un transfert hors EEE doit être documenté avec son mécanisme et ses garanties avant publication.
+
+La version examinée utilise Neon pour la base de données et enregistre les fichiers téléversés dans le répertoire local du service applicatif. La documentation Render précise que le disque local d’un service gratuit ne fournit pas une persistance fiable entre redémarrages ou redéploiements. Tant que les pièces ne sont pas migrées vers un stockage durable et que la restauration n’est pas testée, l’éditeur ne peut pas garantir leur conservation.
 
 | Catégorie | Règle technique observée | Information à finaliser |
 | --- | --- | --- |

@@ -5,7 +5,7 @@ import { config } from '../config.js';
 import { db, query } from '../db.js';
 import { signAccessToken } from '../plugins/auth.js';
 import {
-  requestPasswordReset, validateResetToken, resetPassword, changePassword, bumpSessions, currentLegalDocs,
+  requestPasswordReset, validateResetToken, resetPassword, changePassword, bumpSessions, currentLegalDocs, legalDocumentsReadyForContracts,
   subscriptionState, subscriptionEvent,
 } from '../services/account.js';
 import { AurionError } from '../services/errors.js';
@@ -197,6 +197,7 @@ export async function accountRoutes(app: FastifyInstance) {
       return subscriptionState(org);
     });
     priv.post('/billing/subscribe', async (request,reply) => {
+      if (!(await legalDocumentsReadyForContracts())) return reply.code(503).send({error:'LEGAL_DOCUMENTS_UNPUBLISHED',message:'La souscription est temporairement indisponible : les documents contractuels ne sont pas publiés.'});
       const parsed = billingSubscribeSchema.safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: 'INVALID_INPUT' });
       const { planCode, method } = parsed.data;
