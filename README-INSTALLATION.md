@@ -1,4 +1,6 @@
-# Aurion 15.3.19
+# Aurion 15.3.20
+
+**Périmètre produit :** Aurion est destiné aux entreprises déjà immatriculées. La première connexion sert à renseigner et vérifier les informations d’une entreprise existante (détection SIRET/SIREN) et à configurer les modules de gestion. Il n’existe plus de parcours de création d’entreprise, de formalités de création ni de studio de création d’identité visuelle. La recherche d’entreprise par nom reste un outil distinct dans le tableau de bord.
 
 ## Pour vos clients : un seul fichier
 Envoyez **Aurion-Setup.bat** (il contient l'intégralité d'Aurion). Le client double-clique dessus :
@@ -13,7 +15,7 @@ Le MSI LibreOffice n’est pas embarqué dans l’archive de sources ni dans le 
 
 ## IA locale
 
-Le setup propose d’installer Ollama (éditeur vérifié, installation par utilisateur sans droits administrateur) et de télécharger Qwen3.5-4B Q4_K_M (3,3 Go). Il démarre puis vérifie l’API locale d’Ollama avant le téléchargement. Cette étape est facultative et bornée : si elle est refusée ou échoue, Aurion s’installe normalement et l’IA locale reste indisponible jusqu’à l’installation manuelle d’Ollama et de `qwen3.5:4b-q4_K_M`. En mode local, aucune requête IA ne bascule vers le cloud. La création de compte locale d’évaluation est autorisée avec un avertissement, mais aucun brouillon juridique n’est enregistré comme accepté; les inscriptions de production et les paiements restent verrouillés. La génération locale de logo demande encore un moteur d’image séparé ; les détails figurent dans `docs/IA-LOCALE.md`.
+Le setup propose d’installer Ollama (éditeur vérifié, installation par utilisateur sans droits administrateur) et de télécharger Qwen3.5-4B Q4_K_M (3,3 Go). Il démarre puis vérifie l’API locale d’Ollama avant le téléchargement. Cette étape est facultative et bornée : si elle est refusée ou échoue, Aurion s’installe normalement et l’IA locale reste indisponible jusqu’à l’installation manuelle d’Ollama et de `qwen3.5:4b-q4_K_M`. En mode local, aucune requête IA ne bascule vers le cloud. La création de compte locale d’évaluation est autorisée avec un avertissement, mais aucun brouillon juridique n’est enregistré comme accepté; les inscriptions de production et les paiements restent verrouillés. 
 
 ## Au quotidien
 Icône **Aurion** : arrête proprement le serveur et PostgreSQL, les relance, applique les mises à jour de la base, puis ouvre Aurion en plein écran (**F11** pour quitter / rétablir le plein écran).
@@ -31,7 +33,7 @@ La messagerie et l'agenda se configurent **dans Aurion** (Paramètres → Messag
 - Vérifier le contenu et l’extraction réelle du setup (Windows) : `npm run test:setup-package`. Ce contrôle n’exécute pas l’installation complète de Node.js, PostgreSQL et LibreOffice.
 - Tester les règles de paiement/échéancier : `npm run test:business`. Tester l’accessibilité des notifications : `npm run test:ui-a11y`.
 - Installer depuis les sources (sans le fichier unique) : `INSTALL-DEPUIS-LES-SOURCES.bat`.
-- `npm run dev` (dossier racine) reste réservé au développement. `npm run check` compile, vérifie les types et exécute les tests de fumée ciblés. `npm test` lance la suite complète de régression, dont plusieurs anciens tests statiques doivent encore être réconciliés avec les implémentations plus récentes.
+- `npm run dev` (dossier racine) reste réservé au développement. `npm run check` compile, vérifie les types et exécute les tests de fumée ciblés. `npm test` lance la suite complète de régression. `npm run test:company-config` exécute uniquement les contrats ciblés du parcours entreprise, de la recherche séparée et de la fusion des données de registre.
 - Si vous modifiez `backend/src/services/pricing.ts` : `npm run sync-pricing` régénère la copie navigateur (un test vérifie qu'elles sont identiques).
 - Désinstaller : supprimer le dossier `%LOCALAPPDATA%\Aurion` et les deux raccourcis Aurion.
 
@@ -60,8 +62,8 @@ La suite utilise exclusivement le conteneur de test. Le script `db:reset:test` r
 
 ## Déploiement Web commercial
 
-Le blueprint de production 15.3.19 cible le service Render existant `aurion` à Francfort et demande le plan `starter`; il ne migre pas à lui seul le service ni ses variables si celui-ci n’est pas géré par un Blueprint. Il attend une base PostgreSQL **dédiée à Aurion** via `DATABASE_URL`; il ne crée pas Neon, le bucket OVH, Brevo ni Stripe. Ne réutilisez jamais une base appartenant à VYRATY ou à un autre projet. Pour l’ordre de configuration, voir `docs/PLAN-BASCULE-FRANKFURT-15.3.19.md`.
+Le blueprint de production 15.3.20 cible le service Render existant `aurion` à Francfort et demande le plan `starter`; il ne migre pas à lui seul le service ni ses variables si celui-ci n’est pas géré par un Blueprint. Il attend une base PostgreSQL **dédiée à Aurion** via `DATABASE_URL`; il ne crée pas Neon, le bucket OVH, Brevo ni Stripe. Ne réutilisez jamais une base appartenant à VYRATY ou à un autre projet. Pour l’ordre de configuration, voir `docs/PLAN-BASCULE-FRANKFURT-15.3.20.md`.
 
 Avant tout déploiement, configurez dans les variables Render `DATABASE_URL`, `AURION_MIGRATION_DATABASE_URL`, `AURION_RUNTIME_DB_ROLE`, `JWT_SECRET` (au moins 32 caractères aléatoires), `CORS_ORIGIN` (l’origine HTTPS exacte de l’application), `APP_BASE_URL` (URL publique exacte) et une `AURION_ENCRYPTION_KEY` persistante. `COOKIE_SECURE=true` et `HOST=0.0.0.0` sont définis pour la production. En production Render, le stockage S3 privé doit aussi être complet. Si Google Calendar ou SMTP sont activés, configurez également les secrets et les URL de rappel correspondants. Ne commitez jamais de fichier `.env`.
 
-**Stockage commercial :** en production, Aurion 15.3.19 exige `AURION_STORAGE_BACKEND=s3` et un bucket privé OVHcloud à Francfort. La cible n’est pas encore configurée : migrer et vérifier les fichiers du service Oregon, activer les sauvegardes indépendantes et tester une restauration base + fichiers avant les données réelles.
+**Stockage commercial :** en production, Aurion 15.3.20 exige `AURION_STORAGE_BACKEND=s3` et un bucket privé OVHcloud à Francfort. La cible n’est pas encore configurée : migrer et vérifier les fichiers du service Oregon, activer les sauvegardes indépendantes et tester une restauration base + fichiers avant les données réelles.

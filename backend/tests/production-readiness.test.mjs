@@ -19,15 +19,19 @@ test('public database health response never returns raw driver messages', () => 
   assert.doesNotMatch(route, /message:String\(e\?\.message/);
 });
 
-test('Render blueprint is free-tier web only and requires an externally managed database URL', () => {
+test('Render blueprint describes the existing Frankfurt commercial target and an externally managed database', () => {
   const render = read('render.yaml');
   assert.match(render, /type: web/);
-  assert.match(render, /plan: free/);
+  assert.match(render, /name: aurion/);
+  assert.match(render, /region: frankfurt/);
+  assert.match(render, /plan: starter/);
   assert.doesNotMatch(render, /type: pserv|type: postgres|type: keyvalue/);
   assert.match(render, /key: DATABASE_URL\s+sync: false/);
-  assert.match(render, /key: HOST\s+value: 0\.0\.0\.0/);
-  assert.match(render, /healthCheckPath: \/health/);
-  assert.match(read('backend/src/routes/health.ts'), /app.get\("\/health"/);
+  assert.match(render, /key: AURION_MIGRATION_DATABASE_URL\s+sync: false/);
+  assert.match(render, /key: AURION_RUNTIME_DB_ROLE\s+sync: false/);
+  assert.match(render, /key: AURION_STORAGE_BACKEND\s+value: s3/);
+  assert.match(render, /healthCheckPath: \/health\/db/);
+  assert.match(read('backend/src/routes/health.ts'), /app.get\("\/health\/db"/);
 });
 
 test('PWA cache is restricted to static assets and never stores business API responses', () => {
@@ -43,16 +47,16 @@ test('CSP keeps images local and blocks third-party image-host dependencies', ()
   const security = read('backend/src/plugins/security.ts');
   assert.match(security, /imgSrc:\[\"'self'\",\"data:\",\"blob:\"\]/);
   for (const host of ['https://www.apple.com','https://msftstories.thesourcemediaassets.com','https://storage.googleapis.com']) {
-    assert.ok(!security.includes(host), `Unexpected third-party image host in CSP: ${host}`);
+    assert.ok(!security.includes(host), 'Unexpected third-party image host in CSP: ' + host);
   }
   for (const asset of ['assets/platforms/ios.svg','assets/platforms/windows.svg','assets/platforms/android.svg','assets/platforms/macos.svg']) {
-    assert.ok(read(asset), `Expected local platform image: ${asset}`);
+    assert.ok(read(asset), 'Expected local platform image: ' + asset);
   }
 });
 
 test('repository ignores local environment, uploads and generated dependencies', () => {
   const ignore = read('.gitignore');
-  for (const entry of ['.env', 'backend/storage/', 'node_modules/', 'backend/dist/']) assert.ok(ignore.includes(entry), `missing ignore entry ${entry}`);
+  for (const entry of ['.env','backend/storage/','node_modules/','backend/dist/']) assert.ok(ignore.includes(entry), 'missing ignore entry ' + entry);
 });
 
 test('fresh checkout test command builds dist before node tests load compiled services', () => {

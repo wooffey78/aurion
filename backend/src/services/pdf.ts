@@ -2,24 +2,21 @@ import type PDFKit from 'pdfkit';
 const pdfkit=async()=>(await import('pdfkit')).default as unknown as typeof PDFKit;
 import { query } from '../db.js';
 import { clientSummary } from './clients.js';
-import { readPrivateObject } from './storage.js';
 
 function money(v:any){return `${Number(v||0).toFixed(2).replace('.',',')} €`}
 function esc(v:any){return String(v??'')}
-async function makePdf(title:string,org:any,rows:Array<[string,string]>,total?:string){const PDFDocument=await pdfkit();const logoBuffer:Buffer|null=org.logo_key?await readPrivateObject(org.logo_key).catch(()=>null):null;return new Promise<Buffer>((resolve,reject)=>{const doc=new PDFDocument({size:'A4',margin:48});const chunks:Buffer[]=[];doc.on('data',(c:Buffer)=>chunks.push(c));doc.on('end',()=>resolve(Buffer.concat(chunks)));doc.on('error',reject);const left=48,right=547,width=499;
- doc.roundedRect(left,42,width,96,12).fill('#0b1220');let logoDrawn=false;if(logoBuffer){try{doc.image(logoBuffer,left+14,54,{fit:[77.5,71.4],align:'center',valign:'center'});logoDrawn=true}catch{}}
- const tx=left+(logoDrawn?106:18);doc.fillColor('#fff').font('Helvetica-Bold').fontSize(21).text(esc(org.name)||'Entreprise',tx,58,{width:365});doc.font('Helvetica').fontSize(9).fillColor('#cbd5e1').text(esc(org.activity)||'',tx,86,{width:365});if(org.siret)doc.text(`SIRET : ${esc(org.siret)}`,tx,101,{width:365});
+async function makePdf(title:string,org:any,rows:Array<[string,string]>,total?:string){const PDFDocument=await pdfkit();return new Promise<Buffer>((resolve,reject)=>{const doc=new PDFDocument({size:'A4',margin:48});const chunks:Buffer[]=[];doc.on('data',(c:Buffer)=>chunks.push(c));doc.on('end',()=>resolve(Buffer.concat(chunks)));doc.on('error',reject);const left=48,right=547,width=499;
+ doc.roundedRect(left,42,width,96,12).fill('#0b1220');const tx=left+18;doc.fillColor('#fff').font('Helvetica-Bold').fontSize(21).text(esc(org.name)||'Entreprise',tx,58,{width:365});doc.font('Helvetica').fontSize(9).fillColor('#cbd5e1').text(esc(org.activity)||'',tx,86,{width:365});if(org.siret)doc.text(`SIRET : ${esc(org.siret)}`,tx,101,{width:365});
  doc.fillColor('#111827').font('Helvetica-Bold').fontSize(20).text(title,left,164);doc.font('Helvetica').fontSize(9).fillColor('#64748b').text(`Émis le ${new Date().toLocaleDateString('fr-FR')}`,left,190);let y=220;
  doc.roundedRect(left,y,width,50,8).fill('#f1f5f9');doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(10).text('DÉSIGNATION',left+14,y+10,{width:300});doc.text('VALEUR',right-125,y+10,{width:110,align:'right'});y+=50;
  rows.filter(r=>r[0]&&r[1]).forEach((r,i)=>{const label=esc(r[0]),value=esc(r[1]);const valueH=doc.heightOfString(value,{width:145});const labelH=doc.heightOfString(label,{width:315});const h=Math.max(32,Math.max(valueH,labelH)+18);if(y+h>760){doc.addPage();y=54}if(i%2===0)doc.rect(left,y,width,h).fill('#fafafa');doc.fillColor('#334155').font('Helvetica').fontSize(9).text(label,left+14,y+10,{width:315});doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(9).text(value,right-140,y+10,{width:125,align:'right'});y+=h;});
  if(total){y+=14;if(y+70>780){doc.addPage();y=54}doc.roundedRect(left,y,width,60,9).fill('#e8f3ff');doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(12).text('TOTAL TTC',left+18,y+21);doc.fillColor('#0b63ce').fontSize(18).text(total,right-170,y+18,{width:150,align:'right'});y+=80}
  doc.moveTo(left,y).lineTo(right,y).stroke('#e2e8f0');doc.fillColor('#64748b').font('Helvetica').fontSize(7.5).text('Aurion · Document commercial · Les paramètres fiscaux et sociaux restent sous le contrôle de l’entreprise.',left,y+12,{width:width,align:'center'});doc.end();})}
 
-export async function quotePdf(organizationId:string,id:string){const q=await query(`select q.*,c.name client_name,c.email client_email,c.phone client_phone,c.address client_address,o.name company_name,o.activity company_activity,o.siret,o.logo_key,a.name activity_name,a.cgv_text activity_cgv from quotes q left join clients c on c.id=q.client_id join organizations o on o.id=q.organization_id left join activities a on a.id=q.activity_id where q.id=$1 and q.organization_id=$2`,[id,organizationId]);if(!q.rowCount)throw new Error('NOT_FOUND');const x=q.rows[0];const title=x.document_type==='invoice'?`FACTURE ${x.number}`:`DEVIS ${x.number}`;const rows:[string,string][]=[['Client',esc(x.client_name||'')],['Adresse',esc(x.billing_address_snapshot||x.client_address||'')],...(x.intervention_address_snapshot?[['Adresse d’intervention',esc(x.intervention_address_snapshot)] as [string,string]]:[]),['Intervention',esc(x.intervention||'')],['Article / pièce',esc(x.product||'')],['Prix d’achat pièce HT',money(x.part_cost)],['Livraison HT',money(x.shipping_cost)],['Main-d’œuvre HT',money(x.margin||x.labor_cost)],['Total HT',money(x.total_ht)],['TVA',money(x.total_tva)],['Garantie',esc(x.warranty_text||'')],['CGV',esc(x.cgv_snapshot||x.activity_cgv||'')]];return {buffer:await makePdf(title,{name:x.company_name,activity:x.company_activity,siret:x.siret,logo_key:x.logo_key},rows,money(x.total_ttc)),row:x}}
+export async function quotePdf(organizationId:string,id:string){const q=await query(`select q.*,c.name client_name,c.email client_email,c.phone client_phone,c.address client_address,o.name company_name,o.activity company_activity,o.siret,a.name activity_name,a.cgv_text activity_cgv from quotes q left join clients c on c.id=q.client_id join organizations o on o.id=q.organization_id left join activities a on a.id=q.activity_id where q.id=$1 and q.organization_id=$2`,[id,organizationId]);if(!q.rowCount)throw new Error('NOT_FOUND');const x=q.rows[0];const title=x.document_type==='invoice'?`FACTURE ${x.number}`:`DEVIS ${x.number}`;const rows:[string,string][]=[['Client',esc(x.client_name||'')],['Adresse',esc(x.billing_address_snapshot||x.client_address||'')],...(x.intervention_address_snapshot?[['Adresse d’intervention',esc(x.intervention_address_snapshot)] as [string,string]]:[]),['Intervention',esc(x.intervention||'')],['Article / pièce',esc(x.product||'')],['Prix d’achat pièce HT',money(x.part_cost)],['Livraison HT',money(x.shipping_cost)],['Main-d’œuvre HT',money(x.margin||x.labor_cost)],['Total HT',money(x.total_ht)],['TVA',money(x.total_tva)],['Garantie',esc(x.warranty_text||'')],['CGV',esc(x.cgv_snapshot||x.activity_cgv||'')]];return {buffer:await makePdf(title,{name:x.company_name,activity:x.company_activity,siret:x.siret},rows,money(x.total_ttc)),row:x}}
 export async function clientPdf(organizationId:string,id:string){
   const sum=await clientSummary(organizationId,id);if(!sum)throw new Error('NOT_FOUND');
-  const o=(await query('select name,activity,siret,logo_key from organizations where id=$1',[organizationId])).rows[0]||{};
-  const logoBuffer:Buffer|null=o.logo_key?await readPrivateObject(o.logo_key).catch(()=>null):null;
+  const o=(await query('select name,activity,siret from organizations where id=$1',[organizationId])).rows[0]||{};
   const c=sum.client as any;
   const eur=(n:any)=>{const [a,b]=Math.abs(Number(n||0)).toFixed(2).split('.');return `${a!.replace(/\B(?=(\d{3})+(?!\d))/g,'\u00A0')},${b}\u00A0€`};
   const fd=(d:any)=>new Date(d).toLocaleDateString('fr-FR');
@@ -33,7 +30,7 @@ export async function clientPdf(organizationId:string,id:string){
     const label=(t:string,x:number,y:number,w:number)=>doc.font('Helvetica-Bold').fontSize(7.5).fillColor(muted).text(t.toUpperCase(),x,y,{width:w,characterSpacing:1.3});
     const need=(y:number,h:number)=>{if(y+h>770){doc.addPage();return 56}return y};
     // en-tête
-    let tx=L;if(logoBuffer){try{doc.image(logoBuffer,L,52,{fit:[52,52]});tx=L+68}catch{/* logo illisible */}}
+    const tx=L;
     doc.font('Helvetica-Bold').fontSize(16).fillColor(ink).text(o.name||'Entreprise',tx,56,{width:260});
     doc.font('Helvetica').fontSize(9.5).fillColor(muted);if(o.activity)doc.text(o.activity,tx,doc.y+2,{width:260});
     doc.font('Helvetica-Bold').fontSize(14).fillColor(accent).text('FICHE CLIENT',R-220,56,{width:220,align:'right'});
@@ -78,7 +75,7 @@ export async function clientPdf(organizationId:string,id:string){
 }
 
 export async function supplierPdf(organizationId:string,id:string){
-  const r=await query(`select s.*,o.name company_name,o.activity company_activity,o.siret org_siret,o.logo_key from suppliers s join organizations o on o.id=s.organization_id where s.id=$1 and s.organization_id=$2`,[id,organizationId]);
+  const r=await query(`select s.*,o.name company_name,o.activity company_activity,o.siret org_siret from suppliers s join organizations o on o.id=s.organization_id where s.id=$1 and s.organization_id=$2`,[id,organizationId]);
   if(!r.rowCount)throw new Error('NOT_FOUND'); const x=r.rows[0];
-  return {buffer:await makePdf(`FICHE FOURNISSEUR`,{name:x.company_name,activity:x.company_activity,siret:x.org_siret,logo_key:x.logo_key},[['Fournisseur',x.name],['SIRET',x.siret||''],['Forme juridique',x.legal_form||''],['Site internet',x.website||''],['E-mail',x.email||''],['Téléphone',x.phone||''],['Adresse',x.address||'']],undefined),row:x};
+  return {buffer:await makePdf(`FICHE FOURNISSEUR`,{name:x.company_name,activity:x.company_activity,siret:x.org_siret},[['Fournisseur',x.name],['SIRET',x.siret||''],['Forme juridique',x.legal_form||''],['Site internet',x.website||''],['E-mail',x.email||''],['Téléphone',x.phone||''],['Adresse',x.address||'']],undefined),row:x};
 }

@@ -6,7 +6,7 @@
 
 ## 1. À qui cette politique s’applique
 
-Aurion est destiné aux professionnels et particuliers en France. L’Éditeur est responsable des traitements nécessaires à la gestion des comptes Aurion, la sécurité, le support, les commandes et ses obligations. Pour les dossiers et fichiers métier que le client professionnel saisit dans son espace, le client détermine en principe les finalités et agit comme responsable de traitement; l’Éditeur traite les données pour fournir le service et intervient comme sous-traitant. La qualification doit être réévaluée pour chaque intégration et usage propre à l’Éditeur.
+Aurion est destiné aux professionnels qui utilisent le service pour gérer une entreprise ou activité déjà existante. Le service ne propose pas de parcours de création d’entreprise ni de studio d’identité visuelle. L’Éditeur est responsable des traitements nécessaires à la gestion des comptes Aurion, la sécurité, le support, les commandes et ses obligations. Pour les dossiers et fichiers métier que le client professionnel saisit dans son espace, le client détermine en principe les finalités et agit comme responsable de traitement; l’Éditeur traite les données pour fournir le service et intervient comme sous-traitant. La qualification doit être réévaluée pour chaque intégration et usage propre à l’Éditeur.
 
 ## 2. Données et usages
 
@@ -14,7 +14,7 @@ Le service peut traiter les catégories suivantes selon les modules activés :
 
 - compte : prénom, nom, e-mail, téléphone si renseigné, mot de passe haché, rôles et préférences;
 - données professionnelles introduites par le client : coordonnées des clients et fournisseurs, SIREN/SIRET, devis, factures, achats, interventions, rendez-vous, garanties, échanges et historique;
-- fichiers : pièces jointes, documents, modèles, logos et documents générés;
+- fichiers : pièces jointes, documents, modèles et documents générés;
 - connexions : configuration e-mail, autorisations OAuth et calendrier si l’utilisateur les active;
 - paiement de l’offre : identifiant de commande et statuts Stripe; les données de carte sont traitées par Stripe et ne doivent pas être stockées par Aurion;
 - sécurité et support : données de session, empreinte d’adresse IP selon l’opération, journaux techniques, demandes au support et informations nécessaires aux déclarations de rétractation.
@@ -45,7 +45,7 @@ Les entités contractantes exactes et coordonnées officielles, les rôles RGPD,
 
 ## 5. Hébergement et flux
 
-**Cible retenue pour l’application SaaS :** service Render payant à Francfort, base Neon en région UE et objets privés OVHcloud `de` à Francfort. Render a déjà un service `aurion` actif à Francfort et un `aurion-web` actif dans l’Oregon. Au contrôle du 30 octobre 2026, les deux étaient gratuits, reliés à `main` et déployés sur le même commit 15.3.18; le domaine canonique n’est pas confirmé. Passer Frankfurt en payant, vérifier les données et services, puis basculer le domaine. Tant que cette bascule et la désactivation du trafic Oregon ne sont pas achevées, **ne pas présenter la production comme exclusivement hébergée à Francfort**.
+**Cible retenue pour l’application SaaS :** service Render payant à Francfort, base Neon en région UE et objets privés OVHcloud `de` à Francfort. Render a déjà un service `aurion` actif à Francfort et un `aurion-web` actif dans l’Oregon. Au contrôle du 30 octobre 2026 en soirée, les deux services étaient toujours au plan Free et reliés à `main`. Le dernier déploiement live relevé était 15.3.18 sur les deux services; une tentative manuelle de mise à jour 15.3.19 sur Oregon avait échoué. Les modifications 15.3.20 restent sur une branche de travail et ne sont pas déployées. Le domaine canonique n’est pas confirmé. Passer Frankfurt en payant, vérifier les données et services, puis basculer le domaine. Tant que cette bascule et la désactivation du trafic Oregon ne sont pas achevées, **ne pas présenter la production comme exclusivement hébergée à Francfort**.
 
 Les sauvegardes secondaires chiffrées dans l’UE ne sont pas encore opérationnelles. Définir le lieu et la rétention, séparer les clés, automatiser une sauvegarde cohérente base/fichiers et réussir un exercice de restauration avant données réelles. Le stockage principal OVH S3 ne constitue pas à lui seul une sauvegarde indépendante.
 

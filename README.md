@@ -1,6 +1,8 @@
-# Aurion 15.3.19
+# Aurion 15.3.20
 
-Application de gestion pour indépendants et petites entreprises, avec interface web/PWA et API Node.js/Fastify/PostgreSQL.
+Application de gestion pour entreprises déjà immatriculées, avec interface web/PWA et API Node.js/Fastify/PostgreSQL.
+
+Aurion ne propose plus de parcours de création d’entreprise, de formalités de création ni de studio d’identité visuelle. À la première connexion, le dirigeant renseigne les informations de son entreprise existante, peut les vérifier par SIRET/SIREN, puis configure les modules métier. La recherche publique par nom reste disponible dans un écran séparé du tableau de bord.
 
 ## Développement local
 
@@ -8,9 +10,9 @@ Application de gestion pour indépendants et petites entreprises, avec interface
 2. Copier `backend/.env.example` en `backend/.env` et configurer une base **réservée à Aurion**.
 3. Depuis la racine : `npm ci --prefix backend`, puis `npm run build`.
 4. Appliquer les migrations selon la procédure décrite dans `backend/package.json`, puis lancer `npm start`.
-5. Contrôler `http://127.0.0.1:4000/health` et exécuter `npm run check`.
+5. Contrôler `http://127.0.0.1:4000/health/db` (base joignable) et exécuter `npm run check`.
 
-Pour l’installation Windows autonome, suivre `README-INSTALLATION.md`. Pour la cible commerciale Frankfurt, lire `docs/DEPLOIEMENT-RENDER.md` et `docs/PLAN-BASCULE-FRANKFURT-15.3.19.md`. `render.yaml` cible le service Frankfurt existant et demande un plan payant; il ne migre pas automatiquement sa configuration, Neon ou les fichiers.
+Pour l’installation Windows autonome, suivre `README-INSTALLATION.md`. Pour la cible commerciale Frankfurt, lire `docs/DEPLOIEMENT-RENDER.md` et `docs/PLAN-BASCULE-FRANKFURT-15.3.20.md`. `render.yaml` cible le service Frankfurt existant et demande un plan payant; il ne migre pas automatiquement sa configuration, Neon ou les fichiers.
 
 Le moteur IA local retenu et sa configuration Ollama sont décrits dans `docs/IA-LOCALE.md`.
 
