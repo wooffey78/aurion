@@ -1,4 +1,4 @@
-# Aurion 15.3.16
+# Aurion 15.3.17
 
 Application de gestion pour indépendants et petites entreprises, avec interface web/PWA et API Node.js/Fastify/PostgreSQL.
 
