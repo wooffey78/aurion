@@ -79,7 +79,7 @@ export async function bumpSessions(userId: string) {
 
 // ---------------------------------------------------------------- documents légaux versionnés
 const LEGAL_SEEDS: { kind: string; title: string; file: string; requiredEnv: string[] }[] = [
-  { kind: 'cgv', title: 'Conditions générales d’utilisation et de vente', file: 'CGU-CGV.md', requiredEnv: ['AURION_LEGAL_PUBLISHER_NAME','AURION_LEGAL_PUBLISHER_FORM','AURION_LEGAL_PUBLISHER_SIREN','AURION_LEGAL_PUBLISHER_ADDRESS','AURION_LEGAL_PUBLISHER_EMAIL'] },
+  { kind: 'cgv', title: 'Conditions générales d’utilisation et de vente', file: 'CGU-CGV.md', requiredEnv: ['AURION_LEGAL_PUBLISHER_NAME','AURION_LEGAL_PUBLISHER_FORM','AURION_LEGAL_PUBLISHER_SIREN','AURION_LEGAL_PUBLISHER_SIRET','AURION_LEGAL_PUBLISHER_ADDRESS','AURION_LEGAL_PUBLISHER_EMAIL'] },
   { kind: 'privacy', title: 'Politique de confidentialité et annexe de traitement des données', file: 'POLITIQUE-CONFIDENTIALITE.md', requiredEnv: ['AURION_LEGAL_PUBLISHER_NAME','AURION_LEGAL_PUBLISHER_FORM','AURION_LEGAL_PUBLISHER_SIREN','AURION_LEGAL_PUBLISHER_ADDRESS','AURION_LEGAL_PUBLISHER_EMAIL','AURION_PRIVACY_CONTACT_EMAIL','AURION_SUBPROCESSORS'] },
   { kind: 'cookies', title: 'Politique cookies et stockages du navigateur', file: 'COOKIES.md', requiredEnv: ['AURION_LEGAL_PUBLISHER_NAME','AURION_PRIVACY_CONTACT_EMAIL'] },
   { kind: 'legal-notice', title: 'Mentions légales', file: 'LEGAL-NOTICE.md', requiredEnv: ['AURION_LEGAL_PUBLISHER_NAME','AURION_LEGAL_PUBLISHER_FORM','AURION_LEGAL_PUBLISHER_SIREN','AURION_LEGAL_PUBLISHER_SIRET','AURION_LEGAL_PUBLISHER_ADDRESS','AURION_LEGAL_PUBLISHER_VAT','AURION_LEGAL_DIRECTOR','AURION_LEGAL_PUBLISHER_EMAIL','AURION_HOST_NAME','AURION_HOST_ADDRESS','AURION_HOST_CONTACT','AURION_PRIVACY_CONTACT_EMAIL'] },
@@ -90,15 +90,15 @@ const legalTokenLabel: Record<string,string> = {
 };
 /** Initialise les documents juridiques versionnés; une approbation explicite de version est requise pour publication. */
 export async function ensureLegalDocuments() {
-  const publicationApproved = process.env.AURION_LEGAL_PUBLICATION_APPROVAL === '2.1';
+  const publicationApproved = process.env.AURION_LEGAL_PUBLICATION_APPROVAL === '2.2';
   for (const s of LEGAL_SEEDS) {
     const f = path.join(BACKEND_ROOT, '..', 'docs', s.file);
     let body = existsSync(f) ? readFileSync(f, 'utf8') : `# ${s.title}\n\nTexte juridique indisponible.`;
     body = body.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_match, key: string) => String(process.env[key] || `[À renseigner : ${legalTokenLabel[key] || key}]`));
-    const hasUnresolvedContent = /\{\{[A-Z0-9_]+\}\}|\[(?:À compléter|À confirmer|À valider|À choisir|À désigner)[^\]]*\]|PROJET DE DOCUMENT|PROJET DE PAGE|PROJET À COMPLÉTER/i.test(body);
+    const hasUnresolvedContent = /\{\{[A-Z0-9_]+\}\}|\[(?:À compléter|À confirmer|À valider|À choisir|À désigner|À renseigner)[^\]]*\]|PROJET DE DOCUMENT|PROJET DE PAGE|PROJET À COMPLÉTER/i.test(body);
     const isDraft = !publicationApproved || s.requiredEnv.some(key => !String(process.env[key] || '').trim()) || hasUnresolvedContent;
     await query('update legal_documents set is_current=false where kind=$1 and is_current=true',[s.kind]);
-    await query(`insert into legal_documents(kind,version,title,body,is_current,is_draft) values($1,'2.1',$2,$3,true,$4) on conflict(kind,version) do update set title=excluded.title,body=excluded.body,is_current=true,is_draft=excluded.is_draft`, [s.kind, s.title, body, isDraft]);
+    await query(`insert into legal_documents(kind,version,title,body,is_current,is_draft) values($1,'2.2',$2,$3,true,$4) on conflict(kind,version) do update set title=excluded.title,body=excluded.body,is_current=true,is_draft=excluded.is_draft`, [s.kind, s.title, body, isDraft]);
   }
 }
 export async function currentLegalDocs() {

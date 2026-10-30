@@ -1,8 +1,8 @@
 # Mentions légales — Aurion
 
-> **PROJET DE PAGE — NE PAS PUBLIER AVANT COMPLÉTION.** Les champs d’identité et les coordonnées des hébergeurs doivent être vérifiés avec les documents d’immatriculation et les contrats en vigueur. Mentions établies à partir de l’examen statique du dépôt Aurion 15.3.16.
+> **PROJET DE PAGE — NE PAS PUBLIER AVANT COMPLÉTION.** Les champs d’identité et les coordonnées des hébergeurs doivent être vérifiés avec les documents d’immatriculation et les contrats en vigueur. Mentions établies à partir de l’examen statique du dépôt Aurion 15.3.18.
 
-**Version projet : 2.1 — Mise à jour : 30 octobre 2026**
+**Version projet : 2.2 — Mise à jour : 30 octobre 2026**
 
 ## Éditeur
 

@@ -1,8 +1,8 @@
 # Conditions générales d’utilisation et de vente — Aurion
 
-> **PROJET — NON PUBLIABLE EN L’ÉTAT.** Le texte vise les clients professionnels et les consommateurs, conformément au périmètre déclaré par l’éditeur. Il décrit les fonctions et tarifs examinés dans le dépôt Aurion 15.3.16 et doit être complété par les données d’identité, le médiateur et les parcours consommateurs manquants, puis validé par un juriste avant publication.
+> **PROJET — NON PUBLIABLE EN L’ÉTAT.** Le texte vise les clients professionnels et les consommateurs, conformément au périmètre déclaré par l’éditeur. Il décrit les fonctions et tarifs examinés dans le dépôt Aurion 15.3.18 et doit être complété par les données d’identité, le médiateur et les parcours consommateurs manquants, puis validé par un juriste avant publication.
 
-**Version projet : 2.1 — Date de rédaction : 30 octobre 2026 — Entrée en vigueur : à compléter après validation**
+**Version projet : 2.2 — Date de rédaction : 30 octobre 2026 — Entrée en vigueur : à compléter après validation**
 
 ## 1. Éditeur, service et clientèle
 
@@ -48,7 +48,7 @@ Pour le Client professionnel, le paiement est exigible à la commande, sauf date
 
 Le consommateur qui commande à distance dispose du délai légal de rétractation de **14 jours à compter de la conclusion du contrat**, selon les règles applicables à la prestation. Il peut adresser une déclaration dénuée d’ambiguïté ou utiliser le formulaire ci-dessous. Lorsque la loi le prévoit, l’Éditeur rembourse dans le délai légal. Si le consommateur demande expressément le commencement du service pendant le délai de rétractation, les conséquences financières d’une rétractation sont celles prévues par la loi; aucune renonciation générale au droit de rétractation n’est imposée.
 
-Pour tout contrat conclu par interface en ligne, l’éditeur doit fournir l’interface de rétractation directe exigée par la réglementation en vigueur, avec un accès facile, direct et permanent. **Cette fonction n’a pas été identifiée dans le dépôt Aurion 15.3.16 et doit être développée et vérifiée avant toute commande B2C.** La présente clause ne remplace pas cette fonction.
+Pour tout contrat conclu par interface en ligne, l’éditeur doit fournir l’interface de rétractation directe exigée par la réglementation en vigueur, avec un accès facile, direct et permanent. **Cette fonction n’a pas été identifiée dans le dépôt Aurion 15.3.18 et doit être développée et vérifiée avant toute commande B2C.** La présente clause ne remplace pas cette fonction.
 
 ### Formulaire type de rétractation
 

@@ -6,11 +6,11 @@
 - Contact accessibilité : {{AURION_ACCESSIBILITY_CONTACT_EMAIL}}
 - Date de mise à jour : {{LEGAL_UPDATED_AT}}
 - Référentiel visé, lorsque l’obligation s’applique : RGAA 4.1.2
-- Version projet : 2.1
+- Version projet : 2.2
 
 ## État de conformité
 
-Aucun audit complet et valide de conformité RGAA n’a été trouvé dans le dépôt Aurion 15.3.16 examiné. En l’absence d’un résultat d’audit valide, l’état à publier lorsque l’éditeur est assujetti est **non conforme**, conformément aux indications officielles du RGAA. Aucun taux de conformité, dérogation ou exemption ne peut être déclaré sans audit et analyse vérifiables.
+Aucun audit complet et valide de conformité RGAA n’a été trouvé dans le dépôt Aurion 15.3.18 examiné. En l’absence d’un résultat d’audit valide, l’état à publier lorsque l’éditeur est assujetti est **non conforme**, conformément aux indications officielles du RGAA. Aucun taux de conformité, dérogation ou exemption ne peut être déclaré sans audit et analyse vérifiables.
 
 Audit : {{AURION_ACCESSIBILITY_AUDIT_DATE}}. Résultat : {{AURION_ACCESSIBILITY_AUDIT_RESULT}}. Ces champs ne doivent être renseignés qu’avec le rapport et le périmètre de l’audit réellement réalisé.
 

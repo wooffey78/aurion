@@ -1,8 +1,8 @@
 # Politique relative aux cookies et stockages du navigateur — Aurion
 
-> **PROJET DE DOCUMENT — NE PAS UTILISER POUR UNE COMMERCIALISATION.** Inventaire établi à partir du code du dépôt 15.3.16 le 30 octobre 2026. Vérifier les cookies réellement émis, les scripts tiers et les choix par navigateur sur le site de production avant publication.
+> **PROJET DE DOCUMENT — NE PAS UTILISER POUR UNE COMMERCIALISATION.** Inventaire établi à partir du code du dépôt 15.3.18 le 30 octobre 2026. Vérifier les cookies réellement émis, les scripts tiers et les choix par navigateur sur le site de production avant publication.
 
-**Éditeur : {{AURION_LEGAL_PUBLISHER_NAME}} — Contact : {{AURION_PRIVACY_CONTACT_EMAIL}} — Version projet : 2.1**
+**Éditeur : {{AURION_LEGAL_PUBLISHER_NAME}} — Contact : {{AURION_PRIVACY_CONTACT_EMAIL}} — Version projet : 2.2**
 
 ## 1. Cookies nécessaires
 
