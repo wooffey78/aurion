@@ -2,6 +2,8 @@
 
 Date de l’audit : 30 octobre 2026. Base examinée : `aurion-main-final-15.3.10.zip`, version déclarée `15.3.10`, 422 fichiers après extraction. SHA-256 de l’archive fournie : `D72E7849A5103292E1064199AD17FC2C693B8BAD9D5EF47CF86EB13BB3D1E828`.
 
+> **Mise à jour 15.3.12 :** les constats ci-dessous sont l’audit historique de l’archive 15.3.10 et du code 15.3.11. La 15.3.12 retient et raccorde Qwen3.5-4B via Ollama pour les tâches locales de texte et de vision. Le détail du mode local, de la licence, du résumé du journal, de la classification entrante et des limites (PDF, génération d’image) est dans [`IA-LOCALE.md`](IA-LOCALE.md). FLUX.2 Klein 4B est désormais le candidat documenté pour l’image, mais reste non intégré tant que la chaîne CUDA et les ressources GPU n’ont pas été vérifiées.
+
 L’archive ne contient pas de dossier `.git`. Je ne peux donc pas établir sa branche, son commit, ses remotes ni son historique. Les constats ci-dessous décrivent les fichiers réellement présents dans le ZIP, et non le dépôt distant ni une version publiée sur Render.
 
 ## Résultat de lecture rapide

@@ -1,4 +1,4 @@
-# Aurion 15.3.11
+# Aurion 15.3.12
 
 ## Pour vos clients : un seul fichier
 Envoyez **Aurion-Setup.bat** (il contient l'intégralité d'Aurion). Le client double-clique dessus :
@@ -10,6 +10,10 @@ Envoyez **Aurion-Setup.bat** (il contient l'intégralité d'Aurion). Le client d
 Une connexion Internet est nécessaire pendant l'installation. Windows SmartScreen peut afficher un avertissement (« éditeur inconnu ») tant que le fichier n'est pas signé numériquement : « Informations complémentaires » → « Exécuter quand même ».
 
 Le MSI LibreOffice n’est pas embarqué dans l’archive de sources ni dans le fichier de configuration autonome : l’installateur le télécharge directement depuis le dépôt stable officiel, vérifie sa signature Authenticode avant extraction et propose une poursuite sans ce moteur si le téléchargement ou l’installation échoue. La génération PDF native reste disponible selon le modèle ; les conversions de modèles DOCX/ODT nécessitent LibreOffice.
+
+## IA locale
+
+Aurion utilise Qwen3.5-4B via Ollama pour les fonctions IA de texte et de vision sur une installation locale. Installez Ollama puis exécutez `ollama pull qwen3.5:4b`. Les détails et les limites, dont la génération locale de logo qui demande un moteur d’image séparé, figurent dans `docs/IA-LOCALE.md`.
 
 ## Au quotidien
 Icône **Aurion** : arrête proprement le serveur et PostgreSQL, les relance, applique les mises à jour de la base, puis ouvre Aurion en plein écran (**F11** pour quitter / rétablir le plein écran).

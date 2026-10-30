@@ -16,6 +16,8 @@ services:
         value: 0.0.0.0
       - key: COOKIE_SECURE
         value: "true"
+      - key: AURION_AI_PROVIDER
+        value: managed
       - key: DATABASE_URL
         sync: false
       - key: AURION_MIGRATION_DATABASE_URL

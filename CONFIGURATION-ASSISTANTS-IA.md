@@ -1,4 +1,6 @@
-# Configuration des assistants IA — Aurion 15.3.6
+# Configuration des assistants IA — Aurion 15.3.12
+
+Pour le moteur local choisi dans la version actuelle, les usages couverts et les limites (notamment la génération d’images) voir [`docs/IA-LOCALE.md`](docs/IA-LOCALE.md).
 
 ## Activation côté serveur
 
