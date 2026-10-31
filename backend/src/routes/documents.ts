@@ -55,9 +55,14 @@ export async function documentsRoutes(app:FastifyInstance){
    const org=r.auth!.organizationId,zip=new AdmZip(),clients=(await query('select id,name from clients where organization_id=$1 order by name',[org])).rows;
    const docs=(await query(`select id,number,document_type from quotes where organization_id=$1 order by created_at`,[org])).rows;
    const suppliers=(await query(`select id,name from suppliers where organization_id=$1 order by name`,[org])).rows;
-   for(const c of clients){try{const x=await clientPdf(org,c.id);zip.addFile(`fiches-clients/fiche-${String(c.name||c.id).replace(/[^A-Za-z0-9_-]/g,'_')}-${c.id}.pdf`,x.buffer)}catch{}}
-   for(const d of docs){try{const x=await quotePdf(org,d.id);zip.addFile(`${d.document_type==='invoice'?'factures':'devis'}/${String(d.number||d.id).replace(/[^A-Za-z0-9_-]/g,'_')}.pdf`,x.buffer)}catch{}}
-   for(const s of suppliers){try{const x=await supplierPdf(org,s.id);zip.addFile(`fournisseurs/fiche-${String(s.name||s.id).replace(/[^A-Za-z0-9_-]/g,'_')}-${s.id}.pdf`,x.buffer)}catch{}}
+   // Les fichiers individuellement indisponibles ne bloquent pas l'archive, mais leur absence est tracée.
+   const exportWarnings:string[]=[];
+   const exportOmissions={clientPdfs:0,quotePdfs:0,supplierPdfs:0,storedDocuments:0,templateFiles:0,generatedDocumentFiles:0,brandLogo:0,invalidArchivePaths:0};
+   const includedDocumentIds=new Set<string>();
+   let clientPdfsIncluded=0,quotePdfsIncluded=0,supplierPdfsIncluded=0,storedCount=0,templateFilesIncluded=0,generatedDocumentFilesIncluded=0,brandLogoIncluded=false;
+   for(const c of clients){try{const x=await clientPdf(org,c.id);zip.addFile(`fiches-clients/fiche-${String(c.name||c.id).replace(/[^A-Za-z0-9_-]/g,'_')}-${c.id}.pdf`,x.buffer);clientPdfsIncluded++;}catch(err){exportOmissions.clientPdfs++;r.log.warn({err,clientId:c.id},'Client PDF omitted from full data export');}}
+   for(const doc of docs){try{const x=await quotePdf(org,doc.id);zip.addFile(`${doc.document_type==='invoice'?'factures':'devis'}/${String(doc.number||doc.id).replace(/[^A-Za-z0-9_-]/g,'_')}.pdf`,x.buffer);quotePdfsIncluded++;}catch(err){exportOmissions.quotePdfs++;r.log.warn({err,documentId:doc.id},'Quote or invoice PDF omitted from full data export');}}
+   for(const supplier of suppliers){try{const x=await supplierPdf(org,supplier.id);zip.addFile(`fournisseurs/fiche-${String(supplier.name||supplier.id).replace(/[^A-Za-z0-9_-]/g,'_')}-${supplier.id}.pdf`,x.buffer);supplierPdfsIncluded++;}catch(err){exportOmissions.supplierPdfs++;r.log.warn({err,supplierId:supplier.id},'Supplier PDF omitted from full data export');}}
    const aid=(await query('select id from activities where organization_id=$1 and active=true order by created_at limit 1',[org])).rows[0]?.id;
    const requestedYear=Number((r.query as any)?.year);
    const accountingReportYear=Number.isInteger(requestedYear)&&requestedYear>=1900&&requestedYear<=2100?requestedYear:new Date().getFullYear();
@@ -79,6 +84,9 @@ export async function documentsRoutes(app:FastifyInstance){
    // Ajouts rétrocompatibles à l'export historique : dossier administratif, état du parcours,
    // signature, adresses d'intervention et fichiers réellement présents dans le stockage privé.
    const orgData=(await query(`select id,name,activity,custom_activity,siren,siret,legal_form,address,postal_code,city,website,configuration_incomplete,logo_key from organizations where id=$1`,[org])).rows[0]||{};
+   // La clé de stockage est interne : elle sert à récupérer le logo, mais n'est pas exportée.
+   const logoStorageKey=orgData.logo_key;
+   delete orgData.logo_key;
    const themeRow=(await query(`select accent,dark,font,radius,customized,quote_template_style,invoice_template_style from document_themes where organization_id=$1`,[org])).rows[0]||null;
    const signatureRow=(await query(`select enabled,first_name,last_name,job_title,company,phone,website,address,extra,include_quotes,include_invoices,include_professional,signature_html,signature_text,updated_at from email_signatures where organization_id=$1`,[org])).rows[0]||null;
    const journeyRow=(await query(`select status,current_step,business_status,data,first_redirect_at,completed_at,created_at,updated_at from onboarding_journeys where organization_id=$1`,[org])).rows[0]||null;
@@ -88,25 +96,37 @@ export async function documentsRoutes(app:FastifyInstance){
    const interventions=(await query(`select a.id,a.client_id,c.name as client_name,a.label,a.address,a.is_default,a.is_active,a.created_at,a.updated_at from client_intervention_addresses a join clients c on c.id=a.client_id and c.organization_id=a.organization_id where a.organization_id=$1 order by c.name,a.created_at`,[org])).rows;
    const storedDocs=(await query(`select id,original_name,mime_type,size_bytes,storage_key,status,created_at from documents where organization_id=$1 and status<>'deleted' order by created_at`,[org])).rows;
    const safeName=(name:any)=>String(name||'document').normalize('NFKD').replace(/[^A-Za-z0-9._-]+/g,'_').replace(/^\.+/,'').slice(0,150)||'document';
-   const addStoredFile=async (key:any, archiveName:string)=>{if(!key)return false;try{const bytes=await readPrivateObject(String(key));zip.addFile(archiveName.replace(/\\/g,'/').replace(/^\/+|(?:\.\.[/\\])/g,''),bytes);return true;}catch{return false;}};
+   const addStoredFile=async (key:any, archiveName:string)=>{
+     if(!key)return false;
+     const normalizedName=archiveName.replace(/\\/g,'/');
+     if(normalizedName.startsWith('/')||normalizedName.split('/').some(part=>!part||part==='.'||part==='..')){
+       exportOmissions.invalidArchivePaths++;
+       r.log.warn({archiveName:normalizedName},'Unsafe archive entry path rejected');
+       return false;
+     }
+     try{const bytes=await readPrivateObject(String(key));zip.addFile(normalizedName,bytes);return true;}
+     catch(err){r.log.warn({err,archiveName:normalizedName},'Stored file omitted from full data export');return false;}
+   };
    const putJson=(name:string,data:any)=>zip.addFile(name,Buffer.from(JSON.stringify(data,null,2),'utf8'));
    putJson('dossier-administratif/entreprise.json',orgData);
    putJson('dossier-administratif/parcours.json',journeyRow);
    putJson('dossier-administratif/formalites.json',formalitiesRows);
-   putJson('dossier-administratif/documents-index.json',adminDocs.map(({storage_key,...doc}:any)=>({...doc,storedInArchive:storedDocs.some((d:any)=>d.id===doc.id)})));
+
    putJson('dossier-administratif/messages-detectes.json',mailRows);
    putJson('dossier-administratif/journal-de-bord.json',(await query(`select event_type,title,description,severity,source,internal_path,external_url,dedupe_key,is_read,resolved_at,created_at from dashboard_journal_events where organization_id=$1 order by created_at`,[org])).rows);
    putJson('clients/adresses-intervention.json',interventions);
    putJson('parametres/signature-email.json',signatureRow);
-   let storedCount=0;
-   for(const d of storedDocs){const ok=await addStoredFile(d.storage_key,`dossier-administratif/fichiers/${safeName(d.id)}-${safeName(d.original_name)}`);if(ok)storedCount++;}
+   for(const storedDoc of storedDocs){const ok=await addStoredFile(storedDoc.storage_key,`dossier-administratif/fichiers/${safeName(storedDoc.id)}-${safeName(storedDoc.original_name)}`);if(ok){storedCount++;includedDocumentIds.add(String(storedDoc.id));}else exportOmissions.storedDocuments++;}
+   putJson('dossier-administratif/documents-index.json',adminDocs.map(({storage_key,...doc}:any)=>({...doc,storedInArchive:includedDocumentIds.has(String(doc.id))})));
    // Les modèles et versions ne sont pas forcément enregistrés dans la table documents.
    const templates=(await query(`select id,activity_id,document_type,name,mime_type,size_bytes,storage_key,active,source,file_format,mapping_status,version,created_at,updated_at from document_templates where organization_id=$1 order by created_at`,[org])).rows;
    putJson('modeles-documents/index.json',templates.map(({storage_key,...row}:any)=>row));
-   for(const t of templates)await addStoredFile(t.storage_key,`modeles-documents/${safeName(t.id)}-${safeName(t.name)}`);
+   const templateFilesExpected=templates.filter((t:any)=>Boolean(t.storage_key)).length;
+   for(const t of templates){if(!t.storage_key)continue;if(await addStoredFile(t.storage_key,`modeles-documents/${safeName(t.id)}-${safeName(t.name)}`))templateFilesIncluded++;else exportOmissions.templateFiles++;}
    const generated=(await query(`select id,activity_id,quote_id,document_type,template_id,docx_key,odt_key,pdf_key,created_at from generated_documents where organization_id=$1 order by created_at`,[org])).rows;
+   const generatedDocumentFilesExpected=generated.reduce((total:number,g:any)=>total+[g.docx_key,g.odt_key,g.pdf_key].filter(Boolean).length,0);
    putJson('documents-generes/index.json',generated.map(({docx_key,odt_key,pdf_key,...row}:any)=>row));
-   for(const g of generated){for(const [ext,key] of [['docx',g.docx_key],['odt',g.odt_key],['pdf',g.pdf_key]] as const)if(key)await addStoredFile(key,`documents-generes/${safeName(g.id)}.${ext}`);}
+   for(const g of generated){for(const [ext,key] of [['docx',g.docx_key],['odt',g.odt_key],['pdf',g.pdf_key]] as const){if(!key)continue;if(await addStoredFile(key,`documents-generes/${safeName(g.id)}.${ext}`))generatedDocumentFilesIncluded++;else exportOmissions.generatedDocumentFiles++;}}
    // Bundle visuel réel : fichiers persistés uniquement, et absence explicitement documentée.
    const brandZip=new AdmZip();
    const palette={organization:orgData.name||'',activity:orgData.activity||'',accent:themeRow?.accent||'#0b63ce',dark:themeRow?.dark||'#0b1220',font:themeRow?.font||'sans',radius:themeRow?.radius||'round',documentThemeCustomized:Boolean(themeRow?.customized),quoteTemplate:themeRow?.quote_template_style||'aurion-classic',invoiceTemplate:themeRow?.invoice_template_style||'aurion-classic'};
@@ -114,12 +134,14 @@ export async function documentsRoutes(app:FastifyInstance){
    if(signatureRow?.signature_html)brandZip.addFile('signature/signature.html',Buffer.from(String(signatureRow.signature_html),'utf8'));
    if(signatureRow?.signature_text)brandZip.addFile('signature/signature.txt',Buffer.from(String(signatureRow.signature_text),'utf8'));
    let logoBuffer:Buffer|undefined;
-   if(orgData.logo_key){try{const logo=await readPrivateObject(String(orgData.logo_key));const ext=path.extname(String(orgData.logo_key)).toLowerCase();if(['.png','.jpg','.jpeg'].includes(ext)){addBrandLogoAssets(brandZip,logo,ext,palette.accent,palette.dark);logoBuffer=logo;}}catch{}}
+   if(logoStorageKey){try{const logo=await readPrivateObject(String(logoStorageKey));const ext=path.extname(String(logoStorageKey)).toLowerCase();if(['.png','.jpg','.jpeg'].includes(ext)){addBrandLogoAssets(brandZip,logo,ext,palette.accent,palette.dark);logoBuffer=logo;brandLogoIncluded=true;}else{exportOmissions.brandLogo++;r.log.warn({extension:ext},'Organization logo omitted from visual identity bundle: unsupported file extension');}}catch(err){exportOmissions.brandLogo++;r.log.warn({err},'Organization logo omitted from visual identity bundle');}}
    addBrandGuideFiles(brandZip,{companyName:orgData.name,activity:orgData.activity,accent:palette.accent,dark:palette.dark,font:palette.font,radius:palette.radius});
    await addBrandGuidePdf(brandZip,{companyName:orgData.name,activity:orgData.activity,accent:palette.accent,dark:palette.dark,font:palette.font,radius:palette.radius},logoBuffer);
    brandZip.addFile('README.txt',Buffer.from(brandBundleReadme(orgData.name,brandZip.getEntries().map(entry=>entry.entryName)),'utf8'));
    zip.addFile('identite-visuelle.zip',brandZip.toBuffer());
-   putJson('export-manifest.json',{formatVersion:3,generatedAt:new Date().toISOString(),organizationId:org,contents:{clients:clients.length,quotes:docs.length,suppliers:suppliers.length,storedDocuments:storedDocs.length,storedDocumentsIncluded:storedCount,administrativeFormalities:formalitiesRows.length,detectedMailMetadata:mailRows.length,interventionAddresses:interventions.length,templates:templates.length,generatedDocuments:generated.length,journeyIncluded:Boolean(journeyRow),identityBundle:true,accountingReportPdfIncluded,accountingReportYear},warnings:exportWarnings,security:{oauthTokensIncluded:false,secretsIncluded:false,crossOrganizationDataIncluded:false}});
+   const omissionLabels:Record<string,string>={clientPdfs:'fiche(s) client PDF',quotePdfs:'devis/facture(s) PDF',supplierPdfs:'fiche(s) fournisseur PDF',storedDocuments:'document(s) stocké(s)',templateFiles:'fichier(s) de modèle',generatedDocumentFiles:'fichier(s) de document généré',brandLogo:'logo(s) d’entreprise',invalidArchivePaths:'chemin(s) interne(s) rejeté(s)'};
+   for(const [key,count] of Object.entries(exportOmissions))if(count>0)exportWarnings.push(`${count} ${omissionLabels[key]||key} n’ont pas été inclus dans l’export complet. Consultez le journal d’Aurion pour les détails.`);
+   putJson('export-manifest.json',{formatVersion:4,generatedAt:new Date().toISOString(),organizationId:org,contents:{clients:clients.length,clientPdfsIncluded,quotes:docs.length,quotePdfsIncluded,suppliers:suppliers.length,supplierPdfsIncluded,storedDocuments:storedDocs.length,storedDocumentsIncluded:storedCount,administrativeFormalities:formalitiesRows.length,detectedMailMetadata:mailRows.length,interventionAddresses:interventions.length,templates:templates.length,templateFilesExpected,templateFilesIncluded,generatedDocuments:generated.length,generatedDocumentFilesExpected,generatedDocumentFilesIncluded,journeyIncluded:Boolean(journeyRow),identityBundle:true,brandLogoIncluded,accountingReportPdfIncluded,accountingReportYear},omissions:exportOmissions,warnings:exportWarnings,security:{oauthTokensIncluded:false,secretsIncluded:false,crossOrganizationDataIncluded:false,internalStorageKeysIncluded:false}});
    const buf=zip.toBuffer();return reply.header('Content-Type','application/zip').header('Content-Disposition','attachment; filename="aurion-donnees.zip"').header('Cache-Control','no-store').send(buf);
  });
  app.get('/documents/logo',async(request,reply)=>{const row=(await query('select logo_key from organizations where id=$1',[request.auth!.organizationId])).rows[0];if(!row?.logo_key)return reply.code(404).send({error:'NOT_FOUND',message:'Aucun logo enregistré.'});try{const key=String(row.logo_key);const ext=path.extname(key).toLowerCase();const mime=ext==='.png'?'image/png':(ext==='.jpg'||ext==='.jpeg')?'image/jpeg':'application/octet-stream';const buf=await readPrivateObject(key);return reply.header('Content-Type',mime).header('Cache-Control','no-store').header('Content-Security-Policy',"img-src 'self' blob: data:").send(buf)}catch{return reply.code(404).send({error:'NOT_FOUND',message:'Logo introuvable.'})}});

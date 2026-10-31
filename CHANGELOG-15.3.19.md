@@ -17,3 +17,8 @@ Le code TypeScript a compilé et les scripts PowerShell/Node ont passé l’anal
 - Bloc 6 : l’export ZIP signale explicitement si le PDF comptable a été inclus ou omis, journalise l’échec et ajoute un avertissement au manifeste au lieu de masquer silencieusement le problème. L’année demandée est limitée aux années entières de 1900 à 2100 ; sinon l’année courante est utilisée.
 - Les nouveaux tests de non-régression sont ajoutés mais ne sont pas exécutés dans cette livraison, conformément à la consigne de ne pas relancer les tests déjà effectués.
 
+
+- Blocs 3-4 synchronisés avec l’archive source : l’export PDF comptable ne dépend plus du service de thème historique.
+- Bloc 7 : l’export complet comptabilise les PDF, documents stockés, modèles et fichiers générés réellement ajoutés à l’archive. Les échecs n’interrompent pas l’export, mais sont consignés dans le journal et synthétisés dans le manifeste, avec des compteurs d’omissions.
+- Bloc 8 : l’index des documents administratifs reflète la présence réelle du fichier dans le ZIP. La clé interne de stockage du logo n’est plus publiée dans les données d’entreprise exportées; le logo reste récupéré et inclus si son fichier est disponible et pris en charge.
+- Trois sous-tests ciblés des nouveaux contrats d’export ont été exécutés avec succès. La suite applicative complète et les tests historiques n’ont pas été relancés.
