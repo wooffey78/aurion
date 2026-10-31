@@ -19,15 +19,34 @@ test('public database health response never returns raw driver messages', () => 
   assert.doesNotMatch(route, /message:String\(e\?\.message/);
 });
 
-test('Render blueprint is free-tier web only and requires an externally managed database URL', () => {
+test('Render blueprint targets the existing Frankfurt service and external production database', () => {
   const render = read('render.yaml');
   assert.match(render, /type: web/);
-  assert.match(render, /plan: free/);
+  assert.match(render, /name: aurion/);
+  assert.match(render, /region: frankfurt/);
+  assert.match(render, /plan: starter/);
   assert.doesNotMatch(render, /type: pserv|type: postgres|type: keyvalue/);
   assert.match(render, /key: DATABASE_URL\s+sync: false/);
+  assert.match(render, /key: AURION_MIGRATION_DATABASE_URL\s+sync: false/);
+  assert.match(render, /key: AURION_RUNTIME_DB_ROLE\s+sync: false/);
   assert.match(render, /key: HOST\s+value: 0\.0\.0\.0/);
-  assert.match(render, /healthCheckPath: \/health/);
-  assert.match(read('backend/src/routes/health.ts'), /app.get\("\/health"/);
+  assert.match(render, /healthCheckPath: \/health\/db/);
+  assert.match(render, /key: AURION_STORAGE_BACKEND\s+value: s3/);
+  assert.match(render, /key: AURION_PUBLIC_ORIGIN\s+value: https:\/\/aurion-2hye\.onrender\.com/);
+  assert.match(read('backend/src/routes/health.ts'), /app\.get\("\/health\/db"/);
+});
+
+test('commercial readiness migrations exist but are not applied automatically by repository checks', () => {
+  for (const migration of [
+    'backend/migrations/070_contract_withdrawal_requests.sql',
+    'backend/migrations/071_electronic_invoice_not_transmitted_status.sql',
+    'backend/migrations/072_micro_enterprise_subscription_prices.sql'
+  ]) {
+    assert.ok(read(migration).trim().length > 30, `Missing or empty migration: ${migration}`);
+  }
+  const pkg = JSON.parse(read('package.json'));
+  assert.match(pkg.scripts.start, /start-render-compat|backend start/);
+  assert.doesNotMatch(pkg.scripts.check, /migrate:prod|db:migrate/);
 });
 
 test('PWA cache is restricted to static assets and never stores business API responses', () => {
