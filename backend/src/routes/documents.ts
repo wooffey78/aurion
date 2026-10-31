@@ -67,7 +67,6 @@ export async function documentsRoutes(app:FastifyInstance){
    const requestedYear=Number((r.query as any)?.year);
    const accountingReportYear=Number.isInteger(requestedYear)&&requestedYear>=1900&&requestedYear<=2100?requestedYear:new Date().getFullYear();
    let accountingReportPdfIncluded=false;
-   const exportWarnings:string[]=[];
    if(aid){
      try{
        const {accountingReportPdf}=await import('../services/accounting-report.js');
