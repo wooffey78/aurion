@@ -57,7 +57,31 @@ export async function documentsRoutes(app:FastifyInstance){
    let clientPdfsIncluded=0,quotePdfsIncluded=0,supplierPdfsIncluded=0,storedCount=0,templateFilesIncluded=0,generatedDocumentFilesIncluded=0;
    const includedDocumentIds=new Set<string>();
    for(const c of clients){try{const x=await clientPdf(org,c.id);zip.addFile(`fiches-clients/fiche-${String(c.name||c.id).replace(/[^A-Za-z0-9_-]/g,'_')}-${c.id}.pdf`,x.buffer);clientPdfsIncluded++;}catch(err){exportOmissions.clientPdfs++;r.log.warn({err,clientId:c.id},'Client PDF omitted from full data export');}}
-   for(const d of quotes){try{const x=await quotePdf(org,d.id);zip.addFile(`${d.document_type==='invoice'?'factures':'devis'}/${String(d.number||d.id).replace(/[^A-Za-z0-9_-]/g,'_')}.pdf`,x.buffer);quotePdfsIncluded++;}catch(err){exportOmissions.quotePdfs++;r.log.warn({err,quoteId:d.id},'Quote or invoice PDF omitted from full data export');}}
+   const quotePdfArchiveNames=new Set<string>();
+   let quotePdfFilenameCollisions=0;
+   for(const d of quotes){
+     try{
+       const x=await quotePdf(org,d.id);
+       const directory=d.document_type==='invoice'?'factures':'devis';
+       const baseName=String(d.number||d.id).replace(/[^A-Za-z0-9_-]/g,'_');
+       let archiveName=`${directory}/${baseName}.pdf`;
+       if(quotePdfArchiveNames.has(archiveName)){
+         const safeId=String(d.id).replace(/[^A-Za-z0-9_-]/g,'_');
+         const prefix=archiveName.slice(0,-4);
+         archiveName=`${prefix}-${safeId}.pdf`;
+         let disambiguator=2;
+         while(quotePdfArchiveNames.has(archiveName)){archiveName=`${prefix}-${safeId}-${disambiguator++}.pdf`;}
+         quotePdfFilenameCollisions++;
+       }
+       quotePdfArchiveNames.add(archiveName);
+       zip.addFile(archiveName,x.buffer);
+       quotePdfsIncluded++;
+     }catch(err){
+       exportOmissions.quotePdfs++;
+       r.log.warn({err,quoteId:d.id},'Quote or invoice PDF omitted from full data export');
+     }
+   }
+   if(quotePdfFilenameCollisions>0)exportWarnings.push(`${quotePdfFilenameCollisions} nom(s) de devis/facture normalisé(s) en doublon ont été suffixés avec leur identifiant pour éviter une perte de fichier.`);
    for(const s of suppliers){try{const x=await supplierPdf(org,s.id);zip.addFile(`fournisseurs/fiche-${String(s.name||s.id).replace(/[^A-Za-z0-9_-]/g,'_')}-${s.id}.pdf`,x.buffer);supplierPdfsIncluded++;}catch(err){exportOmissions.supplierPdfs++;r.log.warn({err,supplierId:s.id},'Supplier PDF omitted from full data export');}}
    const activeActivities=(await query('select id,name from activities where organization_id=$1 and active=true order by created_at',[org])).rows;
    const requestedYear=Number((r.query as any)?.year);
@@ -118,7 +142,7 @@ export async function documentsRoutes(app:FastifyInstance){
    for(const g of generated){for(const [ext,key] of [['docx',g.docx_key],['odt',g.odt_key],['pdf',g.pdf_key]] as const){if(!key)continue;if(await addStoredFile(key,`documents-generes/${safeName(g.id)}.${ext}`))generatedDocumentFilesIncluded++;else exportOmissions.generatedDocumentFiles++;}}
    const omissionLabels:Record<string,string>={clientPdfs:'fiche(s) client PDF',quotePdfs:'devis/facture(s) PDF',supplierPdfs:'fiche(s) fournisseur PDF',accountingReports:'rapport(s) comptable(s) PDF',storedDocuments:'document(s) stocké(s)',templateFiles:'fichier(s) de modèle',generatedDocumentFiles:'fichier(s) de document généré',invalidArchivePaths:'chemin(s) interne(s) rejeté(s)'};
    for(const [key,count] of Object.entries(exportOmissions)){if(count>0)exportWarnings.push(`${count} ${omissionLabels[key]||key} n’ont pas été inclus dans l’export complet. Consultez le journal d’Aurion pour les détails.`)}
-   putJson('export-manifest.json',{formatVersion:4,generatedAt:new Date().toISOString(),organizationId:org,contents:{clients:clients.length,clientPdfsIncluded,quotes:quotes.length,quotePdfsIncluded,suppliers:suppliers.length,supplierPdfsIncluded,storedDocuments:storedDocs.length,storedDocumentsIncluded:storedCount,interventionAddresses:interventions.length,templates:templates.length,templateFilesExpected,templateFilesIncluded,generatedDocuments:generated.length,generatedDocumentFilesExpected,generatedDocumentFilesIncluded,journalEvents:journal.length,signatureIncluded:Boolean(signature),accountingReportPdfIncluded,accountingReportsExpected,accountingReportsIncluded,accountingReportYear},omissions:exportOmissions,warnings:exportWarnings,security:{oauthTokensIncluded:false,secretsIncluded:false,crossOrganizationDataIncluded:false,documentStorageKeysIncluded:false}});
+   putJson('export-manifest.json',{formatVersion:4,generatedAt:new Date().toISOString(),organizationId:org,contents:{clients:clients.length,clientPdfsIncluded,quotes:quotes.length,quotePdfsIncluded,quotePdfFilenameCollisions,suppliers:suppliers.length,supplierPdfsIncluded,storedDocuments:storedDocs.length,storedDocumentsIncluded:storedCount,interventionAddresses:interventions.length,templates:templates.length,templateFilesExpected,templateFilesIncluded,generatedDocuments:generated.length,generatedDocumentFilesExpected,generatedDocumentFilesIncluded,journalEvents:journal.length,signatureIncluded:Boolean(signature),accountingReportPdfIncluded,accountingReportsExpected,accountingReportsIncluded,accountingReportYear},omissions:exportOmissions,warnings:exportWarnings,security:{oauthTokensIncluded:false,secretsIncluded:false,crossOrganizationDataIncluded:false,documentStorageKeysIncluded:false}});
    const buffer=zip.toBuffer();return reply.header('Content-Type','application/zip').header('Content-Disposition','attachment; filename="aurion-donnees.zip"').header('Cache-Control','no-store').send(buffer);
  });
 }

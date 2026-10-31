@@ -17,3 +17,10 @@ Cette branche est fondée sur le commit de référence 15.3.20 eba2a831d9a37a194
 - Bloc 10 : l’export CSV direct applique la même règle d’année que le ZIP : année entière entre 1900 et 2100, sinon année courante.
 - Un nouveau contrat ciblé est ajouté. Aucun test historique n’a été relancé. Le nouveau test et la compilation restent non confirmés, car le runner GitHub Actions n’a pas démarré les étapes sur la tentative précédente.
 - Aucun déploiement n’a été lancé : les services Render suivent `main`, tandis que cette branche est basée sur le commit 15.3.20 `eba2a831`.
+
+
+## Blocs 11 et 12 — Noms d’archives sans perte et protection CSV renforcée
+
+- Bloc 11 : lorsque plusieurs devis ou factures ont un même nom de PDF après normalisation, les fichiers supplémentaires reçoivent un suffixe basé sur leur identifiant. Les noms historiques restent inchangés en l’absence de collision. Le manifeste compte ces collisions et l’export les signale.
+- Bloc 12 : la neutralisation des formules CSV reconnaît désormais les espaces Unicode ou BOM initiaux avant les marqueurs de formule, uniquement sur les champs texte. Les montants numériques négatifs restent inchangés.
+- Aucun test historique n’a été relancé. Un nouveau contrat ciblé est ajouté ; compilation et exécution du nouveau test restent à confirmer. Aucun déploiement Render n’est déclenché.
