@@ -24,3 +24,10 @@ Cette branche est fondée sur le commit de référence 15.3.20 eba2a831d9a37a194
 - Bloc 11 : lorsque plusieurs devis ou factures ont un même nom de PDF après normalisation, les fichiers supplémentaires reçoivent un suffixe basé sur leur identifiant. Les noms historiques restent inchangés en l’absence de collision. Le manifeste compte ces collisions et l’export les signale.
 - Bloc 12 : la neutralisation des formules CSV reconnaît désormais les espaces Unicode ou BOM initiaux avant les marqueurs de formule, uniquement sur les champs texte. Les montants numériques négatifs restent inchangés.
 - Aucun test historique n’a été relancé. Un nouveau contrat ciblé est ajouté ; compilation et exécution du nouveau test restent à confirmer. Aucun déploiement Render n’est déclenché.
+
+
+## Bloc 14 — État de complétude explicite
+
+- Le manifeste contient désormais `completion.status` (`complete` ou `partial`) et `completion.hasOmissions`. Une archive comportant des fichiers manquants ou sans rapport comptable est déclarée partielle ; une collision de nom résolue sans perte n’est pas considérée comme une omission.
+- La validation d’année de `/accounting/summary` a été alignée sur celle des exports CSV et ZIP (bloc 13).
+- Aucun test historique n’a été relancé. Les nouveaux contrats n’ont pas été exécutés et la compilation n’est pas confirmée.
