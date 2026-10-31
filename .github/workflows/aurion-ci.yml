@@ -1,9 +1,9 @@
 name: Aurion CI — build, typecheck, smoke
 on:
   push:
-    branches: [main]
+    branches: [main, 'integration/**']
   pull_request:
-    branches: [main]
+    branches: [main, 'integration/**']
 permissions:
   contents: read
 jobs:
