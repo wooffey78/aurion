@@ -1343,7 +1343,8 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
   });
   app.get('/accounting/summary',async r=>{
     const aid=await ensureActivity(r,activityId(r));
-    const year=Number((r.query as any)?.year)||new Date().getFullYear();const org=r.auth!.organizationId;
+    const requestedYear=Number((r.query as any)?.year);
+    const year=Number.isInteger(requestedYear)&&requestedYear>=1900&&requestedYear<=2100?requestedYear:new Date().getFullYear();const org=r.auth!.organizationId;
     const months=await monthlyAccounting(org,aid!,year);
     const totals=months.reduce((t,m)=>({revenue_ht:t.revenue_ht+m.revenueHt,vat:t.vat+m.vat,purchases:t.purchases+m.purchases,purchase_vat:t.purchase_vat+(m.purchaseVat||0),social:t.social+m.social,mileage_total:t.mileage_total+Number(m.mileage||0)}),{revenue_ht:0,vat:0,purchases:0,purchase_vat:0,social:0,mileage_total:0});
     const count=Number((await query(`select count(distinct q.id)::int n from quotes q join invoice_payments p on p.quote_id=q.id where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice' and p.paid_at>=make_date($3,1,1) and p.paid_at<make_date($3+1,1,1)`,[org,aid,year])).rows[0]?.n||0);
