@@ -1,0 +1,40 @@
+name: Aurion 15.3.20 — validation ciblée export 5-8
+on:
+  push:
+    branches:
+      - fix/aurion-15.3.20-blocs-5-8-port-20261031
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Installer les dépendances backend
+        run: npm ci --prefix backend --include=dev --no-audit --no-fund
+      - name: Compiler et vérifier les types
+        run: npm run build && npm run typecheck
+      - name: Exécuter uniquement le nouveau contrat blocs 5 à 8
+        run: node --test backend/tests/accounting-export-blocks-5-8.contract.test.mjs
+      - name: Construire et vérifier le ZIP source complet
+        run: |
+          set -euo pipefail
+          mkdir -p dist-artifacts
+          VERSION="$(tr -d '\r\n' < VERSION.txt)"
+          ZIP="dist-artifacts/Aurion-${VERSION}-blocs-5-8-${GITHUB_SHA:0:7}.zip"
+          git archive --format=zip --prefix="Aurion-${VERSION}/" -o "$ZIP" HEAD
+          unzip -t "$ZIP"
+          sha256sum "$ZIP" > "$ZIP.sha256"
+      - name: Publier le ZIP complet et son SHA-256
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aurion-15.3.20-blocs-5-8-${{ github.sha }}
+          path: dist-artifacts/*.zip*
+          if-no-files-found: error
+          retention-days: 14
