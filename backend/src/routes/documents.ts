@@ -59,7 +59,23 @@ export async function documentsRoutes(app:FastifyInstance){
    for(const d of docs){try{const x=await quotePdf(org,d.id);zip.addFile(`${d.document_type==='invoice'?'factures':'devis'}/${String(d.number||d.id).replace(/[^A-Za-z0-9_-]/g,'_')}.pdf`,x.buffer)}catch{}}
    for(const s of suppliers){try{const x=await supplierPdf(org,s.id);zip.addFile(`fournisseurs/fiche-${String(s.name||s.id).replace(/[^A-Za-z0-9_-]/g,'_')}-${s.id}.pdf`,x.buffer)}catch{}}
    const aid=(await query('select id from activities where organization_id=$1 and active=true order by created_at limit 1',[org])).rows[0]?.id;
-   if(aid){try{const {accountingReportPdf}=await import('../services/accounting-report.js');const year=Number((r.query as any)?.year)||new Date().getFullYear();const x=await accountingReportPdf(org,aid,year);zip.addFile(`comptabilite/comptabilite-${year}.pdf`,x.buffer)}catch{}}
+   const requestedYear=Number((r.query as any)?.year);
+   const accountingReportYear=Number.isInteger(requestedYear)&&requestedYear>=1900&&requestedYear<=2100?requestedYear:new Date().getFullYear();
+   let accountingReportPdfIncluded=false;
+   const exportWarnings:string[]=[];
+   if(aid){
+     try{
+       const {accountingReportPdf}=await import('../services/accounting-report.js');
+       const report=await accountingReportPdf(org,aid,accountingReportYear);
+       zip.addFile(`comptabilite/comptabilite-${accountingReportYear}.pdf`,report.buffer);
+       accountingReportPdfIncluded=true;
+     }catch(err){
+       r.log.warn({err},'Accounting PDF omitted from data export');
+       exportWarnings.push('Le rapport comptable PDF n’a pas pu être inclus. Vérifiez le journal d’Aurion avant d’utiliser cet export.');
+     }
+   }else{
+     exportWarnings.push('Le rapport comptable PDF n’a pas été inclus : aucune activité active n’a été trouvée.');
+   }
    // Ajouts rétrocompatibles à l'export historique : dossier administratif, état du parcours,
    // signature, adresses d'intervention et fichiers réellement présents dans le stockage privé.
    const orgData=(await query(`select id,name,activity,custom_activity,siren,siret,legal_form,address,postal_code,city,website,configuration_incomplete,logo_key from organizations where id=$1`,[org])).rows[0]||{};
@@ -103,7 +119,7 @@ export async function documentsRoutes(app:FastifyInstance){
    await addBrandGuidePdf(brandZip,{companyName:orgData.name,activity:orgData.activity,accent:palette.accent,dark:palette.dark,font:palette.font,radius:palette.radius},logoBuffer);
    brandZip.addFile('README.txt',Buffer.from(brandBundleReadme(orgData.name,brandZip.getEntries().map(entry=>entry.entryName)),'utf8'));
    zip.addFile('identite-visuelle.zip',brandZip.toBuffer());
-   putJson('export-manifest.json',{formatVersion:2,generatedAt:new Date().toISOString(),organizationId:org,contents:{clients:clients.length,quotes:docs.length,suppliers:suppliers.length,storedDocuments:storedDocs.length,storedDocumentsIncluded:storedCount,administrativeFormalities:formalitiesRows.length,detectedMailMetadata:mailRows.length,interventionAddresses:interventions.length,templates:templates.length,generatedDocuments:generated.length,journeyIncluded:Boolean(journeyRow),identityBundle:true},security:{oauthTokensIncluded:false,secretsIncluded:false,crossOrganizationDataIncluded:false}});
+   putJson('export-manifest.json',{formatVersion:3,generatedAt:new Date().toISOString(),organizationId:org,contents:{clients:clients.length,quotes:docs.length,suppliers:suppliers.length,storedDocuments:storedDocs.length,storedDocumentsIncluded:storedCount,administrativeFormalities:formalitiesRows.length,detectedMailMetadata:mailRows.length,interventionAddresses:interventions.length,templates:templates.length,generatedDocuments:generated.length,journeyIncluded:Boolean(journeyRow),identityBundle:true,accountingReportPdfIncluded,accountingReportYear},warnings:exportWarnings,security:{oauthTokensIncluded:false,secretsIncluded:false,crossOrganizationDataIncluded:false}});
    const buf=zip.toBuffer();return reply.header('Content-Type','application/zip').header('Content-Disposition','attachment; filename="aurion-donnees.zip"').header('Cache-Control','no-store').send(buf);
  });
  app.get('/documents/logo',async(request,reply)=>{const row=(await query('select logo_key from organizations where id=$1',[request.auth!.organizationId])).rows[0];if(!row?.logo_key)return reply.code(404).send({error:'NOT_FOUND',message:'Aucun logo enregistré.'});try{const key=String(row.logo_key);const ext=path.extname(key).toLowerCase();const mime=ext==='.png'?'image/png':(ext==='.jpg'||ext==='.jpeg')?'image/jpeg':'application/octet-stream';const buf=await readPrivateObject(key);return reply.header('Content-Type',mime).header('Cache-Control','no-store').header('Content-Security-Policy',"img-src 'self' blob: data:").send(buf)}catch{return reply.code(404).send({error:'NOT_FOUND',message:'Logo introuvable.'})}});

@@ -13,3 +13,7 @@
 - Audite les deux services Render et le projet Neon; les migrations 070–072 ont été préparées et vérifiées sur une branche temporaire, sans application à la production.
 
 Le code TypeScript a compilé et les scripts PowerShell/Node ont passé l’analyse syntaxique. L’installation Ollama complète et les parcours applicatifs ne sont pas testés sur le poste d’origine. La bascule Frankfurt, l’upgrade payant et le stockage restent à faire; le service Oregon est encore actif.
+- Bloc 5 : protège les champs texte de l’export CSV comptable contre l’injection de formules dans les tableurs, sans altérer les montants numériques négatifs.
+- Bloc 6 : l’export ZIP signale explicitement si le PDF comptable a été inclus ou omis, journalise l’échec et ajoute un avertissement au manifeste au lieu de masquer silencieusement le problème. L’année demandée est limitée aux années entières de 1900 à 2100 ; sinon l’année courante est utilisée.
+- Les nouveaux tests de non-régression sont ajoutés mais ne sont pas exécutés dans cette livraison, conformément à la consigne de ne pas relancer les tests déjà effectués.
+
