@@ -11,6 +11,7 @@ Date du diagnostic : 31 octobre 2026. Base applicative : archive 15.3.20, commit
 - Les deux tentatives terminent avant la première étape : `runner_id=0`, `runner_name` vide, `steps=[]`. L'exécution ne démontre donc ni échec de compilation ni échec de test ; elle démontre que le runner n'a pas été attribué.
 - La relance via l'API GitHub a été acceptée mais n'a pas changé le résultat.
 - Les journaux de ce run répondent `404 BlobNotFound`.
+- Après la mise à jour documentaire de la PR, une troisième exécution distincte a été créée : run `41159454170` (run number 226), échouée en 2 secondes avec `runner_id=0`, `runner_name` vide et `steps=[]`. La PR reste sans exécution CI réelle.
 - Cause racine non déterminée : disponibilité des runners hébergés, paramètres Actions du dépôt/compte ou limite de facturation/quota à vérifier dans les paramètres GitHub. Il ne faut ni désactiver le workflow ni contourner les vérifications.
 - La PR reste ouverte et non fusionnée ; aucun push direct vers `main`.
 
