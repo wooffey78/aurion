@@ -70,7 +70,8 @@ Environnement : Node.js `v22.16.0`, npm `10.9.2`, Git `2.47.3`.
 ### Contrôles GitHub et Render en lecture seule
 
 - Dépôt privé `wooffey78/aurion`, branche par défaut `main`, permission GitHub `admin` confirmée.
-- Le connecteur n'a retourné aucun statut CI associé au commit d'intégration lors du contrôle ; la validation CI distante reste à confirmer.
+- PR B0 : [#31](https://github.com/wooffey78/aurion/pull/31), ouverte vers `integration/15.4.0`, non fusionnée.
+- Exécution GitHub Actions associée au commit de PR : run `41158823161`, conclusion `failure`. Le job `quality` est terminé en échec, mais aucune étape n'est retournée (`steps: null`, liste des étapes vide) et l'URL des journaux répond `404 BlobNotFound`. Aucune commande de compilation ou de test n'est donc prouvée par cette exécution. Cause exacte non déterminée : quota, facturation ou runner restent « À CONFIRMER ». PR non fusionnée.
 - Workspace Render : `My Workspace`.
 - Service Frankfurt `aurion` : ID `srv-dbfut4t9el5s73bcj0gg`, région Frankfurt, plan Free, branche `main`, auto-déploiement activé, commande de build `npm run build && npm run migrate`, démarrage `npm start`, aucun health check configuré dans les détails du service.
 - Service Oregon `aurion-web` : ID `srv-dbfv74ec6qcc73dq3ip0`, plan Free, branche `main`, auto-déploiement activé, health check `/health/db`.
