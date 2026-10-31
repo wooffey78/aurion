@@ -1393,7 +1393,8 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
   });
   app.get('/accounting/report.csv',async(r,reply)=>{
     const aid=await ensureActivity(r,activityId(r));if(!aid)return reply.code(400).send({error:'INVALID_INPUT'});
-    const year=Number((r.query as any)?.year)||new Date().getFullYear();
+    const requestedYear=Number((r.query as any)?.year);
+    const year=Number.isInteger(requestedYear)&&requestedYear>=1900&&requestedYear<=2100?requestedYear:new Date().getFullYear();
     const buffer=await accountingReportCsv(r.auth!.organizationId,aid,year);
     return reply.header('Content-Type','text/csv; charset=utf-8').header('Cache-Control','no-store').header('Content-Disposition',`attachment; filename="export-comptable-${year}.csv"`).send(buffer);
   });
