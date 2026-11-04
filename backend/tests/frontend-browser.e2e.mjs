@@ -95,7 +95,12 @@ try{
     throw new Error('La personnalisation n’a pas affiché son étape finale : '+JSON.stringify(diagnostics)+'\\n'+serverLog+'\\n'+error.message);
   }
   await page.locator('#finish-config').click();
-  await page.locator('#sidebar').waitFor({state:'visible',timeout:20000});
+  try{
+    await page.locator('#sidebar').waitFor({state:'visible',timeout:20000});
+  }catch(error){
+    const diagnostics={url:page.url(),hash:await page.evaluate(()=>location.hash).catch(()=>''),body:await page.locator('#app').innerText().catch(()=>''),html:await page.locator('#app').evaluate(el=>el.innerHTML.slice(0,5000)).catch(()=>''),errors};
+    throw new Error('Le tableau de bord ne s’est pas affiché après la configuration : '+JSON.stringify(diagnostics)+'\\n'+serverLog+'\\n'+error.message);
+  }
   const viewIds=await page.locator('.nav [data-view]').evaluateAll(nodes=>[...new Set(nodes.map(node=>node.getAttribute('data-view')).filter(Boolean))]);
   if(!viewIds.length)throw new Error('Aucune vue de tableau de bord n’a été rendue dans la navigation.');
   for(const viewId of viewIds){
