@@ -1,6 +1,6 @@
 # Avancement Aurion 15.4.0
 
-Dernière mise à jour : 31 octobre 2026 (Europe/Paris).
+Dernière mise à jour : 4 novembre 2026 (Europe/Paris).
 Base retenue par le propriétaire : archive Aurion 15.3.20, commit `eba2a831d9a37a194bef266cf6c57985d7c29787`.
 Branche d'intégration : `integration/15.4.0`.
 Mode de déploiement : `final` (aucun déploiement intermédiaire).
@@ -34,9 +34,9 @@ Chaque tâche vaut 0 % (non commencée), 50 % (exécutée/écrite mais non valid
 |---|---|---:|
 | B0.1 Vérifier l'identité du dépôt et comparer l'archive à `origin/main` | Archive identifiée exactement au commit `eba2a831`. Divergence expliquée : archive +3 commits depuis l'ancêtre commun, `main` +1 commit. Le propriétaire a choisi explicitement l'archive 15.3.20 et la reprise du changement de test utile de `main`. | 100 % |
 | B0.2 Créer `integration/15.4.0` et activer la CI sur `integration/**` | Branche créée depuis `eba2a831`. Contrôles de préparation repris dans un commit atomique ; workflow étendu aux événements push et pull_request sur `integration/**`. Aucun contrôle supprimé ou affaibli. | 100 % |
-| B0.3 Installer, compiler, typecheck, `npm run check`, `node --test` | Exécution partielle. `npm ci` bloqué par la résolution DNS du registre npm (`EAI_AGAIN)); compilation et `npm run check` interrompus pendant l'installation. `typecheck` échoue faute de types installés. Tests de fumée : 66 tests, 59 réussis, 7 échecs de référence. Suite `node --test` : 277 tests, 244 réussis, 31 échecs, 2 ignorés ; dépendances absentes dont `pg`. | 50 % |
+| B0.3 Installer, compiler, typecheck, `npm run check`, `node --test` | Validation distante réelle sur GitHub Actions (Ubuntu 24.04, Node 22, PostgreSQL 17) : installation, build, typecheck et migrations réussis. La comparaison au commit exact 15.3.20 confirme les mêmes échecs de référence, sans nouvel échec : smoke 66 tests (59 réussis, 7 échecs) ; suite complète 296 tests (278 réussis, 18 échecs). Le navigateur Playwright garde le même timeout `#sidebar` que la référence. Le contrôleur comparatif passe, mais `npm run check` et `npm test` restent non verts en mode strict. | 50 % |
 | B0.4 Créer le suivi et l'inventaire fichier:ligne | Présent dans `AVANCEMENT-15.4.0.md` et `INVENTAIRE-15.4.0-B0.md`. | 100 % |
-| B0.5 Vérifier les prérequis GitHub/Render en lecture seule | Accès GitHub administrateur confirmé. Deux services Render relevés ; le service Frankfurt cible est encore sur Free et sa configuration active diverge du Blueprint. Le connecteur disponible ne permet pas de lire la liste des noms de variables d'environnement ; aucune valeur de secret n'a été demandée ou affichée. | 50 % |
+| B0.5 Vérifier les prérequis GitHub/Render en lecture seule | Deux services Render inspectés sans écriture. Le service Frankfurt `aurion` reste sur Free avec l'ancien build/start et sans health check ; dernier démarrage observé le 4 novembre à 08:53 UTC, toujours fermé en mode sûr par `start-render-compat.mjs`. Le service Oregon `aurion-web` a un déploiement `update_failed`. La liste des variables d'environnement n'est pas exposée par le connecteur ; aucune valeur secrète n'a été consultée ou modifiée. | 50 % |
 
 **Moyenne B0 : (100 + 100 + 50 + 100 + 50) / 5 = 80 %.**
 
@@ -54,7 +54,7 @@ Chaque tâche vaut 0 % (non commencée), 50 % (exécutée/écrite mais non valid
 - Comparaison GitHub de l'intégration à l'archive : 2 commits, 2 fichiers, sans divergence supplémentaire.
 - Le clone Git local n'a pas abouti : `github.com` n'était pas résolu par le DNS de l'environnement. Les références distantes ont été vérifiées au moyen de l'accès GitHub connecté. L'archive ne contient pas de dossier `.git`.
 
-### Résultats d'exécution locaux
+### Résultats d'exécution locaux — diagnostic initial du 31 octobre
 
 Environnement : Node.js `v22.16.0`, npm `10.9.2`, Git `2.47.3`.
 
@@ -67,20 +67,38 @@ Environnement : Node.js `v22.16.0`, npm `10.9.2`, Git `2.47.3`.
 - `node --test` : 277 tests, 244 réussis, 31 en échec, 2 ignorés. Le premier échec d'import est lié au paquet `pg` absent ; les autres échecs ne sont pas tous attribués à une cause certaine à ce stade.
 - Docker et `psql` ne sont pas installés dans l'environnement local ; PostgreSQL 17 jetable n'a donc pas pu être lancé ici.
 
-### Contrôles GitHub et Render en lecture seule
+### Validation CI comparative — 4 novembre 2026
+
+- Workflow exécuté sur `ubuntu-24.04`, Node.js 22 et PostgreSQL 17 jetable. `npm ci`, build TypeScript, typecheck et migrations PostgreSQL 17 : réussis.
+- Playwright 1.56.1, dépendances système Chromium et binaire Chromium : installés avec succès. Le runner Ubuntu 24.04 est épinglé parce que Playwright 1.56.1 ne prend pas en charge Chromium sur Ubuntu 26.04.
+- Référence exécutée sur le commit exact 15.3.20 `eba2a831d9a37a194bef266cf6c57985d7c29787` (run [#236](https://github.com/wooffey78/aurion/actions/runs/41824863953)) : smoke 65 tests (58 réussis, 7 échecs) ; suite complète 295 tests (277 réussis, 18 échecs) ; timeout navigateur sur `#sidebar`.
+- Intégration contrôlée (run [#241](https://github.com/wooffey78/aurion/actions/runs/41826643139)) : smoke 66 tests (59 réussis, 7 échecs) ; suite complète 296 tests (278 réussis, 18 échecs) ; même timeout navigateur. L'intégration comporte un test supplémentaire réussi ; aucun échec supplémentaire n'a été introduit.
+- Le contrôleur `verify-b0-baseline.mjs` confirme : aucun nouvel échec smoke, aucun nouvel échec de régression complète, timeout Playwright identique à la référence. Le job `quality` est vert.
+- Confirmation sur la branche `integration/15.4.0` après fusion de la correction CI : runs push [#242](https://github.com/wooffey78/aurion/actions/runs/41827260107) et pull_request [#243](https://github.com/wooffey78/aurion/actions/runs/41827269343), tous deux verts.
+- Important : le statut vert est celui de la comparaison à la baseline. Les 7 échecs smoke et 18 échecs complets restent présents ; `npm run check`, `npm test` et le parcours navigateur ne sont pas encore verts en validation stricte. Aucun test n'a été désactivé.
+
+### Contrôles GitHub et Render en lecture seule — 4 novembre 2026
+
+**GitHub**
 
 - Dépôt privé `wooffey78/aurion`, branche par défaut `main`, permission GitHub `admin` confirmée.
-- PR B0 : [#31](https://github.com/wooffey78/aurion/pull/31), ouverte vers `integration/15.4.0`, non fusionnée.
-- Exécution GitHub Actions associée à la PR : run `41158823161`. Deux tentatives ont échoué avant attribution d'un runner : `runner_id=0`, nom de runner vide, aucune étape (`steps=[]`), échec au bout de 3 à 4 secondes. La relance `rerun_failed_workflow_run_jobs` a été acceptée, mais la tentative 2 a reproduit le même échec. Les journaux GitHub ne sont pas disponibles (`404 BlobNotFound`). Aucune commande du workflow n'a été exécutée ; cause côté GitHub Actions non déterminée (quota/facturation, politique d'exécution ou indisponibilité des runners à vérifier dans les paramètres GitHub).  PR non fusionnée. Une troisième exécution distincte (run `41159454170`, run number 226) sur le dernier commit de la PR a reproduit l'échec immédiat sans runner (`runner_id=0`, aucune étape).
-- Workspace Render : `My Workspace`.
-- Service Frankfurt `aurion` : ID `srv-dbfut4t9el5s73bcj0gg`, région Frankfurt, plan Free, branche `main`, auto-déploiement activé, commande de build `npm run build && npm run migrate`, démarrage `npm start`, aucun health check configuré dans les détails du service. Déploiement actuellement déclaré `live` : `dep-dbilajqjnfac73auq9q0`, commit `5de3380d67412dcc2f32096edaef2db3de6cfb95`, application version 15.3.19 ; logs de démarrage à 02:41 UTC confirment 503 en fermeture sûre faute de configuration complète. Le déploiement archive 15.3.20 (`dep-dbig3e2vcj2c73fb1450`) est maintenant désactivé. Dernier déploiement `dep-dbig3e2vcj2c73fb1450` (commit `eba2a831`) : statut Render `live`, mais les journaux applicatifs montrent que `start-render-compat.mjs` a refusé de démarrer le backend et sert une réponse 503 en mode sûr (« configuration de production incomplète »). `hasProductionBackendConfig()` exige notamment `DATABASE_URL`, `JWT_SECRET`, `AURION_ENCRYPTION_KEY` (32 caractères minimum), `AURION_ENCRYPTION_KEY_VERSION`, `APP_BASE_URL`, `CORS_ORIGIN`, `AURION_SUPPORT_EMAIL`, `COOKIE_SECURE=true`, `NODE_ENV=production`, ainsi que `AURION_MIGRATION_DATABASE_URL`, `AURION_RUNTIME_DB_ROLE`, `AURION_STORAGE_BACKEND=s3`, `AURION_S3_BUCKET`, `AURION_S3_ACCESS_KEY` et `AURION_S3_SECRET_KEY` sur Render. Le connecteur ne permet pas d'identifier lesquelles manquent sans lire les variables ; leurs valeurs n'ont pas été demandées, consultées, ni modifiées.
-- Service Oregon `aurion-web` : ID `srv-dbfv74ec6qcc73dq3ip0`, plan Free, branche `main`, auto-déploiement activé, health check `/health/db`.
-- Le `render.yaml` de l'archive cible le service `aurion` en Frankfurt en plan `starter`, avec health check `/health/db` et stockage S3. La configuration active relevée ne correspond pas encore à cette cible.
-- Les variables d'environnement Render n'ont pas été modifiées. Le connecteur en lecture seule utilisé ne permet pas de lister les noms de variables existantes ; leur présence n'est donc pas certifiée.
+- La PR de correction CI [#33](https://github.com/wooffey78/aurion/pull/33) a été fusionnée dans `integration/15.4.0` par squash, commit `2d4d493add404a3f982dea1022b2f6c4e93347f1`. Elle fixe le runner sur Ubuntu 24.04, sépare les étapes Playwright et ajoute la comparaison stricte aux échecs de référence sans les masquer.
+- La PR documentaire B0 [#31](https://github.com/wooffey78/aurion/pull/31) est encore ouverte pendant l'actualisation de ces documents ; elle cible `integration/15.4.0`. Aucun push direct sur `main`.
+- Le workflow `quality` s'exécute maintenant réellement. Runs #241, #242 et #243 ont terminé avec succès au niveau du contrôleur comparatif. Le détail de la baseline et des résultats est consigné ci-dessus.
+
+**Render**
+
+- Workspace : `My Workspace`.
+- Service Frankfurt `aurion` : ID `srv-dbfut4t9el5s73bcj0gg`, URL `https://aurion-2hye.onrender.com`, région Frankfurt, branche `main`, plan actif `free`, auto-déploiement activé. Configuration active observée : build `npm run build && npm run migrate`, démarrage `npm start`, aucun health check (`healthCheckPath` vide).
+- Dernier déploiement listé : `dep-dbilajqjnfac73auq9q0`, commit `5de3380d67412dcc2f32096edaef2db3de6cfb95`, version backend 15.3.19, déclenché manuellement le 31 octobre ; Render le marque `live` au niveau plateforme.
+- Logs applicatifs les plus récents disponibles, le 4 novembre 2026 à 08:53:45 UTC : `npm start` puis `node tools/start-render-compat.mjs`, suivi de `[Aurion] Configuration de production incomplète sur l’origine canonique; service fermé en sécurité.` Le statut plateforme `live` ne prouve donc pas la santé de l'application ; le backend Fastify n'est pas démarré.
+- Service Oregon `aurion-web` : ID `srv-dbfv74ec6qcc73dq3ip0`, URL `https://aurion-web-o6ah.onrender.com`, plan actif `free`, branche `main`, health check `/health/db`. Son dernier déploiement observé (`dep-dbilam8u01pc73d924v0`) est `update_failed` depuis le 31 octobre.
+- Le Blueprint de l'archive cible Frankfurt en plan `starter`, build `npm ci --prefix backend --include=dev --no-audit --no-fund && npm run build`, démarrage `npm --prefix backend start`, health check `/health/db` et stockage S3. La configuration active de Frankfurt diverge de cette cible.
+- Le connecteur ne permet pas de lire la liste des variables Render ; il n'est donc pas possible de dire précisément lesquelles manquent. Aucune variable, valeur secrète, configuration de service ou plan n'a été modifié.
 
 ## État du bloc et conditions de reprise
 
-**B0 : PARTIEL — non validé.** L'intégration est fondée sur le commit demandé et son cadrage est documenté, mais la compilation, le typecheck, `npm run check`, la base PostgreSQL 17 et l'état CI distant ne sont pas certifiés. GitHub Actions ne parvient pas à attribuer un runner. Render affiche le déploiement Frankfurt en état plateforme `live`, mais le serveur applicatif renvoie 503 en mode sûr en raison d'une configuration de production incomplète. Aucun nouveau déploiement ne doit être déclenché avant résolution des paramètres de production indispensables et vérification de la sauvegarde Neon si une migration est prévue.
+**B0 : PARTIEL — 80 %, non validé.** Le cadrage, l'inventaire, le build, le typecheck et les migrations PostgreSQL 17 sont documentés et exécutés. La CI comparative est verte et prouve l'absence de nouvelle régression par rapport à 15.3.20. Toutefois, 7 tests smoke et 18 tests complets restent en échec (déjà présents dans la référence) et le test navigateur garde son timeout historique. Render Frankfurt reste en fermeture sûre faute de configuration de production complète. Le B0 n'est donc pas clôturé en validation stricte ; B1 ne démarre pas. Aucun nouveau déploiement ne doit être déclenché avant correction des tests de référence et remise en état contrôlée de Render.
 
 **Aucun démarrage de B1 tant que B0 n'est pas validé.** Aucun déploiement, aucune migration de production, aucune modification des services ou variables Render, aucun changement de Neon/Stripe/Google, et aucune publication juridique n'ont été effectués.
 
