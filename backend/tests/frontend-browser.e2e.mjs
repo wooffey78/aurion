@@ -51,13 +51,20 @@ try{
   });
 
   await page.goto(baseUrl,{waitUntil:'domcontentloaded'});
+  const registrationStatusPromise=page.waitForResponse(response=>{try{return new URL(response.url()).pathname==='/auth/registration-status'}catch{return false}},{timeout:15000});
   await page.getByRole('link',{name:/Commencer/}).click();
   await page.locator('#auth').waitFor({state:'visible'});
-  const registrationStatus=await page.evaluate(async()=>{const response=await fetch('/auth/registration-status');return {status:response.status,...await response.json()}});
+  const statusResponse=await registrationStatusPromise;
+  const registrationStatus={httpStatus:statusResponse.status(),...await statusResponse.json()};
   if(registrationStatus.available!==true||registrationStatus.localEvaluation!==true){
     throw new Error('Le mode évaluation local doit être disponible pour le test navigateur. Réponse : '+JSON.stringify(registrationStatus)+'\n'+serverLog);
   }
-  await page.waitForFunction(()=>document.querySelector('#terms')?.textContent?.includes('installation locale')&&!document.querySelector('#submit')?.disabled,{timeout:10000});
+  try{
+    await page.waitForFunction(()=>document.querySelector('#terms')?.textContent?.includes('installation locale')&&!document.querySelector('#submit')?.disabled,null,{timeout:10000});
+  }catch(error){
+    const ui={terms:await page.locator('#terms').textContent().catch(()=>''),submitDisabled:await page.locator('#submit').isDisabled().catch(()=>null)};
+    throw new Error('Le formulaire n’a pas répercuté le mode local malgré /auth/registration-status : '+JSON.stringify(registrationStatus)+' ; état UI : '+JSON.stringify(ui)+'\n'+serverLog+'\n'+error.message);
+  }
   const email=`aurion-e2e-${Date.now()}@example.test`;
   const password='Aurion-Test-2026!xY';
   await page.locator('#full-name').fill('Aurion Test');
