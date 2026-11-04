@@ -114,8 +114,21 @@ try{
   await page.locator('#auth').waitFor({state:'visible'});
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(password);
+  const loginResponsePromise=page.waitForResponse(response=>{try{return new URL(response.url()).pathname==='/auth/login'}catch{return false}},{timeout:15000});
   await page.locator('#submit').click();
-  await page.waitForFunction(()=>document.querySelector('#sidebar')||document.querySelector('#passkey-later'),null,{timeout:20000});
+  let loginResponse;
+  try{loginResponse=await loginResponsePromise}catch(error){
+    const diagnostics={url:page.url(),hash:await page.evaluate(()=>location.hash).catch(()=>''),body:await page.locator('#app').innerText().catch(()=>''),errors};
+    throw new Error('Le formulaire de connexion n’a pas appelé /auth/login : '+JSON.stringify(diagnostics)+'\\n'+serverLog+'\\n'+error.message);
+  }
+  const loginBody=await loginResponse.text().catch(()=> '');
+  if(!loginResponse.ok())throw new Error('Le serveur refuse la reconnexion (HTTP '+loginResponse.status()+') : '+loginBody+'\\n'+serverLog);
+  try{
+    await page.waitForFunction(()=>location.hash==='#/dashboard'||document.querySelector('#passkey-later'),null,{timeout:20000});
+  }catch(error){
+    const diagnostics={url:page.url(),hash:await page.evaluate(()=>location.hash).catch(()=>''),body:await page.locator('#app').innerText().catch(()=>''),errors};
+    throw new Error('La réponse /auth/login est positive mais Aurion ne passe ni au tableau de bord ni à la proposition de clé d’accès : '+JSON.stringify(diagnostics)+'\\n'+serverLog+'\\n'+error.message);
+  }
   if(await page.locator('#passkey-later').isVisible().catch(()=>false))await page.locator('#passkey-later').click();
   try{
     await page.locator('#sidebar').waitFor({state:'visible',timeout:20000});
