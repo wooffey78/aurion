@@ -8,7 +8,7 @@ permissions:
   contents: read
 jobs:
   quality:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     services:
       postgres:
@@ -40,7 +40,6 @@ jobs:
         env:
           PGPASSWORD: aurion_test_ci_only
         run: psql -h localhost -U aurion_test -d aurion_test -v ON_ERROR_STOP=1 -c "CREATE ROLE aurion_runtime LOGIN PASSWORD 'aurion_runtime_ci_only';"
-
       - name: Apply migrations to disposable PostgreSQL 17 with migration owner
         id: migrations
         env:
