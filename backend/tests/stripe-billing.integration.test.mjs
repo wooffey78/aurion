@@ -16,6 +16,10 @@ if (!enabled) {
   process.env.AURION_ENCRYPTION_KEY ||= 'integration-only-encryption-key-please-32-chars';
   process.env.AURION_ENCRYPTION_KEY_VERSION ||= 'ci-k1';
   process.env.AURION_SUPPORT_EMAIL ||= 'support@example.invalid';
+  process.env.AURION_STORAGE_BACKEND = 's3';
+  process.env.AURION_S3_BUCKET ||= 'aurion-stripe-tests-only';
+  process.env.AURION_S3_ACCESS_KEY ||= 'ci-only-access-key';
+  process.env.AURION_S3_SECRET_KEY ||= 'ci-only-secret-key';
   process.env.APP_BASE_URL = 'https://aurion.integration.test';
   process.env.CORS_ORIGIN = 'https://aurion.integration.test';
   process.env.STRIPE_SECRET_KEY ||= 'sk_test_integration_not_real';
