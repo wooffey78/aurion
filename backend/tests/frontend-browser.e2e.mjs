@@ -38,7 +38,7 @@ try{
   await waitForApp();
   browser=await chromium.launch({headless:true});
   const context=await browser.newContext({viewport:{width:1440,height:1000}});
-  await context.addInitScript(()=>{try{localStorage.setItem('aurion.biometric.choice','declined')}catch{}});
+  await context.addInitScript(apiUrl=>{window.AURION_API_URL=apiUrl;try{localStorage.setItem('aurion.biometric.choice','declined')}catch{}},baseUrl);
   const page=await context.newPage();
   page.on('console',message=>{if(message.type()==='error')errors.push('console: '+message.text())});
   page.on('pageerror',error=>errors.push('pageerror: '+(error.stack||error.message)));
