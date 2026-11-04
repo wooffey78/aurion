@@ -1,16 +1,30 @@
-# Cible commerciale : service Frankfurt existant `aurion` (observé en lecture seule le 30/10/2026).
-# Ne pas créer un troisième service. Synchroniser ce blueprint appliquera une configuration au service existant.
-# Neon et OVH Object Storage restent des services externes et ne sont pas créés par ce blueprint.
+# Aurion 15.4.0 — configuration du service canonique existant à Francfort.
+#
+# IMPORTANT :
+# - Ce Blueprint ne gère que le service Render existant `aurion` (Frankfurt).
+# - Le service historique `aurion-web` (Oregon) n'est volontairement pas déclaré ici.
+#   Il n'est ni supprimé ni redirigé par ce fichier : désactiver son auto-déploiement
+#   manuellement dans Render avant la fusion de cette version sur main.
+# - Aucun plan n'est indiqué : Render conserve le plan actuel du service existant.
+# - Les secrets ne sont jamais écrits dans Git. Les valeurs `sync: false` doivent
+#   être vérifiées/renseignées dans Render ; sur un service existant, Blueprint Sync
+#   ne redemande pas ces valeurs.
+# - L'auto-déploiement est désactivé pour ne déployer qu'après validation explicite
+#   de GitHub Actions et contrôle de la sauvegarde/base/stockage.
+# - `npm start` utilise le garde-fou de production tools/start-render-compat.mjs,
+#   puis backend/package.json applique les migrations avant de démarrer Fastify.
+# - Neon/PostgreSQL et OVH Object Storage sont externes : ce Blueprint ne les crée pas.
+
 services:
   - type: web
     name: aurion
     runtime: node
     region: frankfurt
-    plan: starter
+    branch: main
     buildCommand: npm ci --prefix backend --include=dev --no-audit --no-fund && npm run build
-    startCommand: npm --prefix backend start
+    startCommand: npm start
     healthCheckPath: /health/db
-    autoDeploy: true
+    autoDeployTrigger: 'off'
     envVars:
       - key: NODE_ENV
         value: production
@@ -18,32 +32,20 @@ services:
         value: 0.0.0.0
       - key: COOKIE_SECURE
         value: "true"
-      - key: AURION_AI_PROVIDER
-        sync: false
+      - key: AURION_PUBLIC_ORIGIN
+        value: https://aurion-2hye.onrender.com
       - key: AURION_STORAGE_BACKEND
         value: s3
       - key: AURION_S3_ENDPOINT
         value: https://s3.de.io.cloud.ovh.net
       - key: AURION_S3_REGION
         value: de
-      - key: AURION_S3_BUCKET
-        sync: false
-      - key: AURION_S3_ACCESS_KEY
-        sync: false
-      - key: AURION_S3_SECRET_KEY
-        sync: false
-      - key: PLATFORM_SMTP_HOST
-        value: smtp-relay.brevo.com
+      - key: AURION_CLOUD_QUOTA_THRESHOLDS
+        value: "80,90,95,100"
       - key: PLATFORM_SMTP_PORT
         value: "587"
       - key: PLATFORM_SMTP_SECURITY
         value: starttls
-      - key: PLATFORM_SMTP_USER
-        sync: false
-      - key: PLATFORM_SMTP_PASS
-        sync: false
-      - key: PLATFORM_SMTP_FROM
-        sync: false
       - key: DATABASE_URL
         sync: false
       - key: AURION_MIGRATION_DATABASE_URL
@@ -51,32 +53,43 @@ services:
       - key: AURION_RUNTIME_DB_ROLE
         sync: false
       - key: JWT_SECRET
-        generateValue: true
-      - key: CORS_ORIGIN
+        sync: false
+      - key: AURION_ENCRYPTION_KEY
+        sync: false
+      - key: AURION_ENCRYPTION_KEY_VERSION
         sync: false
       - key: APP_BASE_URL
         sync: false
-      - key: AURION_PUBLIC_ORIGIN
-        value: https://aurion-2hye.onrender.com
-      - key: GOOGLE_REDIRECT_URI
-        sync: false
-      - key: GOOGLE_TOKEN_ENCRYPTION_KEY
+      - key: CORS_ORIGIN
         sync: false
       - key: AURION_SUPPORT_EMAIL
         sync: false
-      - key: AURION_ENCRYPTION_KEY_VERSION
-        value: k1
-      - key: AURION_ENCRYPTION_KEY_PREVIOUS
+      - key: AURION_S3_BUCKET
         sync: false
-      - key: AURION_ENCRYPTION_KEY_PREVIOUS_VERSION
+      - key: AURION_S3_ACCESS_KEY
         sync: false
-      - key: AURION_ENCRYPTION_LEGACY_JWT_KEY
+      - key: AURION_S3_SECRET_KEY
         sync: false
-      - key: AURION_ENCRYPTION_KEY
-        generateValue: true
+      - key: PLATFORM_SMTP_HOST
+        sync: false
+      - key: PLATFORM_SMTP_USER
+        sync: false
+      - key: PLATFORM_SMTP_PASS
+        sync: false
+      - key: PLATFORM_SMTP_FROM
+        sync: false
+      # Intégrations facultatives : configurez toutes les clés d'un bloc ensemble.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: GOOGLE_DRIVE_REDIRECT_URI
+        sync: false
+      - key: GOOGLE_TOKEN_ENCRYPTION_KEY
+        sync: false
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
-      - key: BILLING_VAT_RATE_BPS
-        value: "0"
