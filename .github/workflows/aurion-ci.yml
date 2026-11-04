@@ -17,7 +17,7 @@ jobs:
       actions: write
       contents: read
     steps:
-      - name: Cancel older queued or stuck runs for this branch
+      - name: Force-cancel unresponsive older runs for this branch
         uses: actions/github-script@v9
         with:
           script: |
@@ -35,18 +35,30 @@ jobs:
             );
 
             for (const run of stale) {
-              core.info(`Canceling stale run #${run.run_number} (${run.status}, ${run.id})`);
+              core.info(`Canceling older run #${run.run_number} (${run.status}, ${run.id})`);
               try {
                 await github.rest.actions.cancelWorkflowRun({
                   owner,
                   repo,
                   run_id: run.id
                 });
+                core.info(`Cancellation accepted for run #${run.run_number}`);
               } catch (error) {
-                if ([409, 422].includes(error.status)) {
-                  core.warning(`Run #${run.run_number} changed state before cancellation: ${error.message}`);
-                } else {
-                  throw error;
+                if (error.status !== 409) throw error;
+                core.warning(`Normal cancellation refused for run #${run.run_number}; trying force-cancel.`);
+                try {
+                  await github.rest.actions.forceCancelWorkflowRun({
+                    owner,
+                    repo,
+                    run_id: run.id
+                  });
+                  core.info(`Force-cancel accepted for run #${run.run_number}`);
+                } catch (forceError) {
+                  if ([404, 409, 422].includes(forceError.status)) {
+                    core.warning(`Run #${run.run_number} is no longer cancellable: ${forceError.message}`);
+                  } else {
+                    throw forceError;
+                  }
                 }
               }
             }
@@ -82,7 +94,6 @@ jobs:
         run: npm ci --prefix backend --include=dev --no-audit --no-fund
       - name: Build and type check (smoke tests run in the full suite)
         run: npm run build && npm run typecheck
-
       - name: Create separate runtime role
         env:
           PGPASSWORD: aurion_test_ci_only
@@ -101,13 +112,10 @@ jobs:
         run: npm run migrate
       - name: Install Playwright test dependency
         run: npm install --prefix backend --no-save --no-package-lock playwright@1.56.1
-
       - name: Install Chromium system dependencies for browser regression
         run: npx --yes playwright@1.56.1 install-deps chromium
-
       - name: Download Chromium for browser regression
         run: npx --yes playwright@1.56.1 install chromium
-
       - name: Run all validations against the B0 baseline
         env:
           NODE_ENV: test
@@ -123,14 +131,12 @@ jobs:
           STRIPE_WEBHOOK_SECRET: whsec_ci_only_dummy_signing_secret
           AURION_BASELINE_STRICT: "1"
         run: node tools/verify-b0-baseline.mjs
-
       - name: Package complete source archive
         run: |
           mkdir -p dist-artifacts
           VERSION="$(tr -d '\r\n' < VERSION.txt)"
           git archive --format=zip --prefix="Aurion-${VERSION}/" -o "dist-artifacts/Aurion-${VERSION}-source-${GITHUB_SHA:0:7}.zip" HEAD
           sha256sum dist-artifacts/*.zip
-
       - name: Upload complete source archive
         uses: actions/upload-artifact@v4
         with:
