@@ -18,7 +18,7 @@ const listen=(server,port=0,host='127.0.0.1')=>new Promise((resolve,reject)=>{
 });
 const freePort=async()=>{const server=net.createServer();const port=await listen(server);await new Promise(resolve=>server.close(resolve));return port};
 const port=await freePort(),baseUrl=`http://127.0.0.1:${port}`;
-const env={...process.env,NODE_ENV:'test',HOST:'127.0.0.1',PORT:String(port),APP_BASE_URL:baseUrl,CORS_ORIGIN:baseUrl,COOKIE_SECURE:'false'};
+const env={...process.env,NODE_ENV:'test',AURION_LOCAL_EVALUATION_MODE:'true',HOST:'127.0.0.1',PORT:String(port),APP_BASE_URL:baseUrl,CORS_ORIGIN:baseUrl,COOKIE_SECURE:'false'};
 let serverLog='';
 const app=spawn(process.execPath,['backend/dist/server.js'],{cwd:root,env,stdio:['ignore','pipe','pipe']});
 app.stdout.on('data',chunk=>{serverLog+=chunk.toString();if(serverLog.length>12000)serverLog=serverLog.slice(-12000)});
@@ -43,10 +43,21 @@ try{
   page.on('console',message=>{if(message.type()==='error')errors.push('console: '+message.text())});
   page.on('pageerror',error=>errors.push('pageerror: '+(error.stack||error.message)));
   page.on('dialog',dialog=>dialog.dismiss());
+  let registrationResponse=null;
+  page.on('response',async response=>{
+    if(new URL(response.url()).pathname==='/auth/register'){
+      registrationResponse={status:response.status(),body:await response.text().catch(()=> '')};
+    }
+  });
 
   await page.goto(baseUrl,{waitUntil:'domcontentloaded'});
   await page.getByRole('link',{name:/Commencer/}).click();
   await page.locator('#auth').waitFor({state:'visible'});
+  const registrationStatus=await page.evaluate(async()=>{const response=await fetch('/auth/registration-status');return {status:response.status,...await response.json()}});
+  if(registrationStatus.available!==true||registrationStatus.localEvaluation!==true){
+    throw new Error('Le mode évaluation local doit être disponible pour le test navigateur. Réponse : '+JSON.stringify(registrationStatus)+'\n'+serverLog);
+  }
+  await page.waitForFunction(()=>document.querySelector('#terms')?.textContent?.includes('installation locale')&&!document.querySelector('#submit')?.disabled,{timeout:10000});
   const email=`aurion-e2e-${Date.now()}@example.test`;
   const password='Aurion-Test-2026!xY';
   await page.locator('#full-name').fill('Aurion Test');
@@ -54,7 +65,12 @@ try{
   await page.locator('#password').fill(password);
   await page.locator('#terms input').check();
   await page.locator('#submit').click();
-  await page.locator('#company').waitFor({state:'visible',timeout:20000});
+  try{
+    await page.locator('#company').waitFor({state:'visible',timeout:20000});
+  }catch(error){
+    const authError=await page.locator('#error').textContent().catch(()=> '');
+    throw new Error('Le parcours d’inscription n’a pas ouvert la configuration entreprise. Erreur UI : '+authError+' ; réponse API : '+JSON.stringify(registrationResponse)+'\n'+serverLog+'\n'+error.message);
+  }
   await page.locator('#name').fill('Aurion E2E Entreprise');
   await page.locator('#activity').fill('Maintenance et réparation');
   await page.locator('#company button[type=submit]').click();
