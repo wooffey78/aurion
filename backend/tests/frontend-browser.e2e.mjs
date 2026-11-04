@@ -115,7 +115,14 @@ try{
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(password);
   await page.locator('#submit').click();
-  await page.locator('#sidebar').waitFor({state:'visible',timeout:20000});
+  await page.waitForFunction(()=>document.querySelector('#sidebar')||document.querySelector('#passkey-later'),null,{timeout:20000});
+  if(await page.locator('#passkey-later').isVisible().catch(()=>false))await page.locator('#passkey-later').click();
+  try{
+    await page.locator('#sidebar').waitFor({state:'visible',timeout:20000});
+  }catch(error){
+    const diagnostics={url:page.url(),hash:await page.evaluate(()=>location.hash).catch(()=>''),body:await page.locator('#app').innerText().catch(()=>''),html:await page.locator('#app').evaluate(el=>el.innerHTML.slice(0,5000)).catch(()=>''),errors};
+    throw new Error('La connexion n’a pas ouvert le tableau de bord après le choix éventuel de clé d’accès : '+JSON.stringify(diagnostics)+'\\n'+serverLog+'\\n'+error.message);
+  }
   if(errors.length)throw new Error('Erreurs navigateur détectées:\n'+errors.join('\n'));
   console.log('Frontend Playwright OK: inscription immédiate, navigation entre '+viewIds.length+' vues, déconnexion et connexion; aucune erreur console.');
 }finally{
