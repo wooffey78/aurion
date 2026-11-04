@@ -75,6 +75,7 @@ jobs:
           CORS_ORIGIN: http://localhost:4000
           STRIPE_SECRET_KEY: sk_test_ci_dummy_key
           STRIPE_WEBHOOK_SECRET: whsec_ci_only_dummy_signing_secret
+          AURION_BASELINE_STRICT: "1"
         run: node tools/verify-b0-baseline.mjs
 
       - name: Package complete source archive
