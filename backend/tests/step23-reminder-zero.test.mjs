@@ -15,7 +15,9 @@ test('délai de relance 0 ou vide : aucune relance automatique programmée',()=>
   assert.match(docs,/id="convertReminderInterval"[^>]*placeholder="0"/);
   assert.doesNotMatch(docs,/id="convertReminderInterval"[^>]*required/);
   assert.match(docs,/rawInterval=.*===\x27\x27\?0/);
-  assert.match(business,/Number\(b\.reminderIntervalDays\?\?0\)/);
+  assert.match(business,/Number\(String\(b\.reminderIntervalDays\?\?0\)\.replace\(','\,'\.'\)\)/);
+  assert.match(business,/if\(!Number\.isInteger\(rawInterval\)\|\|rawInterval<0\)/);
+  assert.match(business,/const reminderInterval=Math\.min\(365,rawInterval\)/);
   assert.match(business,/next_reminder_at=case when \$5::int > 0/);
   assert.match(business,/intervalDays>0\?new Date/);
   assert.match(scheduler,/intervalDays>0\?new Date/);
