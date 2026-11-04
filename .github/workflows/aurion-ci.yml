@@ -2,7 +2,7 @@ name: Aurion CI — build, typecheck, smoke
 on:
   workflow_dispatch:
   push:
-    branches: [main, 'integration/**']
+    branches: [main, 'integration/**', 'release/**']
   pull_request:
     branches: [main, 'integration/**']
 permissions:
