@@ -11,9 +11,10 @@ import*as docs from'./dash/docs.js';
 import*as settings from'./dash/settings.js';
 import*as account from'./dash/account.js';
 import{home,clients,agenda,accounting,treasury,support,admin}from'./dash/other.js';
+import{companyLookup}from'./company-lookup.js';
 
-const VIEWS={home,clients,catalog,suppliers,quote,invoices:docs,agenda,accounting,treasury,support,settings,account,admin};
-const NAV=[['home','Tableau de bord','⌂'],['clients','Clients','♙'],['catalog','Catalogue métier','◈'],['suppliers','Fournisseurs','▱'],['invoices','Devis & factures','▧'],['agenda','Agenda','◷'],['accounting','Comptabilité & trésorerie','∑'],['support','Support Aurion','?'],['settings','Paramètres','⚙']];
+const VIEWS={home,clients,catalog,suppliers,quote,invoices:docs,agenda,accounting,treasury,support,companyLookup,settings,account,admin};
+const NAV=[['home','Tableau de bord','⌂'],['clients','Clients','♙'],['catalog','Catalogue métier','◈'],['suppliers','Fournisseurs','▱'],['invoices','Devis & factures','▧'],['agenda','Agenda','◷'],['accounting','Comptabilité & trésorerie','∑'],['support','Support Aurion','?'],['companyLookup','Recherche entreprise','⌕'],['settings','Paramètres','⚙']];
 
 // Garde-fous de rafraîchissement : ne jamais remplacer l’écran en pleine interaction.
 let metricsRefreshInProgress = false;
@@ -41,6 +42,7 @@ const DATASETS={
   accounting:['accounting','treasury','quotes','sav'],
   treasury:['treasury','accounting','quotes','sav'],
   settings:['templates','mail'],
+  companyLookup:[],
   home:['clients','quotes','appointments'], 
 };
 const ALL_DATASETS=[...new Set(Object.values(DATASETS).flat())];
@@ -49,7 +51,7 @@ async function load(extras=null,viewId=S.view){
   const safe=(p,d)=>Promise.resolve(p).catch(x=>{if(x?.status===401)throw x;return d});
   const full=extras===null;
   const wanted=new Set(full?ALL_DATASETS:[...(DATASETS[viewId]||[]),...(extras||[]).filter(k=>k!=='company')]);
-  const needConfig=full||extras?.includes('company')||['home','settings','quote','catalog'].includes(viewId)||!S.company||Date.now()-lastConfigLoadedAt>120000;
+  const needConfig=full||extras?.includes('company')||['home','settings','quote','catalog','companyLookup'].includes(viewId)||!S.company||Date.now()-lastConfigLoadedAt>120000;
   if(needConfig){
     const [company,activities]=await Promise.all([
       safe(api.organization(),S.company||{name:'Entreprise'}),
@@ -94,7 +96,7 @@ function show(id){
   if(q.parts==='Non'&&q.stock==='Non') hidden.add('catalog');
   if(profileModules.length && !profileModules.some(x=>x.includes('agenda')) && q.agenda!=='Oui') hidden.add('agenda');
   if(hidden.has(id))id='home';
-  const nav=NAV.filter(([k])=>!hidden.has(k)).map(([k,l,i])=>`<button type="button" data-view="${k}" class="${k===id?'active':''}" title="${l}"><i>${i}</i>${k==='catalog'?'Catalogue métier':l}</button>`).join('');
+  const nav=NAV.filter(([k])=>!hidden.has(k)).map(([k,l,i])=>`<button type="button" data-view="${k}" class="${k===id?'active':''}" aria-current="${k===id?'page':'false'}" title="${l}"><i aria-hidden="true">${i}</i>${k==='catalog'?'Catalogue métier':l}</button>`).join('');
   const navRoot=document.querySelector('.nav');
   navRoot.innerHTML=nav+(S.isPlatformAdmin?`<button type="button" data-view="admin" class="${id==='admin'?'active':''}" title="Administration" aria-label="Administration"><i>⚙</i>Administration</button>`:'');
   navRoot.onclick=ev=>{
@@ -108,7 +110,7 @@ function show(id){
   view.innerHTML=VIEWS[id].view();
   VIEWS[id].bind?.();
   if(id==='accounting'||id==='treasury')lastRenderedFinancialSnapshot=financialSnapshot();
-  if(previous!==id){window.requestAnimationFrame(()=>{window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;const main=document.querySelector('#main');if(main)main.scrollTop=0;});}
+  if(previous!==id){window.requestAnimationFrame(()=>{window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;const main=document.querySelector('#main');if(main)main.scrollTop=0;const heading=view.querySelector('h1');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}});}
   view.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{if(b.dataset.go==='quote'){S.editing=null;S.quoteDraft=null;S.startBlankQuote=true;S.prefillClient=null;S.documentType='quote'}hooks.refresh(b.dataset.go).catch(x=>toast(x.message,'error'))});
 }
 
@@ -203,7 +205,7 @@ export async function renderDashboard(){
   await load([...(EXTRAS[initialView]||[])],initialView);
   if(initialView==='accounting'||initialView==='treasury')lastFinancialRefreshAt=Date.now();
   lastBackgroundRefreshAt=Date.now();installBackgroundRefresh();
-  document.querySelector('#app').innerHTML=`<div class="dashboard-shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#/dashboard" aria-label="Aurion — retour au tableau de bord" title="Retour au tableau de bord">${appLogo('42')}<span>AURION<small>PRO</small></span></a><button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar"><span></span><span></span><span></span></button><nav class="nav"></nav><div class="sidebar-bottom"><a class="withdrawal-nav-link" href="#/withdrawal">Renoncer au contrat ici</a><button id="logout" class="nav-logout">Quitter</button><div class="status-dot"><i></i> Système opérationnel</div></div></aside><section class="workspace"><header class="dashboard-top"><div class="activity-switch"><span class="eyebrow" id="shell-company"></span><button id="activity-picker" class="activity-picker"><span>ACTIVITÉ ACTIVE</span><strong id="shell-activity"></strong><small>▾</small></button></div><div class="top-actions"><span class="pill" id="shell-pill"></span><button class="btn secondary small" id="fs-toggle" type="button" title="Activer le plein écran" aria-label="Activer le plein écran" aria-pressed="false"><span class="fs-icon" aria-hidden="true">⛶</span><span class="fs-label">Plein écran</span></button><button class="avatar" id="shell-avatar" title="Mon compte" aria-label="Mon compte"></button></div></header><main id="main" class="content"><div id="view"></div></main></section></div><div id="activity-modal-root"></div>`;
+  document.querySelector('#app').innerHTML=`<div class="dashboard-shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#/dashboard" aria-label="Aurion — retour au tableau de bord" title="Retour au tableau de bord">${appLogo('42')}<span>AURION<small>PRO</small></span></a><button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar"><span></span><span></span><span></span></button><nav class="nav" aria-label="Navigation principale"></nav><div class="sidebar-bottom"><a class="withdrawal-nav-link" href="#/withdrawal">Renoncer au contrat ici</a><button id="logout" class="nav-logout">Quitter</button><div class="status-dot"><i></i> Système opérationnel</div></div></aside><section class="workspace"><header class="dashboard-top"><div class="activity-switch"><span class="eyebrow" id="shell-company"></span><button id="activity-picker" class="activity-picker"><span>ACTIVITÉ ACTIVE</span><strong id="shell-activity"></strong><small>▾</small></button></div><div class="top-actions"><span class="pill" id="shell-pill"></span><button class="btn secondary small" id="fs-toggle" type="button" title="Activer le plein écran" aria-label="Activer le plein écran" aria-pressed="false"><span class="fs-icon" aria-hidden="true">⛶</span><span class="fs-label">Plein écran</span></button><button class="avatar" id="shell-avatar" title="Mon compte" aria-label="Mon compte"></button></div></header><main id="main" class="content"><div id="view"></div></main></section></div><div id="activity-modal-root"></div>`;
   await syncShellAvatar();
   const side=document.querySelector('#sidebar'),burger=document.querySelector('#burger');
   const setMenu=open=>{side.classList.toggle('open',open);burger.setAttribute('aria-expanded',String(open));burger.setAttribute('aria-label',open?'Fermer le menu':'Ouvrir le menu')};

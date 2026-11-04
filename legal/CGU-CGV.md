@@ -1,12 +1,12 @@
 # Conditions générales d’utilisation et de vente — Aurion
 
-> **DOSSIER DE PRÉPARATION — NE PAS PUBLIER NI UTILISER POUR VENDRE EN L’ÉTAT.** Version 2.3 préparée le 30 octobre 2026 pour Aurion 15.3.19. Elle incorpore les choix communiqués par l’éditeur et distingue les fonctionnalités présentes du service encore à provisionner. L’identité, les fournisseurs, le médiateur, les conditions de vente B2C, les e-mails de preuve et la conformité de l’offre doivent être vérifiés avant publication; les présentes conditions doivent être relues par un professionnel du droit.
+> **DOSSIER DE PRÉPARATION — NE PAS PUBLIER NI UTILISER POUR VENDRE EN L’ÉTAT.** Version 2.3 préparée le 30 octobre 2026 pour Aurion 15.3.20. Elle incorpore les choix communiqués par l’éditeur et distingue les fonctionnalités présentes du service encore à provisionner. L’identité, les fournisseurs, le médiateur, les conditions de vente B2C, les e-mails de preuve et la conformité de l’offre doivent être vérifiés avant publication; les présentes conditions doivent être relues par un professionnel du droit.
 
 **Éditeur déclaré : Coulibaly Damien, entrepreneur individuel sous le régime micro-entreprise, nom commercial Easyweb-dev. Adresse communiquée : 5 Rue Jacques Prevert, 85300 Challans, France. SIRET communiqué : 88848569500033; SIREN déduit des neuf premiers chiffres : 888485695. TVA déclarée par l’éditeur : non assujetti. Contact : easyfixit.reparation@gmail.com — 07 81 51 33 21.** Ces données ne sont pas vérifiées au registre. La mention de non-assujettissement et la facturation sans TVA doivent être confirmées avant toute facture ou publication.
 
 ## 1. Objet, éditeur et clientèle
 
-Aurion est un logiciel de gestion d’activité accessible par le Web et, selon l’installation retenue, comme application web installable. Les fonctions peuvent comprendre la configuration d’une activité, les clients, fournisseurs, catalogue, devis, factures, interventions, rendez-vous, documents, échanges de courriels, suivis, tableaux de bord et suggestions automatisées. Les fonctions effectivement disponibles sont celles présentées dans la version et l’offre commandées.
+Aurion est un logiciel de gestion d’activité destiné aux professionnels disposant déjà d’une entreprise ou activité immatriculée. Il est accessible par le Web et, selon l’installation retenue, comme application web installable. Les fonctions peuvent comprendre la configuration d’une entreprise existante, les clients, fournisseurs, catalogue, devis, factures, interventions, rendez-vous, documents, échanges de courriels, tableaux de bord et automatisations. La création d’entreprise, la préparation ou le dépôt de formalités de création et la création d’identité visuelle de l’entreprise ne font pas partie du service. Les fonctions effectivement disponibles sont celles présentées dans la version et l’offre commandées.
 
 L’éditeur indiqué ci-dessus est ci-après « l’Éditeur ». Aurion s’adresse aux professionnels et, si l’offre est ouverte à cette catégorie, aux consommateurs. La qualité du client est déterminée d’après la finalité réelle de la commande; une case ou un libellé ne peut supprimer une protection légale.
 
@@ -18,11 +18,11 @@ Le Client fournit des données exactes, protège ses identifiants et habilite le
 
 ## 3. Étendue et limites du service
 
-Aurion assiste la gestion et la préparation de démarches. Il ne dépose pas à la place du Client les formalités de création d’entreprise, ne fournit pas de conseil juridique, fiscal, social ou comptable, ne tient pas une comptabilité certifiée et ne garantit pas l’acceptation d’un dossier par une administration, une banque ou un organisme.
+Aurion est réservé à la gestion d’une entreprise déjà existante. Il ne constitue pas un service de création d’entreprise, ne prépare ni ne dépose des formalités de création, et ne produit pas d’identité visuelle ou de logo d’entreprise. La recherche par nom ou par SIRET/SIREN sert à retrouver et compléter des informations publiques d’une entreprise existante ; elle ne vaut ni preuve exhaustive de situation juridique ni validation administrative. Aurion ne fournit pas de conseil juridique, fiscal, social ou comptable, ne tient pas une comptabilité certifiée et ne garantit pas l’acceptation d’un document ou d’une opération par une administration, une banque ou un organisme.
 
 Les suggestions d’IA, interprétations de courriels, extractions, estimations et textes générés sont des propositions à contrôler par l’utilisateur. Ils peuvent être inexacts ou incomplets. En mode Ollama, le modèle prévu est `qwen3.5:4b-q4_K_M` sur la machine qui exécute le serveur local. Une session Web sur l’hébergement Aurion ne peut pas utiliser implicitement le Ollama installé sur l’ordinateur du client. Le mode d’IA hébergé est désactivé tant qu’un fournisseur, ses conditions, ses régions et ses garanties n’ont pas été choisis et publiés.
 
-Aurion 15.3.19 produit des données internes de préparation de facture au format JSON, mais ne transmet pas les factures ni les données de paiement ou de transaction à une Plateforme Agréée (PA). Un PDF ou JSON Aurion ne doit pas être présenté comme une facture électronique acheminée au sens de la réforme française.
+Aurion 15.3.20 produit des données internes de préparation de facture au format JSON, mais ne transmet pas les factures ni les données de paiement ou de transaction à une Plateforme Agréée (PA). Un PDF ou JSON Aurion ne doit pas être présenté comme une facture électronique acheminée au sens de la réforme française.
 
 ## 4. Prix, essai, commande et paiement
 

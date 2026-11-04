@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { query } from '../db.js';
 import { loadSignature, saveSignature, renderSignature } from '../services/signature.js';
 import { companyDisplayName } from '../services/company.js';
-import { getTheme, saveTheme, resetTheme, defaultTheme } from '../services/theme.js';
 import { computeMentions } from '../services/mentions.js';
 import { profileFor } from '../services/profiles.js';
 
@@ -27,16 +26,6 @@ export async function settingsRoutes(app: FastifyInstance) {
     const saved = await loadSignature(org);
     return { ok: true, signature: saved, preview: renderSignature(saved, await companyDisplayName(org)).trim() };
   });
-
-  // ---- thème visuel des documents (propre à chaque entreprise, modifiable)
-  app.get('/settings/document-theme', async r => ({ theme: await getTheme(r.auth!.organizationId), suggested: defaultTheme(r.auth!.organizationId) }));
-  app.put('/settings/document-theme', async (r, reply) => {
-    if (!canEdit(r)) return reply.code(403).send({ error: 'FORBIDDEN' });
-    const p = z.object({ accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), font: z.enum(['sans', 'serif']).optional(), radius: z.enum(['round', 'square']).optional() }).safeParse(r.body);
-    if (!p.success) return reply.code(400).send({ error: 'INVALID_INPUT' });
-    return { theme: await saveTheme(r.auth!.organizationId, p.data) };
-  });
-  app.delete('/settings/document-theme', async (r, reply) => { if (!canEdit(r)) return reply.code(403).send({ error: 'FORBIDDEN' }); return { theme: await resetTheme(r.auth!.organizationId) }; });
 
   // ---- synchronisation globale du compte : une seule version serveur pour toutes les données persistées
   app.get('/sync/version', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (r, reply) => {
