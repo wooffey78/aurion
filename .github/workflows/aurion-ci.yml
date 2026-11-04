@@ -4,12 +4,59 @@ on:
     branches: [main, 'integration/**']
   pull_request:
     branches: [main, 'integration/**']
+concurrency:
+  group: aurion-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
+  cleanup-stale-runs:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Cancel older queued or stuck runs for this branch
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const branch = context.payload.pull_request?.head?.ref
+              ?? context.ref.replace(/^refs\/heads\//, '');
+            const runs = await github.paginate(
+              github.rest.actions.listWorkflowRunsForRepo,
+              { owner, repo, workflow_id: 397651928, branch, per_page: 100 }
+            );
+
+            const stale = runs.filter((run) =>
+              run.id !== context.runId &&
+              ['queued', 'in_progress'].includes(run.status)
+            );
+
+            for (const run of stale) {
+              core.info(`Canceling stale run #${run.run_number} (${run.status}, ${run.id})`);
+              try {
+                await github.rest.actions.cancelWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: run.id
+                });
+              } catch (error) {
+                if ([409, 422].includes(error.status)) {
+                  core.warning(`Run #${run.run_number} changed state before cancellation: ${error.message}`);
+                } else {
+                  throw error;
+                }
+              }
+            }
+
   quality:
+    needs: cleanup-stale-runs
     runs-on: ubuntu-22.04
     timeout-minutes: 30
+    permissions:
+      contents: read
     services:
       postgres:
         image: postgres:17-alpine
