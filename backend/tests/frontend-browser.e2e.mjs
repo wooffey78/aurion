@@ -44,9 +44,14 @@ try{
   page.on('pageerror',error=>errors.push('pageerror: '+(error.stack||error.message)));
   page.on('dialog',dialog=>dialog.dismiss());
   let registrationResponse=null;
+  const onboardingResponses=[];
   page.on('response',async response=>{
-    if(new URL(response.url()).pathname==='/auth/register'){
+    const pathname=new URL(response.url()).pathname;
+    if(pathname==='/auth/register'){
       registrationResponse={status:response.status(),body:await response.text().catch(()=> '')};
+    }
+    if(pathname==='/organization'||pathname==='/activities/detect-profile'||pathname.startsWith('/modules/')){
+      onboardingResponses.push({path:pathname,status:response.status(),body:(await response.text().catch(()=> '')).slice(0,1800)});
     }
   });
 
@@ -83,7 +88,12 @@ try{
   await page.locator('#company button[type=submit]').click();
   await page.locator('#detect-config').waitFor({state:'visible',timeout:20000});
   await page.locator('#detect-config').click();
-  await page.locator('#finish-config').waitFor({state:'visible',timeout:20000});
+  try{
+    await page.locator('#finish-config').waitFor({state:'visible',timeout:20000});
+  }catch(error){
+    const diagnostics={responses:onboardingResponses,toasts:await page.locator('.toast').allTextContents().catch(()=>[]),status:await page.locator('#configuration-detection-status').textContent().catch(()=>''),questionnaire:await page.locator('#onboarding-slot').innerText().catch(()=> '')};
+    throw new Error('La personnalisation n’a pas affiché son étape finale : '+JSON.stringify(diagnostics)+'\\n'+serverLog+'\\n'+error.message);
+  }
   await page.locator('#finish-config').click();
   await page.locator('#sidebar').waitFor({state:'visible',timeout:20000});
   const viewIds=await page.locator('.nav [data-view]').evaluateAll(nodes=>[...new Set(nodes.map(node=>node.getAttribute('data-view')).filter(Boolean))]);
