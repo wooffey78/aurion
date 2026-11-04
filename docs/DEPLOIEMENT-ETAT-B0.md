@@ -17,19 +17,6 @@ Date du diagnostic actualisée : 4 novembre 2026. Base applicative : archive 15.
 ## Render — service canonique
 
 - Workspace : `My Workspace`.
-- Service canonique observé : `aurion`, ID `srv-dbfut4t9el5s73bcj0gg`, région Frankfurt, branche liée `main`, plan actif Free.
-- Déploiement précédent : `dep-dbig3e2vcj2c73fb1450`, commit `eba2a831d9a37a194bef266cf6c57985d7c29787` (15.3.20), depuis déactivé.
-- Déploiement actuellement déclaré live : `dep-dbilajqjnfac73auq9q0`, commit `5de3380d67412dcc2f32096edaef2db3de6cfb95` (version du backend 15.3.19), déclenché manuellement le 31/10/2026 à 02:41 UTC. Il a remplacé le déploiement 15.3.20 et ne correspond pas à la base choisie pour Aurion 15.4.0.
-- Les journaux du lancement 02:41:56–02:42:04 confirment de nouveau : `[Aurion] Configuration de production incomplète sur l’origine canonique; service fermé en sécurité.` Le processus ouvre le port Render mais ne démarre pas Fastify ; la réponse reste 503.
-- Aucun journal de requête `/health/db` n'est disponible et le service n'a pas de `healthCheckPath` configuré. Les métriques HTTP Render n'ont pas de points pour la période consultée. Le statut plateforme `live` ne constitue donc pas une preuve de santé HTTP.
-- Les journaux montrent toutefois que `tools/start-render-compat.mjs` démarre en mode de fermeture sûre et affiche : configuration de production incomplète sur l'origine canonique. Ce lanceur répond HTTP 503 au lieu de démarrer Fastify. Le statut `live` dans Render ne signifie donc pas que l'application est opérationnelle.
-- La configuration active relevée : build `npm run build && npm run migrate`, démarrage `npm start`, aucun `healthCheckPath`. Le Blueprint de l'archive définit un build via `npm ci --prefix backend --include=dev --no-audit --no-fund && npm run build`, démarrage `npm --prefix backend start` et health check `/health/db`.
-- Service distinct `aurion-web`, ID `srv-dbfv74ec6qcc73dq3ip0`, région Oregon, Free : ses journaux indiquent qu'en l'absence de backend complet le lanceur le redirige vers l'origine canonique. Il ne doit pas être substitué au service Frankfurt.
-- Le service Frankfurt a été déployé sur Free alors que le Blueprint demande Starter. Le passage sur Starter pourrait entraîner une facturation ; aucun changement de plan n'a été appliqué.
-
-## Render — service canonique
-
-- Workspace : `My Workspace`.
 - Service canonique : `aurion`, ID `srv-dbfut4t9el5s73bcj0gg`, région Frankfurt, URL `https://aurion-2hye.onrender.com`, branche `main`, plan actif `free`, auto-déploiement activé.
 - Configuration observée : build `npm run build && npm run migrate`, démarrage `npm start`, aucun `healthCheckPath`. Le Blueprint de l'archive cible Starter, `npm ci --prefix backend --include=dev --no-audit --no-fund && npm run build`, `npm --prefix backend start`, health check `/health/db` et stockage S3 ; la configuration active diverge de cette cible.
 - Dernier déploiement : `dep-dbilajqjnfac73auq9q0`, commit `5de3380d67412dcc2f32096edaef2db3de6cfb95`, backend 15.3.19, déclenché manuellement le 31 octobre 2026. Render le déclare `live` au niveau plateforme.
