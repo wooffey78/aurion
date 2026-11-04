@@ -113,6 +113,11 @@ export function renderAuth(initialMode='register'){
       }else if(registrationBlocked){
         status.textContent='La création de compte sera réactivée lorsque les documents contractuels auront été finalisés et publiés.';
       }
+      // Le remplacement du contenu de #terms recrée une case obligatoire.
+      // Réappliquer l'état requis selon le mode courant évite qu'un contrôle
+      // obligatoire reste masqué si le statut arrive après l'ouverture de /login.
+      const termsInput=terms.querySelector('input');
+      if(termsInput)termsInput.required=mode==='register';
       submit.disabled=mode==='register'&&registrationBlocked;
     })
     .catch(()=>{});
