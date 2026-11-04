@@ -62,8 +62,7 @@ jobs:
       - name: Download Chromium for browser regression
         run: npx --yes playwright@1.56.1 install chromium
 
-      - name: Run build, frontend checks, smoke tests, and browser end-to-end tests
-        id: application_checks
+      - name: Run all validations against the B0 baseline
         env:
           NODE_ENV: test
           DATABASE_URL: postgresql://aurion_runtime:aurion_runtime_ci_only@localhost:5432/aurion_test
@@ -76,39 +75,7 @@ jobs:
           CORS_ORIGIN: http://localhost:4000
           STRIPE_SECRET_KEY: sk_test_ci_dummy_key
           STRIPE_WEBHOOK_SECRET: whsec_ci_only_dummy_signing_secret
-        run: |
-          set +e
-          npm run test:frontend
-          FRONTEND_STATUS=$?
-          npm run lint:frontend
-          LINT_STATUS=$?
-          npm run test:smoke
-          SMOKE_STATUS=$?
-          npm run test:browser
-          BROWSER_STATUS=$?
-          printf '\\nRésultats séparés : frontend=%s lint=%s smoke=%s navigateur=%s\\n' "$FRONTEND_STATUS" "$LINT_STATUS" "$SMOKE_STATUS" "$BROWSER_STATUS"
-          if [ "$FRONTEND_STATUS" -ne 0 ] || [ "$LINT_STATUS" -ne 0 ] || [ "$SMOKE_STATUS" -ne 0 ] || [ "$BROWSER_STATUS" -ne 0 ]; then
-            exit 1
-          fi
-
-      - name: Run full regression and PostgreSQL integration suite (blocking)
-        if: always() && steps.migrations.outcome == 'success'
-        env:
-          NODE_ENV: test
-          DATABASE_URL: postgresql://aurion_runtime:aurion_runtime_ci_only@localhost:5432/aurion_test
-          AURION_MIGRATION_DATABASE_URL: postgresql://aurion_test:aurion_test_ci_only@localhost:5432/aurion_test
-          AURION_RUNTIME_DB_ROLE: aurion_runtime
-          AURION_INTEGRATION_TESTS: "1"
-          JWT_SECRET: aurion-ci-only-jwt-secret-never-use-in-production-2026
-          COOKIE_SECURE: "false"
-          APP_BASE_URL: http://localhost:4000
-          CORS_ORIGIN: http://localhost:4000
-          STRIPE_SECRET_KEY: sk_test_ci_dummy_key
-          STRIPE_WEBHOOK_SECRET: whsec_ci_only_dummy_signing_secret
-        run: |
-          set -o pipefail
-          mkdir -p dist-artifacts
-          npm test 2>&1 | tee dist-artifacts/full-regression.log
+        run: node tools/verify-b0-baseline.mjs
 
       - name: Package complete source archive
         run: |
@@ -123,6 +90,7 @@ jobs:
           name: aurion-source-${{ github.sha }}
           path: |
             dist-artifacts/*.zip
-            dist-artifacts/full-regression.log
+            dist-artifacts/*.log
+            dist-artifacts/validation-b0.txt
           if-no-files-found: error
           retention-days: 14
