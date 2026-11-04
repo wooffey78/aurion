@@ -42,6 +42,7 @@ jobs:
         run: psql -h localhost -U aurion_test -d aurion_test -v ON_ERROR_STOP=1 -c "CREATE ROLE aurion_runtime LOGIN PASSWORD 'aurion_runtime_ci_only';"
 
       - name: Apply migrations to disposable PostgreSQL 17 with migration owner
+        id: migrations
         env:
           NODE_ENV: test
           DATABASE_URL: postgresql://aurion_runtime:aurion_runtime_ci_only@localhost:5432/aurion_test
@@ -61,7 +62,8 @@ jobs:
       - name: Download Chromium for browser regression
         run: npx --yes playwright@1.56.1 install chromium
 
-      - name: Run build, frontend checks, and browser end-to-end tests
+      - name: Run build, frontend checks, smoke tests, and browser end-to-end tests
+        id: application_checks
         env:
           NODE_ENV: test
           DATABASE_URL: postgresql://aurion_runtime:aurion_runtime_ci_only@localhost:5432/aurion_test
@@ -74,9 +76,23 @@ jobs:
           CORS_ORIGIN: http://localhost:4000
           STRIPE_SECRET_KEY: sk_test_ci_dummy_key
           STRIPE_WEBHOOK_SECRET: whsec_ci_only_dummy_signing_secret
-        run: npm run check
+        run: |
+          set +e
+          npm run test:frontend
+          FRONTEND_STATUS=$?
+          npm run lint:frontend
+          LINT_STATUS=$?
+          npm run test:smoke
+          SMOKE_STATUS=$?
+          npm run test:browser
+          BROWSER_STATUS=$?
+          printf '\\nRésultats séparés : frontend=%s lint=%s smoke=%s navigateur=%s\\n' "$FRONTEND_STATUS" "$LINT_STATUS" "$SMOKE_STATUS" "$BROWSER_STATUS"
+          if [ "$FRONTEND_STATUS" -ne 0 ] || [ "$LINT_STATUS" -ne 0 ] || [ "$SMOKE_STATUS" -ne 0 ] || [ "$BROWSER_STATUS" -ne 0 ]; then
+            exit 1
+          fi
 
       - name: Run full regression and PostgreSQL integration suite (blocking)
+        if: always() && steps.migrations.outcome == 'success'
         env:
           NODE_ENV: test
           DATABASE_URL: postgresql://aurion_runtime:aurion_runtime_ci_only@localhost:5432/aurion_test
