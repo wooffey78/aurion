@@ -130,6 +130,10 @@ if (!enabled) {
     return result.rows[0];
   }
 
+  await app.ready();
+  await ensureLegalDocuments();
+  await seedCiPublishedLegalDocuments();
+
   test('retour Checkout: la session payée n’active l’abonnement qu’une fois', async () => {
     const account = await registerAccount();
     const payment = await createPendingPayment(account);
@@ -589,9 +593,6 @@ if (!enabled) {
     assert.ok((await db.query('select 1')).rowCount === 1);
   });
 
-  await app.ready();
-  await ensureLegalDocuments();
-  await seedCiPublishedLegalDocuments();
   test.after(async () => {
     for (const organizationId of createdOrganizations) {
       await db.query('delete from organizations where id=$1', [organizationId]).catch(() => {});
