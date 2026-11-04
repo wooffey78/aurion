@@ -30,11 +30,12 @@ test('clavier mobile : visualViewport, taille minimale des champs et zone de dé
 
 test('biométrie : bouton accessible sans connexion automatique silencieuse', () => {
   const auth = read('../../assets/js/pages/auth.js');
-  assert.match(auth, /biometric.hidden=r\|\|!biometricAllowed\(\)/);
-  assert.doesNotMatch(auth, /setTimeout\(\(\)=>biometricLogin\(\)\.catch\(\(\)=>\{\}\)/);
-  assert.match(auth, /biometric.onclick=async/);
-  assert.match(auth, /window\.isSecureContext&&window\.PublicKeyCredential&&navigator\.credentials\?\.get&&navigator\.credentials\?\.create/);
-  assert.doesNotMatch(auth, /Android\|iPhone\|iPad\|iPod/);
+  assert.match(auth, /startConditionalPasskeyLogin\(email,status,error\)/);
+  assert.match(auth, /id=\\?['"]passkey-enable/);
+  assert.match(auth, /enable\.onclick=async/);
+  assert.doesNotMatch(auth, /setTimeout\(\(\)=>biometricLogin\(\)\.catch/);
+  const device=read('../../assets/js/core/device.js');
+  assert.match(device, /window\.isSecureContext&&window\.PublicKeyCredential&&navigator\.credentials\?\.get&&navigator\.credentials\?\.create/);
   const account=read('../../assets/js/pages/dash/account.js');
   assert.match(account, /webauthnCredentials\(\)/);
   assert.match(account, /deleteWebauthnCredential/);
