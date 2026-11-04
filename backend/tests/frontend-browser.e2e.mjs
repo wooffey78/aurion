@@ -112,9 +112,10 @@ try{
   await page.goto(baseUrl,{waitUntil:'domcontentloaded'});
   await page.getByRole('link',{name:'Se connecter'}).click();
   await page.locator('#auth').waitFor({state:'visible'});
-  // Le lien d’entrée peut arriver sur l’onglet inscription selon le hash conservé par le navigateur.
-  // Sélectionner explicitement Connexion pour tester le vrai formulaire de login.
-  await page.locator('#login').click();
+  const landingLoginState=await page.evaluate(()=>({fullNameHidden:document.querySelector('#full-name-field')?.hidden,fullNameRequired:document.querySelector('#full-name')?.required,termsHidden:document.querySelector('#terms')?.hidden,termsRequired:document.querySelector('#terms input')?.required}));
+  if(!landingLoginState.fullNameHidden||landingLoginState.fullNameRequired||!landingLoginState.termsHidden||landingLoginState.termsRequired){
+    throw new Error('Le lien « Se connecter » de la page d’accueil n’ouvre pas le mode connexion : '+JSON.stringify(landingLoginState)+' ; URL : '+page.url());
+  }
   const loginFormState=await page.evaluate(()=>({fullNameHidden:document.querySelector('#full-name-field')?.hidden,fullNameRequired:document.querySelector('#full-name')?.required,termsHidden:document.querySelector('#terms')?.hidden,termsRequired:document.querySelector('#terms input')?.required}));
   if(!loginFormState.fullNameHidden||loginFormState.fullNameRequired||!loginFormState.termsHidden||loginFormState.termsRequired){
     throw new Error('Le formulaire n’est pas réellement passé en mode connexion : '+JSON.stringify(loginFormState));
