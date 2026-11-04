@@ -18,7 +18,9 @@ test('la recherche par nom est disponible hors paramètres et hors configuration
 
 test('la recherche par nom ne remplace jamais automatiquement les données déjà renseignées', () => {
   const page=read('../../assets/js/pages/company-lookup.js');
-  assert.match(page,/mergeRegistryFields\(currentValues,candidate,\{\}\)/);
-  assert.match(page,/Seuls les champs vides ou non renseignés/);
-  assert.match(page,/askConfirm/);
+  assert.match(page,/mergeRegistryFields\(\s*currentValues\s*,\s*candidate\s*,\s*\{\}\s*\)/);
+  assert.match(page,/Seuls les champs vides ou non renseignés par l’utilisateur seront complétés/);
+  assert.match(page,/if\s*\(\s*!await askConfirm\(/);
+  assert.match(page,/api\.updateOrganization\(/);
+  assert.match(page,/const changed = keys\.filter/);
 });
