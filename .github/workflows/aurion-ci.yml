@@ -52,10 +52,11 @@ jobs:
           APP_BASE_URL: http://localhost:4000
           CORS_ORIGIN: http://localhost:4000
         run: npm run migrate
-      - name: Install Playwright and Chromium for browser regression
-        run: |
-          npm install --prefix backend --no-save --no-package-lock playwright@1.56.1
-          npx --yes playwright@1.56.1 install --with-deps chromium
+      - name: Install Playwright test dependency
+        run: npm install --prefix backend --no-save --no-package-lock playwright@1.56.1
+
+      - name: Install Chromium and system dependencies for browser regression
+        run: npx --yes playwright@1.56.1 install --with-deps chromium
 
       - name: Run build, frontend checks, and browser end-to-end tests
         env:
