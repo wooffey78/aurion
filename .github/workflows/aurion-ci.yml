@@ -4,12 +4,71 @@ on:
     branches: [main, 'integration/**']
   pull_request:
     branches: [main, 'integration/**']
+concurrency:
+  group: aurion-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
+  cleanup-stale-runs:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Force-cancel unresponsive older runs for this branch
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const branch = context.payload.pull_request?.head?.ref
+              ?? context.ref.replace(/^refs\/heads\//, '');
+            const runs = await github.paginate(
+              github.rest.actions.listWorkflowRunsForRepo,
+              { owner, repo, workflow_id: 397651928, branch, per_page: 100 }
+            );
+
+            const stale = runs.filter((run) =>
+              run.id !== context.runId &&
+              ['queued', 'in_progress'].includes(run.status)
+            );
+
+            for (const run of stale) {
+              core.info(`Canceling older run #${run.run_number} (${run.status}, ${run.id})`);
+              try {
+                await github.rest.actions.cancelWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: run.id
+                });
+                core.info(`Cancellation accepted for run #${run.run_number}`);
+              } catch (error) {
+                if (error.status !== 409) throw error;
+                core.warning(`Normal cancellation refused for run #${run.run_number}; trying force-cancel.`);
+                try {
+                  await github.rest.actions.forceCancelWorkflowRun({
+                    owner,
+                    repo,
+                    run_id: run.id
+                  });
+                  core.info(`Force-cancel accepted for run #${run.run_number}`);
+                } catch (forceError) {
+                  if ([404, 409, 422].includes(forceError.status)) {
+                    core.warning(`Run #${run.run_number} is no longer cancellable: ${forceError.message}`);
+                  } else {
+                    throw forceError;
+                  }
+                }
+              }
+            }
+
   quality:
-    runs-on: ubuntu-24.04
+    needs: cleanup-stale-runs
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
+    permissions:
+      contents: read
     services:
       postgres:
         image: postgres:17-alpine
@@ -35,12 +94,10 @@ jobs:
         run: npm ci --prefix backend --include=dev --no-audit --no-fund
       - name: Build and type check (smoke tests run in the full suite)
         run: npm run build && npm run typecheck
-
       - name: Create separate runtime role
         env:
           PGPASSWORD: aurion_test_ci_only
         run: psql -h localhost -U aurion_test -d aurion_test -v ON_ERROR_STOP=1 -c "CREATE ROLE aurion_runtime LOGIN PASSWORD 'aurion_runtime_ci_only';"
-
       - name: Apply migrations to disposable PostgreSQL 17 with migration owner
         id: migrations
         env:
@@ -55,13 +112,10 @@ jobs:
         run: npm run migrate
       - name: Install Playwright test dependency
         run: npm install --prefix backend --no-save --no-package-lock playwright@1.56.1
-
       - name: Install Chromium system dependencies for browser regression
         run: npx --yes playwright@1.56.1 install-deps chromium
-
       - name: Download Chromium for browser regression
         run: npx --yes playwright@1.56.1 install chromium
-
       - name: Run all validations against the B0 baseline
         env:
           NODE_ENV: test
@@ -75,15 +129,14 @@ jobs:
           CORS_ORIGIN: http://localhost:4000
           STRIPE_SECRET_KEY: sk_test_ci_dummy_key
           STRIPE_WEBHOOK_SECRET: whsec_ci_only_dummy_signing_secret
+          AURION_BASELINE_STRICT: "1"
         run: node tools/verify-b0-baseline.mjs
-
       - name: Package complete source archive
         run: |
           mkdir -p dist-artifacts
           VERSION="$(tr -d '\r\n' < VERSION.txt)"
           git archive --format=zip --prefix="Aurion-${VERSION}/" -o "dist-artifacts/Aurion-${VERSION}-source-${GITHUB_SHA:0:7}.zip" HEAD
           sha256sum dist-artifacts/*.zip
-
       - name: Upload complete source archive
         uses: actions/upload-artifact@v4
         with:

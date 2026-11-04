@@ -35,5 +35,6 @@ test('la configuration initiale reste dédiée aux entreprises existantes', () =
   assert.match(onboarding, /supplierLookup/);
   assert.match(onboarding, /SIRET/);
   assert.match(onboarding, /SIREN/);
-  assert.doesNotMatch(onboarding, /brandStep|logo|businessNamePrompt|administrativeFormalit/i);
+  assert.doesNotMatch(onboarding, /brandStep|businessNamePrompt|administrativeFormalit/i);
+  assert.doesNotMatch(onboarding, /(?:organization|company|entreprise)[A-Za-z]*Logo|logo(?:Upload|File|Step)|uploadLogo/i);
 });

@@ -77,6 +77,9 @@ export function mergeRegistryFields(current = {}, detected = {}, previousAuto = 
     if (value !== undefined && value !== null && canFill(key, value)) out[key] = clean(value);
   }
   // A registry's generic activity label is not a reliable "activité précise".
-  if (current.custom_activity === undefined) out.custom_activity = clean(detected.custom_activity);
+  // Preserve the original object shape when the registry has no explicit value.
+  if (current.custom_activity === undefined && detected.custom_activity !== undefined && detected.custom_activity !== null && clean(detected.custom_activity)) {
+    out.custom_activity = clean(detected.custom_activity);
+  }
   return out;
 }

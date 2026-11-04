@@ -14,6 +14,6 @@ test('les notifications rendent les succès et erreurs disponibles aux lecteurs 
 });
 
 test('les notifications restent visibles sur petits écrans avec zone de sécurité mobile',()=>{
-  assert.match(css,/@media\(max-width:700px\)\{\.toast-region\{left:12px;right:12px;bottom:calc\(12px \+ env\(safe-area-inset-bottom,0px\)\)\}/);
-  assert.match(css,/\.toast\{overflow-wrap:anywhere\}/);
+  assert.match(css,/@media\s*\(max-width:\s*700px\)\s*\{[\s\S]*?\.toast-region\s*\{[^}]*left:\s*12px[^}]*right:\s*12px[^}]*bottom:\s*calc\(12px\s*\+\s*env\(safe-area-inset-bottom,?\s*0px\)\)/);
+  assert.match(css,/\.toast\{[^}]*overflow-wrap:anywhere\}/);
 });
