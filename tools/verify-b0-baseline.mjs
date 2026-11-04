@@ -61,8 +61,8 @@ async function main() {
   console.log('Mode : ' + (strict ? 'STRICT (zéro échec autorisé)' : 'BASELINE B0 (aucun nouvel échec autorisé)'));
 
   const check = await run(['run', 'check'], 'controle-complet');
-  const reachedSmoke = /^> aurion@\\S+ test:smoke$/m.test(check.output);
-  const reachedBrowser = /^> aurion@\\S+ test:browser$/m.test(check.output);
+  const reachedSmoke = /^> aurion@\S+ test:smoke$/m.test(check.output);
+  const reachedBrowser = /^> aurion@\S+ test:browser$/m.test(check.output);
   const smokeFailures = parseFailures(check.output);
 
   if (!reachedSmoke) {
