@@ -77,24 +77,37 @@ try{
   await page.locator('#password').fill(password);
   await page.locator('#terms input').check();
   await page.locator('#submit').click();
+
+  // Parcours 15.4.0 : Vous → Entreprise → Activité, puis étapes facultatives.
   try{
-    await page.locator('#company').waitFor({state:'visible',timeout:20000});
+    await page.locator('#ob-first').waitFor({state:'visible',timeout:20000});
+    await page.locator('#ob-last').waitFor({state:'visible',timeout:5000});
   }catch(error){
     const authError=await page.locator('#error').textContent().catch(()=> '');
-    throw new Error('Le parcours d’inscription n’a pas ouvert la configuration entreprise. Erreur UI : '+authError+' ; réponse API : '+JSON.stringify(registrationResponse)+'\n'+serverLog+'\n'+error.message);
+    throw new Error('L’inscription n’a pas ouvert la première étape « Vous » du parcours 15.4.0. Erreur UI : '+authError+' ; réponse API : '+JSON.stringify(registrationResponse)+'\\n'+serverLog+'\\n'+error.message);
   }
-  await page.locator('#name').fill('Aurion E2E Entreprise');
-  await page.locator('#activity').fill('Maintenance et réparation');
-  await page.locator('#company button[type=submit]').click();
-  await page.locator('#detect-config').waitFor({state:'visible',timeout:20000});
-  await page.locator('#detect-config').click();
-  try{
-    await page.locator('#finish-config').waitFor({state:'visible',timeout:20000});
-  }catch(error){
-    const diagnostics={responses:onboardingResponses,toasts:await page.locator('.toast').allTextContents().catch(()=>[]),status:await page.locator('#configuration-detection-status').textContent().catch(()=>''),questionnaire:await page.locator('#onboarding-slot').innerText().catch(()=> '')};
-    throw new Error('La personnalisation n’a pas affiché son étape finale : '+JSON.stringify(diagnostics)+'\\n'+serverLog+'\\n'+error.message);
+
+  await page.locator('#ob-first').fill('Aurion');
+  await page.locator('#ob-last').fill('Test');
+  await page.locator('#ob-next').click();
+
+  await page.locator('#ob-name').waitFor({state:'visible',timeout:20000});
+  await page.locator('#ob-name').fill('Aurion E2E Entreprise');
+  await page.locator('#ob-activity').fill('Maintenance et réparation');
+  await page.locator('#ob-next').click();
+
+  await page.locator('#ob-custom').waitFor({state:'visible',timeout:20000});
+  await page.locator('#ob-custom').fill('Maintenance et réparation');
+  await page.locator('#ob-next').click();
+
+  // Logo, messagerie, signature et cloud sont facultatifs : leur report est explicite.
+  for(const optionalStep of ['Votre logo','Votre messagerie','Votre signature e-mail','Vos documents']){
+    await page.locator('#onboarding-slot #ob-skip').waitFor({state:'visible',timeout:20000});
+    await page.locator('#onboarding-slot #ob-skip').click();
   }
-  await page.locator('#finish-config').click();
+
+  await page.getByRole('heading',{name:'Récapitulatif'}).waitFor({state:'visible',timeout:20000});
+  await page.locator('#ob-next').click();
   try{
     await page.locator('#sidebar').waitFor({state:'visible',timeout:20000});
   }catch(error){
