@@ -40,8 +40,26 @@ try{
   const context=await browser.newContext({viewport:{width:1440,height:1000}});
   await context.addInitScript(apiUrl=>{window.AURION_API_URL=apiUrl;try{localStorage.setItem('aurion.biometric.choice','declined')}catch{}},baseUrl);
   const page=await context.newPage();
-  page.on('console',message=>{if(message.type()==='error')errors.push('console: '+message.text())});
-  page.on('pageerror',error=>errors.push('pageerror: '+(error.stack||error.message)));
+  const httpFailures=[];
+  page.on('response',response=>{
+    if(response.status()>=400)httpFailures.push({status:response.status(),url:response.url(),method:response.request().method()});
+  });
+  await page.addInitScript(()=>{
+    window.__aurionSecurityViolations=[];
+    document.addEventListener('securitypolicyviolation',event=>{
+      window.__aurionSecurityViolations.push({
+        directive:event.violatedDirective,
+        blockedURI:event.blockedURI,
+        sourceFile:event.sourceFile,
+        lineNumber:event.lineNumber,
+        sample:event.sample
+      });
+    });
+  });
+  page.on('console',message=>{
+    if(message.type()==='error')errors.push({text:message.text(),location:message.location()});
+  });
+  page.on('pageerror',error=>errors.push({type:'pageerror',message:error.stack||error.message}));
   page.on('dialog',dialog=>dialog.dismiss());
   let registrationResponse=null;
   const onboardingResponses=[];
@@ -157,7 +175,10 @@ try{
     const diagnostics={url:page.url(),hash:await page.evaluate(()=>location.hash).catch(()=>''),body:await page.locator('#app').innerText().catch(()=>''),html:await page.locator('#app').evaluate(el=>el.innerHTML.slice(0,5000)).catch(()=>''),errors};
     throw new Error('La connexion n’a pas ouvert le tableau de bord après le choix éventuel de clé d’accès : '+JSON.stringify(diagnostics)+'\\n'+serverLog+'\\n'+error.message);
   }
-  if(errors.length)throw new Error('Erreurs navigateur détectées:\n'+errors.join('\n'));
+  if(errors.length){
+    const securityViolations=await page.evaluate(()=>window.__aurionSecurityViolations||[]).catch(()=>[]);
+    throw new Error('Erreurs navigateur détectées : '+JSON.stringify({errors,httpFailures,securityViolations}));
+  }
   console.log('Frontend Playwright OK: inscription immédiate, navigation entre '+viewIds.length+' vues, déconnexion et connexion; aucune erreur console.');
 }finally{
   if(browser)await browser.close().catch(()=>{});
