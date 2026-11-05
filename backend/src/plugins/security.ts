@@ -8,9 +8,9 @@ import { config } from "../config.js";
 export default fp(async app=>{
   const prod=config.NODE_ENV==="production";
   await app.register(helmet,{
-    // CSP stricte : uniquement des scripts / styles servis par Aurion ; blob: autorisé pour l'aperçu PDF ; jamais intégrable dans un iframe tiers.
+    // CSP stricte pour scripts et feuilles de style ; styles d'attribut seuls autorisés pour les styles calculés (avatars, progression, viewport). blob: autorisé pour l'aperçu PDF ; jamais intégrable dans un iframe tiers.
     contentSecurityPolicy:{useDefaults:false,directives:{
-      defaultSrc:["'self'"],scriptSrc:["'self'"],styleSrc:["'self'"],imgSrc:["'self'","data:","blob:"],
+      defaultSrc:["'self'"],scriptSrc:["'self'"],styleSrc:["'self'"],styleSrcAttr:["'unsafe-inline'"],imgSrc:["'self'","data:","blob:"],
       fontSrc:["'self'","data:"],connectSrc:["'self'"],objectSrc:["'self'","blob:"],frameSrc:["'self'","blob:"],
       frameAncestors:["'none'"],baseUri:["'self'"],formAction:["'self'"],
       ...(prod?{upgradeInsecureRequests:[]}:{})
