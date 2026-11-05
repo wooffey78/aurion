@@ -213,7 +213,7 @@ export function bind(){
       toast('Entreprise enregistrée.','success');registryCandidate=null;markCompanyDirty(false);await hooks.refresh('settings');
     }catch(x){toast(x.message,'error')}
   });
-  $('#company-reset')?.addEventListener('click',()=>{Object.entries(initialCompany).forEach(([k,val])=>{const map={name:'#sname',siret:'#ssiret',siren:'#ssiren',legal_form:'#slegal',address:'#saddress',postal_code:'#spostal',city:'#scity',website:'#swebsite',activity:'#sactivity',custom_activity:'#scustom'};const el=map[k]?$(map[k]):null;if(el)el.value=val??''});$('#snaf').value=initialCompany.configuration_data?.naf_code||'';registryCandidate=null;renderRegistryPreview();markCompanyDirty(false)});
+  $('#company-reset')?.addEventListener('click',()=>{Object.entries(initialCompany).forEach(([k,val])=>{const map={name:'#sname',siret:'#ssiret',siren:'#ssiren',legal_form:'#slegal',address:'#saddress',postal_code:'#spostal',city:'#scity',website:'#swebsite',activity:'#sactivity',custom_activity:'#scustom'};const el=map[k]?$(map[k]):null;if(el)el.value=val??''});$('#snaf').value=initialCompany.configuration_data?.naf_code||'';registryCandidate=null;const preview=$('#company-registry-preview');if(preview){preview.hidden=true;preview.innerHTML=''}markCompanyDirty(false)});
 
   const configurationForm=$('#configuration-form');
   if(configurationForm){
