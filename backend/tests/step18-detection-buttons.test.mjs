@@ -15,12 +15,14 @@ function assertOrder(source, before, after, message) {
   assert.ok(a < b, `${message}: '${after}' must follow '${before}'`);
 }
 
-assertOrder(onboarding, '<span>SIRET</span>', 'id="detect"', 'Onboarding detection placement');
-assert.ok(onboarding.indexOf('id="detect"') < onboarding.indexOf('id="close"'));
+// D4/D6 (15.4.0) : nouveau parcours ; le bouton « Détecter mon entreprise » suit le champ SIRET/SIREN et précède les champs proposés.
+assertOrder(onboarding, "field('ob-identifier','SIRET ou SIREN'", 'id="ob-detect"', 'Onboarding detection placement');
+assert.ok(onboarding.indexOf('id="ob-detect"') < onboarding.indexOf("field('ob-name'"));
 assertOrder(settings, "F('ssiret','SIRET'", 'id="lookup-company-siret"', 'Settings SIRET detection placement');
 assertOrder(suppliers, "F('name','Nom'", "F('siret','SIRET'", 'Supplier identifier order');
 assertOrder(suppliers, "F('siret','SIRET'", 'id="lookup-supplier"', 'Supplier SIRET detection placement');
-assertOrder(suppliers, 'id="lookup-supplier"', 'id="lookup-supplier-name"', 'Supplier detection controls order');
+// D4 (15.4.0) : la détection fournisseur par nom est retirée.
+assert.ok(!suppliers.includes('id="lookup-supplier-name"'), 'Supplier name detection removed');
 assertOrder(clients, '<span>SIRET</span><input id="siret"', 'id="lookup-client-siret"', 'Client SIRET detection placement');
 
 // The current activity editor auto-detects fiscal/legal form; it intentionally has no duplicate button.

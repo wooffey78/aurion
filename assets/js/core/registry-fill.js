@@ -17,8 +17,8 @@ export function isValidRegistryIdentifier(value) {
 export function normalizeWebsite(value) {
   const raw = clean(value);
   if (!raw) return '';
-  if (/^https?:\/\//i.test(raw)) return raw;
-  return `https://${raw}`;
+  const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try { const url = new URL(candidate); if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password) return ''; const normalized = url.href; return url.pathname === '/' && !url.search && !url.hash ? normalized.replace(/\/$/, '') : normalized; } catch { return ''; }
 }
 
 const previousValue = (previous, key, fallback = '') => clean(previous?.[key] ?? fallback);
@@ -52,14 +52,21 @@ export function mergeRegistryFields(current = {}, detected = {}, previousAuto = 
   const canFill = (key, detectedValue) => {
     const cur = clean(current[key]);
     const previous = previousValue(previousAuto, key);
-    return !cur || (previous && cur === previous);
+    const incoming = clean(detectedValue);
+    if (!incoming) return false;
+    return !cur || Boolean(previous && cur === previous);
   };
+  const siret = String(detected.siret ?? '').replace(/\D/g, '');
+  const siren = String(detected.siren ?? '').replace(/\D/g, '');
+  const identifiersValid = (!siret || isValidRegistryIdentifier(siret) && siret.length === 14)
+    && (!siren || isValidRegistryIdentifier(siren) && siren.length === 9)
+    && (!siret || !siren || siret.slice(0, 9) === siren);
   const detectedMap = {
     name: detected.legalName ?? detected.name,
     activity: detected.activity,
     naf_code: detected.legalActivityCode ?? detected.nafCode ?? detected.naf_code,
-    siret: detected.siret,
-    siren: detected.siren,
+    siret: identifiersValid ? (siret || undefined) : undefined,
+    siren: identifiersValid ? (siren || undefined) : undefined,
     legal_form: detected.legalForm ?? detected.legal_form,
     address: normalizeStreetAddress(detected.address, detected.postalCode ?? detected.postal_code, detected.city),
     postal_code: detected.postalCode ?? detected.postal_code,
@@ -70,6 +77,9 @@ export function mergeRegistryFields(current = {}, detected = {}, previousAuto = 
     if (value !== undefined && value !== null && canFill(key, value)) out[key] = clean(value);
   }
   // A registry's generic activity label is not a reliable "activité précise".
-  if (current.custom_activity === undefined) out.custom_activity = clean(detected.custom_activity);
+  // Preserve the original object shape when the registry has no explicit value.
+  if (current.custom_activity === undefined && detected.custom_activity !== undefined && detected.custom_activity !== null && clean(detected.custom_activity)) {
+    out.custom_activity = clean(detected.custom_activity);
+  }
   return out;
 }

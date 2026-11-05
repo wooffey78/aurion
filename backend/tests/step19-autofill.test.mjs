@@ -18,6 +18,7 @@ assert.equal(normalizeWebsite('www.registre.fr'),'https://www.registre.fr');
 const blank=mergeRegistryFields({},detected,{});
 assert.equal(blank.name,'Autre société');
 assert.equal(blank.activity,'Commerce de détail');
-assert.equal(blank.custom_activity,'');
+assert.equal(blank.custom_activity,undefined);
+assert.equal(Object.hasOwn(blank,'custom_activity'),false);
 assert.equal(blank.website,'https://www.registre.fr');
 console.log('step19 autofill: 2/2');

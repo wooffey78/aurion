@@ -2,8 +2,9 @@
 import{api,getActiveActivity,setActiveActivity}from'../../core/api.js';
 import{S,e,toast,modalForm,confirmDelete,hooks,askConfirm}from'./core.js';
 import{renderMailbox}from'../mailbox.js';
-import{mergeRegistryFields}from'../../core/registry-fill.js';
-import{isValidRegistryIdentifier}from'../../core/registry-fill.js';
+import{renderDataImport}from'../data-import.js';
+import{detectCompany,buildProposals,renderProposals}from'../../core/company-detect.js';
+import{storageSection,bindStorage}from'./storage.js';
 
 const F=(id,label,val='',extra='')=>`<label class="field"><span>${label}</span><input id="${id}" value="${e(val)}" ${extra}${/placeholder=/.test(extra)?'':` placeholder="Saisissez ${e(label.toLowerCase())}…"`}></label>`;
 const v=(m,id)=>m.querySelector('#'+id)?.value.trim()??'';
@@ -101,34 +102,31 @@ const activityBody=(m,a={})=>{
   };
 };
 
-let companyLogoObjectUrl='';
-async function loadCompanyLogoPreview(){
-  const box=document.querySelector('#company-logo-preview');if(!box||!S.company?.logo_key)return;
-  try{const response=await api.companyLogo();if(!response.ok)throw new Error('LOGO_LOAD_FAILED');const blob=await response.blob();if(companyLogoObjectUrl)URL.revokeObjectURL(companyLogoObjectUrl);companyLogoObjectUrl=URL.createObjectURL(blob);const img=document.createElement('img');img.src=companyLogoObjectUrl;img.alt='Logo de l’entreprise';img.decoding='async';box.replaceChildren(img);}
-  catch{if(companyLogoObjectUrl){URL.revokeObjectURL(companyLogoObjectUrl);companyLogoObjectUrl='';}}
-}
-
 export const view=()=>{
   const completeness=settingsCompleteness(S.company||{});
   return `<div class="page-head"><div><span class="eyebrow">ENTREPRISE & ACTIVITÉS</span><h1>Paramètres</h1><p>Une information est saisie une seule fois, détectée quand elle est disponible, puis réutilisée partout dans Aurion.</p></div></div>
   <section class="panel settings-toolbar"><div class="grid-2"><label class="field"><span>Rechercher dans les paramètres</span><input id="settings-search" type="search" placeholder="Entreprise, fiscalité, facturation, tarification…"></label><div class="notice"><b>Profil complété à ${completeness} %</b><small>Les données manquantes restent à renseigner par l’utilisateur.</small></div></div>
-    <nav class="settings-nav" aria-label="Navigation des paramètres"><button type="button" data-target="settings-company">Entreprise</button><button type="button" data-target="settings-configuration">Configuration</button><button type="button" data-target="settings-activities">Activités</button><button type="button" data-target="settings-mailbox">Messagerie & agenda</button><button type="button" data-target="settings-signature">Signature e-mail</button><button type="button" data-target="settings-account">Compte & sécurité</button><button type="button" data-target="settings-subscription">Abonnement</button></nav>
+    <nav class="settings-nav" aria-label="Navigation des paramètres"><button type="button" data-target="settings-company">Entreprise</button><button type="button" data-target="settings-configuration">Configuration</button><button type="button" data-target="settings-data-import">Import de données</button><button type="button" data-target="settings-activities">Activités</button><button type="button" data-target="settings-mailbox">Messagerie & agenda</button><button type="button" data-target="settings-signature">Signature e-mail</button><button type="button" data-target="settings-storage">Stockage</button><button type="button" data-target="settings-logo">Logo</button><button type="button" data-target="settings-account">Compte & sécurité</button><button type="button" data-target="settings-subscription">Abonnement</button></nav>
   </section>
-  <section class="panel stack settings-section" id="settings-company" data-settings-text="entreprise identité siren siret adresse code postal ville site web forme juridique naf registre logo">
+  <section class="panel stack settings-section" id="settings-company" data-settings-text="entreprise informations siren siret adresse code postal ville site web forme juridique naf registre">
     <div class="section-title"><div><h2>1 · Entreprise</h2><small>Identité juridique et siège : source unique pour les devis, factures et activités.</small></div><span class="pill" id="company-completeness">Détection active</span></div>
     <div class="settings-company-grid">
       <form id="settings">
         <div class="grid-2">${F('sname','Raison sociale',S.company.name,'required')}${F('ssiret','SIRET',S.company.siret||'')}</div>
         <div class="grid-2">${F('ssiren','SIREN',S.company.siren||'')}<label class="field"><span>Forme juridique</span><select id="slegal"><option value="">Votre choix</option>${S.company.legal_form?`<option value="${e(S.company.legal_form)}" selected>${e(S.company.legal_form)}</option>`:''}</select></label></div>
-        <div class="button-row"><button type="button" class="btn secondary" id="lookup-company-siret">Détecter par SIRET / SIREN</button><button type="button" class="btn secondary" id="lookup-company-name">Détecter par nom</button></div>
+        <div class="button-row"><button type="button" class="btn secondary" id="lookup-company-siret">Détecter mon entreprise (SIRET / SIREN)</button></div><p id="company-registry-status" class="help" role="status" aria-live="polite"></p>
         <div id="company-registry-preview" class="notice" hidden></div>
         <div class="grid-2">${F('saddress','Adresse du siège',S.company.address||'')}<div>${F('swebsite','Site web',S.company.website||'')}</div></div>
         <div class="grid-2">${F('spostal','Code postal',S.company.postal_code||'')}${F('scity','Ville',S.company.city||'')}</div>
-        <div class="grid-2">${F('sactivity','Activité / métier',S.company.activity||'')} ${F('snaf','Code NAF',S.company.configuration_data?.naf_code||'')}</div><div>${F('scustom','Activité précise',S.company.custom_activity||'')}</div>
+        <div class="grid-2">${F('sactivity','Activité / métier',S.company.activity||'')} ${F('snaf','Code NAF',S.company.configuration_data?.naf_code||'')}</div><div class="grid-2">${F('svat','N° de TVA intracommunautaire',S.company.configuration_data?.vat_number||'')}<div></div></div><div>${F('scustom','Activité précise',S.company.custom_activity||'')}</div>
         <div class="settings-savebar"><span class="settings-state" id="company-state">Aucune modification</span><div class="button-row"><button class="btn secondary" type="button" id="company-reset">Annuler</button><button class="btn primary" type="submit">Enregistrer l’entreprise</button></div></div>
       </form>
-      <aside class="settings-side"><h3>Logo de l’entreprise</h3><div class="settings-logo${S.company.logo_key?' has-logo':''}" id="company-logo-preview">${S.company.logo_key?'':'<div class="pill">Aucun logo</div>'}</div><label class="btn secondary file-btn">${S.company.logo_key?'Remplacer le logo':'Téléverser le logo'}<input id="company-logo" type="file" accept="image/png,image/jpeg" hidden></label><small class="help">Le logo est réutilisé automatiquement sur les documents.</small></aside>
+
     </div>
+  </section>
+  <section class="panel stack settings-section" id="settings-data-import" data-settings-text="import données entreprise existante ancien logiciel clients fournisseurs produits services devis factures">
+    <div class="section-title"><div><h2>Import de données d’une entreprise existante</h2><small>Prévisualisez les exports de vos anciens outils, corrigez les rapprochements, puis choisissez ce qui sera importé.</small></div></div>
+    <div id="data-import-slot"></div>
   </section>
   <section class="panel stack settings-section" id="settings-mailbox" data-settings-text="messagerie agenda compte connexion">
     <div class="section-title"><div><h2>2 · Messagerie & agenda</h2><small>Les intégrations existantes restent au même endroit, sans recopier l’identité de l’entreprise.</small></div></div>
@@ -154,6 +152,7 @@ export const view=()=>{
       <div class="notice"><b>Aperçu texte</b><pre id="signature-preview" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre><small>Les versions texte et HTML sont produites côté serveur à partir de champs échappés. Le logo n’est pas inséré dans les e-mails tant que la couche d’envoi ne prend pas en charge un CID public/embarqué sûr.</small></div>
     </form>
   </section>
+  ${storageSection()}
   <section class="panel stack settings-section" id="settings-account" data-settings-text="compte sécurité connexion mot de passe biométrie"><div class="section-title"><div><h2>6 · Compte & sécurité</h2><small>Les informations personnelles restent gérées dans leur espace dédié ; aucun doublon n’est créé ici.</small></div></div><div class="button-row"><button type="button" class="btn secondary" data-go="account">Ouvrir Compte & sécurité</button></div></section>
   <section class="panel stack settings-section" id="settings-subscription" data-settings-text="abonnement paiement offre formule facturation compte"><div class="section-title"><div><h2>7 · Abonnement</h2><small>La gestion de l’offre et des paiements reste centralisée dans Compte.</small></div></div><div class="button-row"><button type="button" class="btn secondary" data-go="account">Ouvrir l’abonnement</button></div></section>`;
 };
@@ -168,7 +167,8 @@ export function bind(){
   };
   populateLegalForms();
   renderMailbox($('#mailbox-slot'),{companyName:S.company?.name||'',onChange:async()=>{S.mail=await api.mailStatus().catch(()=>S.mail)}});
-  loadCompanyLogoPreview();
+  renderDataImport($('#data-import-slot'));
+  bindStorage();
   const signatureFields=['signature-first','signature-last','signature-role','signature-company','signature-email-phone','signature-website','signature-address','signature-extra'];
   const setSignatureFields=signature=>{const s=signature||{};const pairs={'signature-first':'firstName','signature-last':'lastName','signature-role':'jobTitle','signature-company':'company','signature-email-phone':'phone','signature-website':'website','signature-address':'address','signature-extra':'extra'};for(const [id,key] of Object.entries(pairs)){const el=$('#'+id);if(el)el.value=s[key]||'';}$('#signature-enabled').checked=s.enabled!==false;$('#signature-quotes').checked=s.includeQuotes!==false;$('#signature-invoices').checked=s.includeInvoices!==false;$('#signature-professional').checked=s.includeProfessional!==false;};
   const signaturePayload=()=>({enabled:$('#signature-enabled').checked,firstName:$('#signature-first').value.trim(),lastName:$('#signature-last').value.trim(),jobTitle:$('#signature-role').value.trim(),company:$('#signature-company').value.trim(),phone:$('#signature-email-phone').value.trim(),website:$('#signature-website').value.trim(),address:$('#signature-address').value.trim(),extra:$('#signature-extra').value,includeQuotes:$('#signature-quotes').checked,includeInvoices:$('#signature-invoices').checked,includeProfessional:$('#signature-professional').checked});
@@ -176,134 +176,40 @@ export function bind(){
   $('#email-signature-form')?.addEventListener('submit',async ev=>{ev.preventDefault();const btn=$('#email-signature-form button[type="submit"]');btn.disabled=true;$('#signature-state').textContent='Enregistrement en cours…';try{const result=await api.saveEmailSignature(signaturePayload());$('#signature-preview').textContent=result.preview||'';$('#signature-state').textContent='Le serveur a confirmé l’enregistrement de la signature.';toast('Signature enregistrée.','success');}catch(x){$('#signature-state').textContent='Échec récupérable : '+(x.message||'erreur serveur');toast(x.message||'Signature non enregistrée.','error')}finally{btn.disabled=false;}});
   $('#signature-disable')?.addEventListener('click',async()=>{const payload=signaturePayload();payload.enabled=false;try{const result=await api.saveEmailSignature(payload);setSignatureFields(result.signature||payload);$('#signature-preview').textContent=result.preview||'';$('#signature-state').textContent='Signature désactivée côté serveur.';toast('Signature désactivée.','success')}catch(x){$('#signature-state').textContent='Échec : '+(x.message||'erreur serveur');toast(x.message||'Impossible de désactiver la signature.','error')}});
 
-  let registryDetected={};let registryCandidate=null;
-  const currentCompanyValues=()=>({name:$('#sname')?.value.trim(),siret:$('#ssiret')?.value.trim(),siren:$('#ssiren')?.value.trim(),address:$('#saddress')?.value.trim(),postal_code:$('#spostal')?.value.trim(),city:$('#scity')?.value.trim(),legal_form:$('#slegal')?.value.trim(),website:$('#swebsite')?.value.trim(),activity:$('#sactivity')?.value.trim(),naf_code:$('#snaf')?.value.trim(),custom_activity:$('#scustom')?.value.trim()});
-  const renderRegistryPreview=()=>{
-    const box=$('#company-registry-preview');if(!box)return;
-    if(!registryCandidate){box.hidden=true;box.innerHTML='';return}
-    const merged=mergeRegistryFields(currentCompanyValues(),registryCandidate,registryDetected);
-    const changes=Object.entries(merged).filter(([k,val])=>String(val??'')!==String(currentCompanyValues()[k]??'')&&String(val??'').trim());
-    box.hidden=false;
-    box.innerHTML=`<b>Prévisualisation de la détection</b><small>${changes.length?changes.map(([k,val])=>`${e(k)} : <strong>${e(String(val))}</strong>`).join(' · '):'Aucune information nouvelle ne sera appliquée.'}</small><div class="button-row"><button type="button" class="btn primary small" id="apply-registry-detection">Appliquer la détection</button><button type="button" class="btn secondary small" id="cancel-registry-detection">Annuler</button></div>`;
-    $('#apply-registry-detection')?.addEventListener('click',()=>{
-      const next=mergeRegistryFields(currentCompanyValues(),registryCandidate,registryDetected);
-      $('#sname').value=next.name||'';$('#ssiret').value=next.siret||'';$('#ssiren').value=next.siren||'';$('#saddress').value=next.address||'';$('#spostal').value=next.postal_code||'';$('#scity').value=next.city||'';const legalSelect=$('#slegal');if(legalSelect&&next.legal_form&&![...legalSelect.options].some(o=>o.value===next.legal_form))legalSelect.add(new Option(next.legal_form,next.legal_form));if(legalSelect)legalSelect.value=next.legal_form||'';$('#swebsite').value=next.website||'';$('#sactivity').value=next.activity||'';$('#snaf').value=next.naf_code||'';$('#scustom').value=next.custom_activity||'';
-      registryDetected=next;registryCandidate=null;renderRegistryPreview();markCompanyDirty(true);toast('Détection appliquée. Les champs déjà saisis restent prioritaires.','success');
-    });
-    $('#cancel-registry-detection')?.addEventListener('click',()=>{registryCandidate=null;renderRegistryPreview()});
-  };
-  const lookupRegistry = async (showToast = false) => {
-    const identifier = $('#ssiret').value.replace(/\D/g, '') || $('#ssiren').value.replace(/\D/g, '');
-    try {
-      let company = null;
-      if (identifier) {
-        const result = await api.supplierLookup(identifier);
-        company = result.company || null;
-      } else {
-        const name = $('#sname').value.trim();
-        if (name.length < 2) return;
-        const result = await api.supplierSearch(name);
-        company = result.companies?.[0] || null;
-        if (company?.siret) {
-          try {
-            const exact = await api.supplierLookup(company.siret);
-            company = exact.company || company;
-          } catch {}
-        }
-      }
-      if (!company) {
-        if (showToast) toast('Entreprise introuvable dans le registre public.', 'info');
-        return;
-      }
-
-      let legal = company.legalForm || company.legal_form || '';
-      if (!legal) {
-        try {
-          const detected = await api.detectLegalForm({
-            name: company.legalName || company.name || '',
-            description: company.activity || ''
-          });
-          legal = detected.legalForm || '';
-        } catch {}
-      }
-
-      registryCandidate = { ...company, legalForm: legal };
-      const next = mergeRegistryFields(currentCompanyValues(), registryCandidate, registryDetected);
-      $('#sname').value = next.name || '';
-      $('#ssiret').value = next.siret || '';
-      $('#ssiren').value = next.siren || '';
-      $('#saddress').value = next.address || '';
-      $('#spostal').value = next.postal_code || '';
-      $('#scity').value = next.city || '';
-      const legalSelect = $('#slegal');
-      if (legalSelect && next.legal_form && ![...legalSelect.options].some(option => option.value === next.legal_form)) {
-        legalSelect.add(new Option(next.legal_form, next.legal_form));
-      }
-      if (legalSelect) legalSelect.value = next.legal_form || '';
-      $('#swebsite').value = next.website || '';
-      $('#sactivity').value = next.activity || '';
-      $('#snaf').value = next.naf_code || '';
-      $('#scustom').value = next.custom_activity || '';
-      registryDetected = next;
-      registryCandidate = null;
-      renderRegistryPreview();
-      markCompanyDirty(true);
-
-      if (next.legal_form) {
-        const currentActivity = S.activities.find(activity => activity.id === getActiveActivity()) || S.activities[0];
-        if (currentActivity) {
-          try {
-            const fiscal = await api.detectFiscal({
-              legalForm: next.legal_form,
-              name: currentActivity.name || next.activity || '',
-              description: currentActivity.description || next.activity || '',
-              profileCode: currentActivity.profile_code
-            });
-            const updated = await api.updateActivity(currentActivity.id, {
-              name: currentActivity.name,
-              description: currentActivity.description || '',
-              legalForm: next.legal_form,
-              urssafRate: String(fiscal.socialRate ?? currentActivity.urssaf_rate ?? 0),
-              vatRate: Number(fiscal.vatRate ?? currentActivity.vat_rate ?? 20),
-              autoFiscalDetect: true,
-              profileCode: currentActivity.profile_code
-            });
-            S.activities = S.activities.map(activity => activity.id === currentActivity.id ? { ...activity, ...updated } : activity);
-            const row = [...document.querySelectorAll('.edit-activity')]
-              .find(button => button.dataset.id === currentActivity.id)?.closest('.activity-row');
-            const summary = row?.querySelector('small');
-            if (summary) {
-              summary.textContent = `${updated.description || ''} · TVA ${updated.vat_rate ?? '—'} % · Cotisations ${updated.urssaf_rate == null ? 'à configurer' : updated.urssaf_rate + ' %'}`;
-            }
-          } catch (error) {
-            if (showToast) toast('Entreprise détectée, mais la mise à jour fiscale automatique a échoué : ' + (error?.message || error), 'error');
-          }
-        }
-      }
-      if (showToast) toast('Entreprise détectée : identité et paramètres fiscaux actualisés. Vérifiez puis enregistrez la fiche entreprise.', 'success');
-    } catch (error) {
-      if (showToast) toast(error.message, 'error');
-    }
-  };
+  // Détection SIRET/SIREN (D4) : implémentation partagée avec le parcours, au clic uniquement, propositions champ par champ.
+  let registryCandidate=null;
   const markCompanyDirty=(dirty=true)=>{const el=$('#company-state');if(el)el.textContent=dirty?'Modifications non enregistrées':'Aucune modification'};
-  $('#company-logo')?.addEventListener('change',async ev=>{const f=ev.target.files?.[0];if(!f)return;try{await api.uploadLogo(f);toast('Logo enregistré.','success');await hooks.refresh()}catch(x){toast(x.message,'error')}});
-  $('#lookup-company-siret')?.addEventListener('click',()=>lookupRegistry(true));
-  $('#lookup-company-name')?.addEventListener('click',()=>lookupRegistry(true));
-  const registryLookupReady=()=>{
-    const siret=$('#ssiret')?.value.replace(/\D/g,'')||'';
-    const siren=$('#ssiren')?.value.replace(/\D/g,'')||'';
-    if(siret)return isValidRegistryIdentifier(siret);
-    if(siren)return isValidRegistryIdentifier(siren);
-    return ($('#sname')?.value.trim().length||0)>=3;
+  const registryFieldMap={name:'#sname',siret:'#ssiret',siren:'#ssiren',legal_form:'#slegal',address:'#saddress',postal_code:'#spostal',city:'#scity',activity:'#sactivity',naf_code:'#snaf',website:'#swebsite',vat_number:'#svat'};
+  const currentCompanyValues=()=>Object.fromEntries(Object.entries(registryFieldMap).map(([k,sel])=>[k,$(sel)?.value.trim()||'']));
+  const applyFiscalFromLegalForm=async legalForm=>{
+    const currentActivity=S.activities.find(activity=>activity.id===getActiveActivity())||S.activities[0];
+    if(!legalForm||!currentActivity)return;
+    try{
+      const fiscal=await api.detectFiscal({legalForm,name:currentActivity.name||'',description:currentActivity.description||'',profileCode:currentActivity.profile_code});
+      const updated=await api.updateActivity(currentActivity.id,{name:currentActivity.name,description:currentActivity.description||'',legalForm,urssafRate:String(fiscal.socialRate??currentActivity.urssaf_rate??0),vatRate:Number(fiscal.vatRate??currentActivity.vat_rate??20),autoFiscalDetect:true,profileCode:currentActivity.profile_code});
+      S.activities=S.activities.map(activity=>activity.id===currentActivity.id?{...activity,...updated}:activity);
+    }catch(error){toast('La mise à jour fiscale automatique a échoué : '+(error?.message||error),'error')}
   };
-  let lookupTimer=0;['#ssiret','#ssiren','#sname'].forEach(sel=>$(sel)?.addEventListener('input',()=>{markCompanyDirty();clearTimeout(lookupTimer);lookupTimer=window.setTimeout(()=>{if(registryLookupReady())lookupRegistry(false)},700)}));
-  if(isValidRegistryIdentifier(S.company?.siret)||isValidRegistryIdentifier(S.company?.siren))setTimeout(()=>lookupRegistry(false),0);
+  const applyRegistryField=(key,value)=>{
+    const el=$(registryFieldMap[key]);if(!el)return;
+    if(el.tagName==='SELECT'&&![...el.options].some(o=>o.value===value))el.add(new Option(value,value));
+    el.value=value;markCompanyDirty(true);
+    if(key==='legal_form')applyFiscalFromLegalForm(value);
+  };
+  $('#lookup-company-siret')?.addEventListener('click',async()=>{
+    const identifier=$('#ssiret').value.trim()||$('#ssiren').value.trim();
+    const result=await detectCompany(identifier,{button:$('#lookup-company-siret'),status:$('#company-registry-status')});
+    registryCandidate=result.company||null;
+    const box=$('#company-registry-preview');
+    if(registryCandidate)renderProposals(box,buildProposals(currentCompanyValues(),registryCandidate),applyRegistryField);else if(box){box.hidden=true;box.innerHTML=''}
+  });
+  ['#ssiret','#ssiren'].forEach(sel=>$(sel)?.addEventListener('input',()=>markCompanyDirty()));
   $('#settings')?.addEventListener('input',()=>markCompanyDirty());
   $('#settings')?.addEventListener('change',()=>markCompanyDirty());
   $('#settings')?.addEventListener('submit',async ev=>{
     ev.preventDefault();
     try{
-      await api.updateOrganization({name:$('#sname').value.trim(),activity:$('#sactivity').value.trim(),customActivity:$('#scustom').value.trim(),siret:$('#ssiret').value.replace(/\D/g,''),siren:$('#ssiren').value.replace(/\D/g,''),legalForm:$('#slegal').value.trim(),address:$('#saddress').value.trim(),postalCode:$('#spostal').value.trim(),city:$('#scity').value.trim(),website:$('#swebsite').value.trim(),configurationData:{...(S.company?.configuration_data||{}),naf_code:$('#snaf').value.trim()}});
+      await api.updateOrganization({name:$('#sname').value.trim(),activity:$('#sactivity').value.trim(),customActivity:$('#scustom').value.trim(),siret:$('#ssiret').value.replace(/\D/g,''),siren:$('#ssiren').value.replace(/\D/g,''),legalForm:$('#slegal').value.trim(),address:$('#saddress').value.trim(),postalCode:$('#spostal').value.trim(),city:$('#scity').value.trim(),website:$('#swebsite').value.trim(),configurationData:{...(S.company?.configuration_data||{}),naf_code:$('#snaf').value.trim(),vat_number:$('#svat')?.value.trim()||''}});
       toast('Entreprise enregistrée.','success');registryCandidate=null;markCompanyDirty(false);await hooks.refresh('settings');
     }catch(x){toast(x.message,'error')}
   });

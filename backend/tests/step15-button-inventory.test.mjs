@@ -43,7 +43,11 @@ test('Step 15: static button ids either have a click contract or submit a form',
       const a=m[1], id=a.match(/id="([^"]+)"/i)?.[1];
       if(!id || id.includes('${')) continue;
       const windowSrc=src;
-      const hasHandler = new RegExp(`(?:#${id.replace(/[.*+?^${}()|[\\]\\]/g,'\\$&')}|\\b${id}\\b)[\\s\\S]{0,1200}(?:onclick|addEventListener\\(|onsubmit)`).test(windowSrc);
+      const escapedId=id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      const inlineHandler=new RegExp(`(?:#${escapedId}|\\b${escapedId}\\b)[\\s\\S]{0,1200}(?:onclick|addEventListener\\(|onsubmit)`).test(windowSrc);
+      const selectorBinding=new RegExp(`(?:const|let|var)\\s+(\\w+)\\s*=\\s*document\\.querySelector\\(\\s*['"]#${escapedId}['"]\\s*\\)`).exec(windowSrc);
+      const variableHandler=selectorBinding?new RegExp(`\\b${selectorBinding[1]}\\.(?:onclick\\s*=|addEventListener\\s*\\()`).test(windowSrc):false;
+      const hasHandler=inlineHandler||variableHandler;
       const isSubmit = /type="submit"/i.test(a) || knownSubmit.has(id);
       if(!hasHandler && !isSubmit) missing.push(`${file}#${id}`);
     }

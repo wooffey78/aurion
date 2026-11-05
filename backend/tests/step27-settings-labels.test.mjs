@@ -15,5 +15,6 @@ test('paramètres : adresse du siège, activité métier, code NAF et activité 
   assert.equal((source.match(/F\('snaf','Code NAF'/g)||[]).length,1);
   assert.match(source,/\$\('#scustom'\)\.value\.trim\(\)/);
   assert.match(source,/customActivity:\$\('#scustom'\)\.value\.trim\(\)/);
-  assert.match(source,/mergeRegistryFields/);
+  // D4 (15.4.0) : la fusion passe par le module partagé company-detect.js (propositions champ par champ, saisie manuelle prioritaire).
+  assert.match(source,/buildProposals\(currentCompanyValues\(\),registryCandidate\)/);
 });

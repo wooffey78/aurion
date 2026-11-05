@@ -14,6 +14,8 @@ test('étape 1: la détection sépare rue, code postal et ville',()=>{
 test('étape 1: les paramètres utilisent cette normalisation pour la détection registre',()=>{
   const root=path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
   const source=fs.readFileSync(path.join(root,'assets/js/pages/dash/settings.js'),'utf8');
-  assert.match(source,/import\{mergeRegistryFields\}from/);
+  // D4 (15.4.0) : les Paramètres utilisent l'implémentation partagée, qui applique normalizeStreetAddress.
+  assert.match(source,/import\{detectCompany,buildProposals,renderProposals\}from'..\/..\/core\/company-detect.js'/);
+  assert.match(fs.readFileSync(path.join(root,'assets/js/core/company-detect.js'),'utf8'),/normalizeStreetAddress\(company\.address/);
   assert.match(fs.readFileSync(path.join(root,'assets/js/core/registry-fill.js'),'utf8'),/address: normalizeStreetAddress\(/);
 });

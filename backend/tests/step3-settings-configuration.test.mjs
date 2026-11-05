@@ -20,7 +20,9 @@ test('paramètres : la configuration fonctionnelle est organisée en une source 
   assert.match(settings,/3 · Configuration fonctionnelle[\s\S]*4 · Activités et calculs métier/);
   assert.match(settings,/Entreprise[\s\S]*Messagerie & agenda/);
   assert.match(settings,/company-registry-preview/);
-  assert.match(settings,/Appliquer la détection/);
-  assert.match(settings,/Aucune information nouvelle ne sera appliquée/);
+  // D4 (15.4.0) : « Appliquer la détection » globale remplacée par « Appliquer / Ignorer » champ par champ (company-detect.js).
+  assert.match(settings,/renderProposals\(box,buildProposals\(/);
+  // D4 (15.4.0) : message porté par l'implémentation partagée de détection.
+  assert.match(fs.readFileSync(path.join(root,'assets/js/core/company-detect.js'),'utf8'),/Les informations du registre correspondent déjà à votre saisie/);
   assert.match(onboarding,/Configuration initiale d’Aurion/);
 });

@@ -19,8 +19,11 @@ import { accountRoutes } from "./routes/account.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { supportRoutes } from "./routes/support.js";
 import { adminRoutes } from "./routes/admin.js";
-import { journeyRoutes } from "./routes/journey.js";
-import { aiAssistanceRoutes } from "./routes/ai-assistance.js";
+import { dashboardJournalRoutes } from "./routes/dashboard-journal.js";
+import { clientAddressRoutes } from "./routes/client-addresses.js";
+import { dataImportRoutes } from "./routes/data-import.js";
+import { cloudRoutes } from "./routes/cloud.js";
+import { expenseReportRoutes } from "./routes/expense-reports.js";
 import { AurionError } from "./services/errors.js";
 
 export async function buildApp() {
@@ -74,8 +77,11 @@ export async function buildApp() {
   await app.register(settingsRoutes);
   await app.register(supportRoutes);
   await app.register(adminRoutes);
-  await app.register(journeyRoutes);
-  await app.register(aiAssistanceRoutes);
+  await app.register(dashboardJournalRoutes);
+  await app.register(clientAddressRoutes);
+  await app.register(dataImportRoutes);
+  await app.register(cloudRoutes);
+  await app.register(expenseReportRoutes);
 
   return app;
 }

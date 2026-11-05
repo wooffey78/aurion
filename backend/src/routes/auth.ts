@@ -220,8 +220,6 @@ async function googleLoginClient(){
           "insert into subscriptions(organization_id,status,trial_started_at,trial_ends_at) values($1,'trialing',now(),now()+interval '60 days')",
           [orgId],
         );
-        // Seuls les nouveaux espaces reçoivent un parcours de première connexion.
-        await client.query("insert into onboarding_journeys(organization_id,status,current_step) values($1,'in_progress',1) on conflict(organization_id) do nothing", [orgId]);
         if ((request.body as any)?.fullName) await client.query("update users set full_name=$1 where id=$2", [String((request.body as any).fullName).trim(), id]);
         await recordAcceptances(client, id, request.ip);
         await client.query("commit");

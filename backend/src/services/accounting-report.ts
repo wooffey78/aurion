@@ -1,7 +1,6 @@
 import type PDFKit from 'pdfkit';
 import { query } from '../db.js';
 import { readPrivateObject } from './storage.js';
-import { getTheme } from './theme.js';
 
 const pdfkit = async () => (await import('pdfkit')).default as unknown as typeof PDFKit;
 const eur = (n: unknown) => { const v = Number(n || 0); const [i, d] = Math.abs(v).toFixed(2).split('.'); return `${v < 0 ? '-' : ''}${i!.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0')},${d}\u00A0€`; };
@@ -13,7 +12,6 @@ export async function accountingReportPdf(organizationId: string, activityId: st
   const logoBuffer: Buffer | null = org.logo_key ? await readPrivateObject(org.logo_key).catch(() => null) : null;
   const act = (await query('select name,legal_form,social_regime,vat_regime from activities where id=$1', [activityId])).rows[0];
   const contributions=(await query('select name,rate,basis,variable from activity_contributions where activity_id=$1 order by position,name',[activityId])).rows;
-  const theme = await getTheme(organizationId);
   const monthRows=(await query(`select date_trunc('month',p.paid_at)::date month,
       coalesce(sum(p.amount/nullif(1+q.vat_rate/100,0)),0)::numeric revenue_ht,
       coalesce(sum(p.amount-(p.amount/nullif(1+q.vat_rate/100,0))),0)::numeric vat,
@@ -38,7 +36,7 @@ export async function accountingReportPdf(organizationId: string, activityId: st
   const buffer: Buffer = await new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 56, info: { Title: `Export comptable ${year}`, Author: org.name || 'Aurion' } });
     const chunks: Buffer[] = []; doc.on('data', (c: Buffer) => chunks.push(c)); doc.on('end', () => resolve(Buffer.concat(chunks))); doc.on('error', reject);
-    const L = 56, R = 539, W = R - L, NAVY = theme.dark, accent = theme.accent, ink = '#0f172a', muted = '#64748b', line = '#e2e8f0', card = '#f8fafc';
+    const L = 56, R = 539, W = R - L, NAVY = '#0b1220', accent = '#0b63ce', ink = '#0f172a', muted = '#64748b', line = '#e2e8f0', card = '#f8fafc';
     const footer = () => { const sx = doc.x, sy = doc.y, b = doc.page.margins.bottom; doc.page.margins.bottom = 0; doc.font('Helvetica').fontSize(8).fillColor('#94a3b8').text(`${org.name || ''}  ·  Export comptable ${year}  ·  généré le ${new Date().toLocaleDateString('fr-FR')}`, L, 806, { width: W, align: 'center', lineBreak: false }); doc.page.margins.bottom = b; doc.x = sx; doc.y = sy; };
     footer(); doc.on('pageAdded', footer);
     const label = (t: string, x: number, y: number, w: number) => doc.font('Helvetica-Bold').fontSize(7.5).fillColor(muted).text(t.toUpperCase(), x, y, { width: w, characterSpacing: 1.3 });

@@ -1,6 +1,10 @@
-# Aurion 15.3.19
+# Aurion 15.4.0
 
-Application de gestion pour indépendants et petites entreprises, avec interface web/PWA et API Node.js/Fastify/PostgreSQL.
+Application de gestion pour entreprises déjà immatriculées, avec interface web/PWA et API Node.js/Fastify/PostgreSQL.
+
+Aurion ne propose ni parcours de création d’entreprise, ni studio d’identité visuelle, ni intelligence artificielle, ni recherche d’entreprise par nom. À la première connexion, un parcours en 8 étapes (Vous, Entreprise avec détection SIRET/SIREN au clic, Activité, Logo facultatif, Messagerie, Signature e-mail, Documents dans le cloud, Récapitulatif) écrit directement dans les fiches lues par Paramètres et « Mon compte ».
+
+Nouveautés 15.4.0 : stockage documentaire dans le Google Drive de l’utilisateur (file d’attente hors ligne, reprise automatique, quota et alertes dans le journal de bord), notes de frais intégrées à la comptabilité et à la trésorerie, rétractation déplacée dans « Mon compte ». Voir `CHANGELOG-15.4.0.md`, `docs/CLOUD-STOCKAGE-15.4.0.md` et `docs/PARCOURS-15.4.0.md`.
 
 ## Développement local
 
@@ -8,11 +12,9 @@ Application de gestion pour indépendants et petites entreprises, avec interface
 2. Copier `backend/.env.example` en `backend/.env` et configurer une base **réservée à Aurion**.
 3. Depuis la racine : `npm ci --prefix backend`, puis `npm run build`.
 4. Appliquer les migrations selon la procédure décrite dans `backend/package.json`, puis lancer `npm start`.
-5. Contrôler `http://127.0.0.1:4000/health` et exécuter `npm run check`.
+5. Contrôler `http://127.0.0.1:4000/health/db` (base joignable) et exécuter `npm run check`.
 
-Pour l’installation Windows autonome, suivre `README-INSTALLATION.md`. Pour la cible commerciale Frankfurt, lire `docs/DEPLOIEMENT-RENDER.md` et `docs/PLAN-BASCULE-FRANKFURT-15.3.19.md`. `render.yaml` cible le service Frankfurt existant et demande un plan payant; il ne migre pas automatiquement sa configuration, Neon ou les fichiers.
-
-Le moteur IA local retenu et sa configuration Ollama sont décrits dans `docs/IA-LOCALE.md`.
+Pour l’installation Windows autonome, suivre `README-INSTALLATION.md`. Pour Render, lire `docs/DEPLOIEMENT-RENDER.md`. `render.yaml` décrit les deux services existants (Frankfurt `aurion` et Oregon `aurion-web`), avec déploiement automatique désactivé ; il ne crée ni la base Neon ni le stockage S3.
 
 L’archive de sources ne contient ni dépendances installées, ni secrets locaux, ni journaux ou données d’exécution. Installez les dépendances à partir du fichier de verrouillage avant le build. LibreOffice est téléchargé en ligne par l’installateur Windows si nécessaire ; le MSI n’est pas inclus dans l’archive source.
 

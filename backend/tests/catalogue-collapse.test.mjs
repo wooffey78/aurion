@@ -15,7 +15,8 @@ test('les catégories du catalogue métier sont repliées au chargement et peuve
 
 test('le fond est légèrement bleuté et le texte utilise un bleu sombre lisible',()=>{
   const css=read('../../assets/css/app.css');
-  assert.match(css,/:root\{color-scheme:light;--bg:#f1f6fc/);
-  assert.match(css,/html,body\{background:#f1f6fc!important;color:#173252!important\}/);
-  assert.match(css,/color:#435d7b!important/);
+  assert.match(css,/:root\{color-scheme:light;--bg:#bad2f2;--bg2:#b5cff1;--panel:#c2d7f4;[^}]*--text:#0d223d/);
+  assert.match(css,/html,body\{background:#bad2f2!important;color:#0d223d!important\}/);
+  assert.match(css,/color:#0d223d!important/);
+  assert.match(css,/color:#293f59!important/);
 });
