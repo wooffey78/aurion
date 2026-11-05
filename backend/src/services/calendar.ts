@@ -43,7 +43,11 @@ export async function syncAppointment(orgId: string, a: any, action: CalendarAct
       try {
         if (google) {
           const ev = { title: a.title, startsAt: start.toISOString(), endsAt: end.toISOString() };
-          if (action === 'create') { const id = await calendarCreate(orgId, ev); if (id) await query('update appointments set google_event_id=$1 where id=$2', [id, a.id]); }
+          if (action === 'create') {
+            const id = await calendarCreate(orgId, ev);
+            if (!id) throw new Error('GOOGLE_EVENT_ID_MISSING');
+            await query('update appointments set google_event_id=$1 where id=$2 and organization_id=$3', [id, a.id, orgId]);
+          }
           else if (a.google_event_id) { if (action === 'update') await calendarUpdate(orgId, a.google_event_id, ev); else await calendarDelete(orgId, a.google_event_id); }
           return { ok: true, mode: 'google' };
         }

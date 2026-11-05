@@ -9,9 +9,10 @@ const read = p => fs.readFileSync(path.join(root, p), 'utf8');
 
 test('deep: onboarding preserves manual fields and falls back to legal-form detection', () => {
   const s = read('assets/js/pages/onboarding.js');
-  assert.match(s, /let\s+detectedLegal=[^;]*;if\(!detectedLegal\)\{try\{const lf=await api\.detectLegalForm/);
-  assert.match(s, /custom_activity:val\('custom'\)/);
-  assert.match(s, /mergeRegistryFields\(current,next,previous\)/);
+  // D4 (15.4.0) : forme juridique issue du code INSEE du registre ; propositions champ par champ, saisie manuelle jamais écrasée.
+  assert.match(s, /renderProposals\(box,buildProposals\(current\(\),r\.company\),apply\)/);
+  assert.match(s, /field\('ob-custom','Activité précise'/);
+  assert.match(read('assets/js/core/company-detect.js'), /Les valeurs déjà saisies ne sont jamais remplacées sans votre accord/);
 });
 
 test('deep: settings fiscal auto-fill respects manual VAT/social edits', () => {

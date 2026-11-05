@@ -18,6 +18,8 @@ test('dashboard summary executes independent reads concurrently without changing
 });
 
 test('monthly accounting executes independent invoice and accounting-entry queries concurrently', () => {
-  assert.match(accounting, /const \[inv,ent\]=await Promise\.all\(\[query\(/);
+  // Cahier des charges 15.4.0 (notes de frais) : une troisième requête indépendante, toujours exécutée en parallèle.
+  assert.match(accounting, /const \[inv,ent,exp\]=await Promise\.all\(\[query\(/);
+  assert.match(accounting, /from expense_reports where organization_id=\$1 and activity_id=\$2/);
   assert.match(accounting, /query\(\x60select date_trunc\('month',entry_date\)/);
 });

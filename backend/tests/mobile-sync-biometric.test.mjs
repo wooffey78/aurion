@@ -30,11 +30,12 @@ test('clavier mobile : visualViewport, taille minimale des champs et zone de dé
 
 test('biométrie : bouton accessible sans connexion automatique silencieuse', () => {
   const auth = read('../../assets/js/pages/auth.js');
-  assert.match(auth, /biometric.hidden=r\|\|!biometricAllowed\(\)/);
-  assert.doesNotMatch(auth, /setTimeout\(\(\)=>biometricLogin\(\)\.catch\(\(\)=>\{\}\)/);
-  assert.match(auth, /biometric.onclick=async/);
-  assert.match(auth, /window\.isSecureContext&&window\.PublicKeyCredential&&navigator\.credentials\?\.get&&navigator\.credentials\?\.create/);
-  assert.doesNotMatch(auth, /Android\|iPhone\|iPad\|iPod/);
+  assert.match(auth, /startConditionalPasskeyLogin\(email,status,error\)/);
+  assert.match(auth, /id=\\?['"]passkey-enable/);
+  assert.match(auth, /enable\.onclick=async/);
+  assert.doesNotMatch(auth, /setTimeout\(\(\)=>biometricLogin\(\)\.catch/);
+  const device=read('../../assets/js/core/device.js');
+  assert.match(device, /window\.isSecureContext&&window\.PublicKeyCredential&&navigator\.credentials\?\.get&&navigator\.credentials\?\.create/);
   const account=read('../../assets/js/pages/dash/account.js');
   assert.match(account, /webauthnCredentials\(\)/);
   assert.match(account, /deleteWebauthnCredential/);
@@ -47,5 +48,8 @@ test('registre entreprise : aucun appel automatique avant identifiant complet va
   assert.equal(isValidRegistryIdentifier('732829320'), true);
   assert.equal(isValidRegistryIdentifier('73282932'), false);
   assert.equal(isValidRegistryIdentifier('35600000000000'), false);
-  assert.match(read('../../assets/js/pages/dash/settings.js'), /if\(registryLookupReady\(\)\)lookupRegistry\(false\)/);
+  // D4 (15.4.0) : détection déclenchée au clic uniquement, jamais pendant la saisie ni au chargement.
+  const settingsSource=read('../../assets/js/pages/dash/settings.js');
+  assert.match(settingsSource, /\$\('#lookup-company-siret'\)\?\.addEventListener\('click'/);
+  assert.doesNotMatch(settingsSource, /lookupTimer|setTimeout\(\(\)=>lookupRegistry/);
 });

@@ -49,15 +49,6 @@ export async function gmailSend(organizationId:string,to:string,subject:string,b
  const c=await connection(organizationId);if(!c)throw new Error('GOOGLE_NOT_CONNECTED');return sendGmailUsingConnection(c,to,subject,body,attachment,html);
 }
 
-/** Envoi administratif après consentement OAuth distinct (scope Gmail Send uniquement). */
-export async function gmailSendAdministrative(organizationId:string,to:string,subject:string,body:string,attachment?:GmailAttachment|GmailAttachment[],html?:string){
- const r=await query('select * from administrative_mail_send_connections where organization_id=$1',[organizationId]);if(!r.rowCount)throw new Error('ADMIN_GMAIL_SEND_NOT_CONNECTED');const row=r.rows[0];
- const redirect=config.APP_BASE_URL?new URL('/administrative-mail/oauth/callback',config.APP_BASE_URL).toString():config.GOOGLE_REDIRECT_URI;const client=await oauthClient(redirect);
- client.setCredentials({access_token:row.access_token_enc?decrypt(row.access_token_enc):undefined,refresh_token:row.refresh_token_enc?decrypt(row.refresh_token_enc):undefined,expiry_date:row.expires_at?new Date(row.expires_at).getTime():undefined});
- client.on('tokens',async(t:any)=>{try{await query(`update administrative_mail_send_connections set access_token_enc=coalesce($1,access_token_enc),refresh_token_enc=coalesce($2,refresh_token_enc),expires_at=coalesce($3,expires_at),updated_at=now() where organization_id=$4`,[t.access_token?encrypt(t.access_token):null,t.refresh_token?encrypt(t.refresh_token):null,t.expiry_date?new Date(t.expiry_date):null,organizationId])}catch{}});
- return sendGmailUsingConnection({row,client},to,subject,body,attachment,html);
-}
-
 export async function calendarCreate(organizationId:string,event:any){const c=await connection(organizationId);if(!c)throw new Error('GOOGLE_NOT_CONNECTED');const google=await G();const cal=google.calendar({version:'v3',auth:c.client});const result=await cal.events.insert({calendarId:config.GOOGLE_CALENDAR_ID,requestBody:{summary:event.title,description:event.description||'Créé par Aurion',start:{dateTime:event.startsAt},end:{dateTime:event.endsAt},reminders:{useDefault:false,overrides:[{method:'email',minutes:1440},{method:'popup',minutes:1440}]}}});return result.data.id||null}
 
 export async function validateGoogleConnection(organizationId:string){

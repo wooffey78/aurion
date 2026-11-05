@@ -61,7 +61,9 @@ export async function accountRoutes(app: FastifyInstance) {
   });
 
   // Parcours public de rétractation consommateur, accessible sans authentification.
-  app.post('/billing/withdrawal', { config: { rateLimit: { max: 3, timeWindow: '30 minutes' } } }, async (request, reply) => {
+  // Une seule implémentation de la rétractation : route publique (accès direct) et section « Mon compte » (authentifiée).
+  const withdrawalHandler = (linked: boolean) => async (request: any, reply: any) => {
+    const link = linked && request.auth ? { userId: String(request.auth.userId), organizationId: String(request.auth.organizationId) } : null;
     const parsed = z.object({
       firstName: z.string().trim().min(1).max(100),
       lastName: z.string().trim().min(1).max(100),
@@ -79,8 +81,8 @@ export async function accountRoutes(app: FastifyInstance) {
     if (contractDate.getTime() > Date.UTC(submittedAt.getUTCFullYear(), submittedAt.getUTCMonth(), submittedAt.getUTCDate())) return reply.code(400).send({ error: 'CONTRACT_DATE_IN_FUTURE' });
     const id = randomUUID();
     const declarationText = `Je soussigné(e) ${b.firstName} ${b.lastName}, notifie ma décision de me rétracter du contrat Aurion identifié comme suit : ${b.contractReference}. Date de conclusion indiquée : ${b.contractDate}. Adresse de réponse demandée : ${b.email}.`;
-    await query(`insert into contract_withdrawal_requests(id,first_name,last_name,email,contract_reference,contract_date,declaration_text,submitted_at)
-      values($1,$2,$3,$4,$5,$6,$7,$8)`, [id, b.firstName, b.lastName, b.email, b.contractReference, b.contractDate, declarationText, submittedAt]);
+    await query(`insert into contract_withdrawal_requests(id,first_name,last_name,email,contract_reference,contract_date,declaration_text,submitted_at,user_id,organization_id)
+      values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [id, b.firstName, b.lastName, b.email, b.contractReference, b.contractDate, declarationText, submittedAt, link?.userId || null, link?.organizationId || null]);
     let receiptSent = false;
     try {
       if (!platformMailerConfigured()) throw new Error('PLATFORM_SMTP_NOT_CONFIGURED');
@@ -97,7 +99,9 @@ export async function accountRoutes(app: FastifyInstance) {
       request.log.error({ withdrawalId: id, code }, 'withdrawal receipt email could not be delivered');
     }
     return reply.code(201).send({ id, submittedAt: submittedAt.toISOString(), receiptSent, declaration: declarationText, supportEmail: config.AURION_SUPPORT_EMAIL });
-  });
+  };
+  app.post('/billing/withdrawal', { config: { rateLimit: { max: 3, timeWindow: '30 minutes' } } }, withdrawalHandler(false));
+  app.post('/account/withdrawal', { preHandler: app.requireAuth, config: { rateLimit: { max: 3, timeWindow: '30 minutes' } } }, withdrawalHandler(true));
 
   // Stripe appelle cette route serveur-à-serveur : aucune session utilisateur n'est requise.
   // Le parseur local conserve les octets exacts nécessaires à Stripe-Signature.
@@ -167,11 +171,11 @@ export async function accountRoutes(app: FastifyInstance) {
 
     priv.get('/account', async request => {
       const a = request.auth!;
-      const u = (await query('select id,email,full_name,phone_fixed,phone_mobile,created_at,password_changed_at,avatar_key from users where id=$1', [a.userId])).rows[0];
+      const u = (await query('select id,email,full_name,job_title,phone_fixed,phone_mobile,created_at,password_changed_at,avatar_key from users where id=$1', [a.userId])).rows[0];
       const o = (await query('select id,name from organizations where id=$1', [a.organizationId])).rows[0];
       const acc = (await query(`select d.kind,d.version,d.title,d.is_draft,x.accepted_at from legal_acceptances x join legal_documents d on d.id=x.document_id where x.user_id=$1 order by x.accepted_at desc`, [a.userId])).rows;
       return {
-        user: { id: u.id, email: u.email, fullName: u.full_name || '', fixedPhone: u.phone_fixed || '', mobilePhone: u.phone_mobile || '', createdAt: u.created_at, passwordChangedAt: u.password_changed_at, avatarUrl: u.avatar_key ? '/account/avatar' : null },
+        user: { id: u.id, email: u.email, fullName: u.full_name || '', jobTitle: u.job_title || '', fixedPhone: u.phone_fixed || '', mobilePhone: u.phone_mobile || '', createdAt: u.created_at, passwordChangedAt: u.password_changed_at, avatarUrl: u.avatar_key ? '/account/avatar' : null },
         role: a.role, organization: o, legalAcceptances: acc, subscription: await subscriptionState(a.organizationId),
       };
     });
@@ -196,13 +200,21 @@ export async function accountRoutes(app: FastifyInstance) {
       return {ok:true,avatarUrl:'/account/avatar'};
     });
     priv.patch('/account', async (request, reply) => {
-      const parsed = z.object({ fullName: z.string().trim().max(160), fixedPhone: z.string().trim().max(60).optional(), mobilePhone: z.string().trim().max(60).optional() }).safeParse(request.body);
+      const parsed = z.object({ fullName: z.string().trim().max(160), jobTitle: z.string().trim().max(160).optional(), fixedPhone: z.string().trim().max(60).optional(), mobilePhone: z.string().trim().max(60).optional() }).safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: 'INVALID_INPUT' });
       await query(`update users set full_name=nullif($1,''),
         phone_fixed=case when $2::boolean then nullif($3,'') else phone_fixed end,
-        phone_mobile=case when $4::boolean then nullif($5,'') else phone_mobile end
-        where id=$6`, [parsed.data.fullName, parsed.data.fixedPhone !== undefined, parsed.data.fixedPhone || '', parsed.data.mobilePhone !== undefined, parsed.data.mobilePhone || '', request.auth!.userId]);
+        phone_mobile=case when $4::boolean then nullif($5,'') else phone_mobile end,
+        job_title=case when $7::boolean then nullif($8,'') else job_title end
+        where id=$6`, [parsed.data.fullName, parsed.data.fixedPhone !== undefined, parsed.data.fixedPhone || '', parsed.data.mobilePhone !== undefined, parsed.data.mobilePhone || '', request.auth!.userId, parsed.data.jobTitle !== undefined, parsed.data.jobTitle || '']);
       return { ok: true };
+    });
+    // Historique des demandes de rétractation de l'utilisateur (D8) : ses demandes liées au compte ou envoyées avec son adresse.
+    priv.get('/account/withdrawals', async request => {
+      const me = (await query('select email from users where id=$1', [request.auth!.userId])).rows[0];
+      const rows = (await query(`select id,first_name as "firstName",last_name as "lastName",email,contract_reference as "contractReference",to_char(contract_date,'YYYY-MM-DD') as "contractDate",submitted_at as "submittedAt",status,receipt_delivery_status as "receiptStatus",receipt_sent_at as "receiptSentAt",processed_at as "processedAt"
+        from contract_withdrawal_requests where user_id=$1 or (user_id is null and lower(email)=lower($2)) order by submitted_at desc limit 50`, [request.auth!.userId, me?.email || ''])).rows;
+      return { withdrawals: rows };
     });
     priv.post('/account/change-password', { config: { rateLimit: { max: 8, timeWindow: '15 minutes' } } }, async (request, reply) => {
       const parsed = z.object({ currentPassword: z.string().min(1).max(256), newPassword: passwordSchema }).safeParse(request.body);

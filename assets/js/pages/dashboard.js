@@ -2,7 +2,7 @@
 import{api,getActiveActivity,setActiveActivity}from'../core/api.js';
 import{appLogo,toast}from'../core/ui.js';
 import{invalidateSession}from'../core/session.js';
-import{go}from'../core/router.js';
+import{go,routeQuery}from'../core/router.js';
 import{S,e,hooks,active,prof,money}from'./dash/core.js';
 import*as catalog from'./dash/catalog.js';
 import{suppliers}from'./dash/suppliers.js';
@@ -11,6 +11,7 @@ import*as docs from'./dash/docs.js';
 import*as settings from'./dash/settings.js';
 import*as account from'./dash/account.js';
 import{home,clients,agenda,accounting,treasury,support,admin}from'./dash/other.js';
+import{setCloudOwner}from'../core/cloud-sync.js';
 
 const VIEWS={home,clients,catalog,suppliers,quote,invoices:docs,agenda,accounting,treasury,support,settings,account,admin};
 const NAV=[['home','Tableau de bord','⌂'],['clients','Clients','♙'],['catalog','Catalogue métier','◈'],['suppliers','Fournisseurs','▱'],['invoices','Devis & factures','▧'],['agenda','Agenda','◷'],['accounting','Comptabilité & trésorerie','∑'],['support','Support Aurion','?'],['settings','Paramètres','⚙']];
@@ -38,8 +39,8 @@ const DATASETS={
   quote:['clients','quotes','suppliers','parts','interventions','warranties','policies','sav'],
   invoices:['clients','quotes','treasury','sav'],
   agenda:['appointments','clients','quotes'],
-  accounting:['accounting','treasury','quotes','sav'],
-  treasury:['treasury','accounting','quotes','sav'],
+  accounting:['accounting','treasury','quotes','sav','expenseReports'],
+  treasury:['treasury','accounting','quotes','sav','expenseReports'],
   settings:['templates','mail'],
   home:['clients','quotes','appointments'], 
 };
@@ -58,14 +59,14 @@ async function load(extras=null,viewId=S.view){
     S.company=company;S.activities=activities;lastConfigLoadedAt=Date.now();
     if((!getActiveActivity()||!activities.some(a=>a.id===getActiveActivity()))&&activities[0])setActiveActivity(activities[0].id);
   }
-  const fallback={clients:[],quotes:[],appointments:[],suppliers:[],parts:[],interventions:[],supplies:[],warranties:[],policies:[],devices:[],sav:[],templates:[],accounting:{},treasury:{},mail:{configured:false},timeMetrics:null,dashboardSummary:S.dashboardCounters};
+  const fallback={clients:[],quotes:[],appointments:[],suppliers:[],parts:[],interventions:[],supplies:[],warranties:[],policies:[],devices:[],sav:[],templates:[],accounting:{},treasury:{},expenseReports:{expenses:[],totals:{}},mail:{configured:false},timeMetrics:null,dashboardSummary:S.dashboardCounters};
   const fetchers={
     clients:()=>api.clients(),quotes:()=>api.quotes(),appointments:()=>api.appointments(),
     suppliers:()=>api.suppliers(),parts:()=>api.parts(),interventions:()=>api.interventions(),
     supplies:()=>api.supplies(),warranties:()=>api.warranties(),policies:()=>api.warrantyPolicies(),
     devices:()=>api.devices(),sav:()=>api.sav(),templates:()=>api.documentTemplates(),
     accounting:()=>api.accounting(S.accountingYear||new Date().getFullYear()),treasury:()=>api.treasury(),
-    mail:()=>api.mailStatus(),timeMetrics:()=>api.timeMetrics(),
+    mail:()=>api.mailStatus(),expenseReports:()=>api.expenseReports(S.accountingYear||new Date().getFullYear()),timeMetrics:()=>api.timeMetrics(),
     dashboardSummary:async()=>{const counters=await api.dashboardSummary(S.forecastMonths||6);try{const sub=await api.subscription();counters.trialDaysLeft=Number(sub.daysLeft||0);counters.subscription=sub}catch{}return counters;},
   };
   const jobs=[];
@@ -94,7 +95,7 @@ function show(id){
   if(q.parts==='Non'&&q.stock==='Non') hidden.add('catalog');
   if(profileModules.length && !profileModules.some(x=>x.includes('agenda')) && q.agenda!=='Oui') hidden.add('agenda');
   if(hidden.has(id))id='home';
-  const nav=NAV.filter(([k])=>!hidden.has(k)).map(([k,l,i])=>`<button type="button" data-view="${k}" class="${k===id?'active':''}" title="${l}"><i>${i}</i>${k==='catalog'?'Catalogue métier':l}</button>`).join('');
+  const nav=NAV.filter(([k])=>!hidden.has(k)).map(([k,l,i])=>`<button type="button" data-view="${k}" class="${k===id?'active':''}" aria-current="${k===id?'page':'false'}" title="${l}"><i aria-hidden="true">${i}</i>${k==='catalog'?'Catalogue métier':l}</button>`).join('');
   const navRoot=document.querySelector('.nav');
   navRoot.innerHTML=nav+(S.isPlatformAdmin?`<button type="button" data-view="admin" class="${id==='admin'?'active':''}" title="Administration" aria-label="Administration"><i>⚙</i>Administration</button>`:'');
   navRoot.onclick=ev=>{
@@ -108,7 +109,7 @@ function show(id){
   view.innerHTML=VIEWS[id].view();
   VIEWS[id].bind?.();
   if(id==='accounting'||id==='treasury')lastRenderedFinancialSnapshot=financialSnapshot();
-  if(previous!==id){window.requestAnimationFrame(()=>{window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;const main=document.querySelector('#main');if(main)main.scrollTop=0;});}
+  if(previous!==id){window.requestAnimationFrame(()=>{window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;const main=document.querySelector('#main');if(main)main.scrollTop=0;const heading=view.querySelector('h1');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}});}
   view.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{if(b.dataset.go==='quote'){S.editing=null;S.quoteDraft=null;S.startBlankQuote=true;S.prefillClient=null;S.documentType='quote'}hooks.refresh(b.dataset.go).catch(x=>toast(x.message,'error'))});
 }
 
@@ -199,12 +200,18 @@ function installBackgroundRefresh(){
 }
 
 export async function renderDashboard(){
+  // Liens internes (journal, retour de connexion cloud) : #/dashboard?view=settings&section=settings-storage
+  const query=routeQuery();const requestedView=query.get('view')||(query.get('cloud')?'settings':'');
+  if(requestedView&&VIEWS[requestedView]&&requestedView!=='admin')S.view=requestedView;
+  const requestedSection=query.get('section')||(query.get('cloud')?'settings-storage':'');
   const initialView=S.view==='quote'?'home':S.view;
   await load([...(EXTRAS[initialView]||[])],initialView);
   if(initialView==='accounting'||initialView==='treasury')lastFinancialRefreshAt=Date.now();
   lastBackgroundRefreshAt=Date.now();installBackgroundRefresh();
-  document.querySelector('#app').innerHTML=`<div class="dashboard-shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#/dashboard" aria-label="Aurion — retour au tableau de bord" title="Retour au tableau de bord">${appLogo('42')}<span>AURION<small>PRO</small></span></a><button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar"><span></span><span></span><span></span></button><nav class="nav"></nav><div class="sidebar-bottom"><a class="withdrawal-nav-link" href="#/withdrawal">Renoncer au contrat ici</a><button id="logout" class="nav-logout">Quitter</button><div class="status-dot"><i></i> Système opérationnel</div></div></aside><section class="workspace"><header class="dashboard-top"><div class="activity-switch"><span class="eyebrow" id="shell-company"></span><button id="activity-picker" class="activity-picker"><span>ACTIVITÉ ACTIVE</span><strong id="shell-activity"></strong><small>▾</small></button></div><div class="top-actions"><span class="pill" id="shell-pill"></span><button class="btn secondary small" id="fs-toggle" type="button" title="Activer le plein écran" aria-label="Activer le plein écran" aria-pressed="false"><span class="fs-icon" aria-hidden="true">⛶</span><span class="fs-label">Plein écran</span></button><button class="avatar" id="shell-avatar" title="Mon compte" aria-label="Mon compte"></button></div></header><main id="main" class="content"><div id="view"></div></main></section></div><div id="activity-modal-root"></div>`;
+  document.querySelector('#app').innerHTML=`<div class="dashboard-shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#/dashboard" aria-label="Aurion — retour au tableau de bord" title="Retour au tableau de bord">${appLogo('42')}<span>AURION<small>PRO</small></span></a><button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar"><span></span><span></span><span></span></button><nav class="nav" aria-label="Navigation principale"></nav><div class="sidebar-bottom"><button id="logout" class="nav-logout">Quitter</button><div class="status-dot"><i></i> Système opérationnel</div></div></aside><section class="workspace"><header class="dashboard-top"><div class="activity-switch"><span class="eyebrow" id="shell-company"></span><button id="activity-picker" class="activity-picker"><span>ACTIVITÉ ACTIVE</span><strong id="shell-activity"></strong><small>▾</small></button></div><div class="top-actions"><span class="pill" id="shell-pill"></span><button class="btn secondary small" id="fs-toggle" type="button" title="Activer le plein écran" aria-label="Activer le plein écran" aria-pressed="false"><span class="fs-icon" aria-hidden="true">⛶</span><span class="fs-label">Plein écran</span></button><button class="avatar" id="shell-avatar" title="Mon compte" aria-label="Mon compte"></button></div></header><main id="main" class="content"><div id="view"></div></main></section></div><div id="activity-modal-root"></div>`;
   await syncShellAvatar();
+  // File locale des documents cloud : liée à l'entreprise de la session (jamais d'envoi pour un autre compte de l'appareil).
+  setCloudOwner(S.company?.id||'');
   const side=document.querySelector('#sidebar'),burger=document.querySelector('#burger');
   const setMenu=open=>{side.classList.toggle('open',open);burger.setAttribute('aria-expanded',String(open));burger.setAttribute('aria-label',open?'Fermer le menu':'Ouvrir le menu')};
   burger.onclick=()=>setMenu(!side.classList.contains('open'));
@@ -231,6 +238,7 @@ export async function renderDashboard(){
   };
   syncFullscreenButton();
   paintShell();show(initialView);
+  if(requestedSection&&/^[a-z-]+$/.test(requestedSection))window.setTimeout(()=>document.getElementById(requestedSection)?.scrollIntoView({block:'start'}),250);
   window.__aurionMetricsTimer&&clearInterval(window.__aurionMetricsTimer);
   window.__aurionMetricsTimer=setInterval(async()=>{
     if(metricsRefreshInProgress)return;

@@ -13,7 +13,7 @@ import { clientSummary } from '../services/clients.js';
 import { monthlyAccounting } from '../services/accounting.js';
 import { accountingReportCsv } from '../services/accounting-report.js';
 import { signatureForEmail, emailBodyHtml } from '../services/signature.js';
-import { lookupFrenchCompany, searchFrenchCompanies, normalizeSiret, normalizeSiren } from '../services/public-registry.js';
+import { lookupFrenchCompany, normalizeSiret, normalizeSiren } from '../services/public-registry.js';
 import { savePrivateUpload, readPrivateObject, deletePrivateObject } from '../services/storage.js';
 import { buildStructuredInvoice } from '../services/electronic-invoice.js';
 import { detectFiscalSettings, detectLegalFormFromProfile, LEGAL_FORMS } from '../services/fiscal-detection.js';
@@ -505,7 +505,7 @@ export async function businessRoutes(app:FastifyInstance){
       laborCoefficient=b.defaultLaborCoefficientPercent===undefined?null:(optionalNumber(b.defaultLaborCoefficientPercent,'Coefficient main-d’œuvre',0,1e6)??0);
       if(b.quoteValidityDays!==undefined)optionalNumber(b.quoteValidityDays,'Validité du devis',1,365);
     }catch{return reply.code(400).send({error:'INVALID_INPUT',message:'Les taux et coefficients de l’activité sont invalides.'})}
-    const x=await query('update activities set name=coalesce($1,name),description=$2,legal_form=$3,cgv_text=$4,urssaf_rate=$5,vat_rate=coalesce($6,vat_rate),margin_min_percent=greatest(0,coalesce($7,margin_min_percent)),default_part_coefficient_percent=greatest(0,coalesce($8,default_part_coefficient_percent)),default_labor_coefficient_percent=greatest(0,coalesce($9,default_labor_coefficient_percent)),active=coalesce($10,active),configuration_defined=true,updated_at=now() where id=$11 and organization_id=$12 returning *',[b.name?.trim(),b.description??null,b.legalForm??null,b.cgvText??null,urssafRate,vatRate,marginMinPercent,partCoefficient,laborCoefficient,b.active,id,r.auth!.organizationId]);
+    const x=await query('update activities set name=coalesce($1,name),description=case when $13::boolean then $2 else description end,legal_form=case when $14::boolean then $3 else legal_form end,cgv_text=case when $15::boolean then $4 else cgv_text end,urssaf_rate=case when $16::boolean then $5 else urssaf_rate end,vat_rate=coalesce($6,vat_rate),margin_min_percent=greatest(0,coalesce($7,margin_min_percent)),default_part_coefficient_percent=greatest(0,coalesce($8,default_part_coefficient_percent)),default_labor_coefficient_percent=greatest(0,coalesce($9,default_labor_coefficient_percent)),active=coalesce($10,active),configuration_defined=true,updated_at=now() where id=$11 and organization_id=$12 returning *',[b.name?.trim(),b.description??null,b.legalForm??null,b.cgvText??null,urssafRate,vatRate,marginMinPercent,partCoefficient,laborCoefficient,b.active,id,r.auth!.organizationId,b.description!==undefined,b.legalForm!==undefined,b.cgvText!==undefined,b.urssafRate!==undefined]);
     if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
     if(b.profileCode!==undefined){
       if(b.profileCode&&PROFILE_CODES.includes(b.profileCode))await saveActivityProfileOverride(r.auth!.organizationId,id,b.profileCode);
@@ -566,8 +566,12 @@ export async function businessRoutes(app:FastifyInstance){
 
   app.get('/clients/:id/summary',async(r,reply)=>{const x=await clientSummary(r.auth!.organizationId,(r.params as any).id);if(!x)return reply.code(404).send({error:'NOT_FOUND'});return x});
   app.get('/suppliers',async r=>(await query('select * from suppliers where organization_id=$1 and activity_id=$2 order by name',[r.auth!.organizationId,activityId(r)])).rows);
-  app.get('/suppliers/lookup',async(r,reply)=>{try{const id=String((r.query as any)?.identifier||'');const company=await lookupFrenchCompany(id);return {company}}catch(e:any){return reply.code(400).send({error:'INVALID_INPUT',message:String(e?.message||e)})}});
-  app.get('/suppliers/search',async(r,reply)=>{try{return {companies:await searchFrenchCompanies(String((r.query as any)?.q||''))}}catch(e:any){return reply.code(400).send({error:'INVALID_INPUT',message:String(e?.message||e)})}});
+  // Détection SIRET/SIREN (D4) : déclenchée au clic, une requête par action, débit limité, journalisation sans identifiant.
+  app.get('/suppliers/lookup',{config:{rateLimit:{max:20,timeWindow:'1 minute'}}},async(r,reply)=>{
+    const id=String((r.query as any)?.identifier||'');
+    try{const result=await lookupFrenchCompany(id);return {company:result,status:result?(result.closed?'closed':result.establishmentClosed?'establishment_closed':'found'):'not_found'}}
+    catch(e:any){const code=String(e?.code||'');if(code==='REGISTRY_INVALID_IDENTIFIER')return reply.code(400).send({error:'INVALID_IDENTIFIER',status:'invalid',message:String(e.message)});if(code==='REGISTRY_RATE_LIMITED')return reply.code(429).send({error:'REGISTRY_RATE_LIMITED',status:'unavailable',message:'Le registre public limite temporairement les requêtes. Réessayez dans quelques secondes.'});r.log.warn({code:code||'REGISTRY_UNAVAILABLE'},'registry lookup failed');return reply.code(503).send({error:'REGISTRY_UNAVAILABLE',status:'unavailable',message:'Le registre public est momentanément indisponible. Vous pouvez saisir les informations manuellement.'});}
+  });
 
   app.post('/suppliers',async(r,reply)=>{
     const parsed=supplierCreateInputSchema.safeParse(r.body||{});
@@ -1280,12 +1284,12 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     const configurationState=(await query(`select configuration_incomplete from organizations where id=$1`,[org])).rows[0];
     if(configurationState && configurationState.configuration_incomplete!==false){
       await query(`insert into dashboard_journal_events(organization_id,event_type,title,description,severity,source,internal_path,dedupe_key)
-        values($1,'configuration_incomplete','Configuration à compléter','Certains éléments restent à renseigner ou à vérifier. Reprenez le parcours guidé ou modifiez les paramètres manuellement.','action','dashboard','/onboarding?step=2','legacy-configuration-incomplete')
+        values($1,'configuration_incomplete','Configuration à compléter','Certains éléments restent à renseigner ou à vérifier. Reprenez le parcours guidé ou modifiez les paramètres manuellement.','action','dashboard','/onboarding','legacy-configuration-incomplete')
         on conflict(organization_id,dedupe_key) do nothing`,[org]);
     } else {
       await query(`update dashboard_journal_events set resolved_at=coalesce(resolved_at,now()) where organization_id=$1 and event_type='configuration_incomplete' and resolved_at is null`,[org]);
     }
-    if(!aid){const events=(await query(`select id,event_type,title,description,severity,internal_path,is_read,resolved_at,created_at from dashboard_journal_events where organization_id=$1 and resolved_at is null and severity in ('action','warning','error') order by created_at desc`,[org])).rows;return {tickets:Number(t.rows[0]?.n||0),unpaidCount:0,unpaidTotal:0,forecastEntries:0,journal:events.map((x:any)=>({kind:'persistent',persisted:true,journalId:x.id,title:x.title,detail:x.description,severity:x.severity==='action'||x.severity==='error'?'red':x.severity==='warning'?'yellow':'blue',sortAt:x.created_at,internalPath:x.internal_path,isRead:x.is_read,eventType:x.event_type}))};}
+    if(!aid){const events=(await query(`select id,event_type,title,description,severity,internal_path,is_read,resolved_at,created_at from dashboard_journal_events where organization_id=$1 and event_type not like 'administrative_%' and event_type not like 'journey_%' and resolved_at is null and severity in ('action','warning','error') order by created_at desc`,[org])).rows;return {tickets:Number(t.rows[0]?.n||0),unpaidCount:0,unpaidTotal:0,forecastEntries:0,journal:events.map((x:any)=>({kind:'persistent',persisted:true,journalId:x.id,title:x.title,detail:x.description,severity:x.severity==='action'||x.severity==='error'?'red':x.severity==='warning'?'yellow':'blue',sortAt:x.created_at,internalPath:x.internal_path,isRead:x.is_read,eventType:x.event_type}))};}
     const historyMonths=Math.min(120,Math.max(1,Number((r.query as any)?.forecastMonths||6)));
     const accountingYear=new Date().getFullYear();
     const [u,f,r4,historicalResult,warrResult,appointmentsResult,subResult,yearAccounting]=await Promise.all([
@@ -1336,7 +1340,7 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     let mailReady=false;
     try{mailReady=await mailConfigured(org)}catch{mailReady=false}
     if(!mailReady)journal.push({kind:'mail',severity:'yellow',sortAt:null,title:'Messagerie',detail:'Connectez votre messagerie (une seule fois) pour envoyer vos devis et factures et mettre votre agenda à jour.',action:'settings'});
-    const persistent=(await query(`select id,event_type,title,description,severity,internal_path,is_read,resolved_at,created_at from dashboard_journal_events where organization_id=$1 and resolved_at is null and severity in ('action','warning','error') order by is_read asc,created_at desc`,[org])).rows;
+    const persistent=(await query(`select id,event_type,title,description,severity,internal_path,is_read,resolved_at,created_at from dashboard_journal_events where organization_id=$1 and event_type not like 'administrative_%' and event_type not like 'journey_%' and resolved_at is null and severity in ('action','warning','error') order by is_read asc,created_at desc`,[org])).rows;
     for(const x of persistent)journal.push({kind:'persistent',persisted:true,journalId:x.id,eventType:x.event_type,title:x.title,detail:x.description,severity:x.severity==='action'||x.severity==='error'?'red':x.severity==='warning'?'yellow':x.severity==='success'?'green':'blue',sortAt:x.created_at,internalPath:x.internal_path,isRead:x.is_read});
     journal.sort((a:any,b:any)=>{const rank=(x:any)=>x.severity==='red'?0:x.persisted&&!x.isRead?1:x.severity==='yellow'?2:3;const pr=rank(a)-rank(b);if(pr!==0)return pr;const at=a.sortAt?new Date(a.sortAt).getTime():Number.POSITIVE_INFINITY;const bt=b.sortAt?new Date(b.sortAt).getTime():Number.POSITIVE_INFINITY;return at-bt;});
     return {tickets:Number(t.rows[0]?.n||0),unpaidCount:Number(u.rows[0]?.n||0),unpaidTotal:Number(u.rows[0]?.total||0),forecastEntries:open,fourthReminderCount:Number(r4.rows[0]?.n||0),forecast,subscription:sub,warranty:{count:Number(warr?.n||0),nextEnd:warr?.next_end||null},trialDaysLeft,journal};
@@ -1348,7 +1352,8 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     const totals=months.reduce((t,m)=>({revenue_ht:t.revenue_ht+m.revenueHt,vat:t.vat+m.vat,purchases:t.purchases+m.purchases,purchase_vat:t.purchase_vat+(m.purchaseVat||0),social:t.social+m.social,mileage_total:t.mileage_total+Number(m.mileage||0)}),{revenue_ht:0,vat:0,purchases:0,purchase_vat:0,social:0,mileage_total:0});
     const count=Number((await query(`select count(distinct q.id)::int n from quotes q join invoice_payments p on p.quote_id=q.id where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice' and p.paid_at>=make_date($3,1,1) and p.paid_at<make_date($3+1,1,1)`,[org,aid,year])).rows[0]?.n||0);
     const invoices={...totals,count};
-    return{year,months:months.map(m=>({month:m.month,revenue:m.revenueHt,purchases:m.purchases,social:m.social,mileage:m.mileage,vat:m.vat,invoiceCount:m.invoiceCount})),invoices};
+    const expenseReportsHt=months.reduce((t,m)=>t+Number(m.expenseReports||0),0);
+    return{year,months:months.map(m=>({month:m.month,revenue:m.revenueHt,purchases:m.purchases,social:m.social,mileage:m.mileage,vat:m.vat,purchaseVat:m.purchaseVat,expenseReports:Number(m.expenseReports||0),invoiceCount:m.invoiceCount})),invoices,expenseReportsHt};
   });
   app.get('/forecast/assumptions',async r=>{
     const org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));
@@ -1389,7 +1394,10 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
       const p=Number(x.part_cost||0)+Number(x.shipping_cost||0)+Number(x.labor_internal_cost_ht||0)+mileageCost;
       const purchaseVatRate=x.purchase_vat_mode==='exempt'?0:(x.purchase_vat_rate!=null?Number(x.purchase_vat_rate):Number(x.vat_rate||0));const vat=(Number(x.part_cost||0)+Number(x.shipping_cost||0))*purchaseVatRate/100;const caHt=Number(x.total_ttc||0)/(1+Number(x.vat_rate||0)/100);const rates=Array.isArray(x.contribution_snapshot)?x.contribution_snapshot.filter((c:any)=>String(c?.basis||'ca_ht')==='ca_ht').reduce((t:any,c:any)=>t+Number(c?.rate||0),0):Number(x.urssaf_rate||0);const social=caHt*rates/100;return n+p+vat+social},0);
     const forecastExpenses=rows.reduce((n,x)=>{const mileageCost=x.mileage_mode==='margin'?(Number(x.mileage_internal_rate||0)>0?Number(x.mileage_km||0)*Number(x.mileage_internal_rate||0):Number(x.mileage_total||0)):0;return n+Number(x.part_cost||0)+Number(x.shipping_cost||0)+Number(x.labor_internal_cost_ht||0)+mileageCost},0);
-    return {forecastEntries:forecastIn+savTotal,forecastOutputs:forecastOut,forecastNet:forecastIn+savTotal-forecastOut,expenses:forecastExpenses,savDeduction:savTotal,rows};
+    // Notes de frais (15.4.0) : celles qui restent à rembourser sont des sorties de trésorerie prévues.
+    const er=(await query(`select count(*)::int n,coalesce(sum(amount_ttc),0)::numeric total,coalesce(sum(amount_ttc) filter (where status='to_reimburse'),0)::numeric to_reimburse from expense_reports where organization_id=$1 and activity_id=$2`,[org,aid])).rows[0]||{};
+    const expenseToReimburse=Number(er.to_reimburse||0);
+    return {forecastEntries:forecastIn+savTotal,forecastOutputs:forecastOut+expenseToReimburse,forecastNet:forecastIn+savTotal-forecastOut-expenseToReimburse,expenses:forecastExpenses+expenseToReimburse,savDeduction:savTotal,expenseReports:{count:Number(er.n||0),total:Number(er.total||0),toReimburse:expenseToReimburse},rows};
   });
   app.get('/accounting/report.csv',async(r,reply)=>{
     const aid=await ensureActivity(r,activityId(r));if(!aid)return reply.code(400).send({error:'INVALID_INPUT'});

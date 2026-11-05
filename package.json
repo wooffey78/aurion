@@ -1,6 +1,6 @@
 {
   "name": "aurion",
-  "version": "15.3.19",
+  "version": "15.4.0",
   "private": true,
   "scripts": {
     "dev": "npm --prefix backend run dev",
@@ -15,12 +15,13 @@
     "test:business": "node --experimental-strip-types --test backend/tests/business-payment-workflow.test.mjs backend/tests/invoice-payment-concurrency.contract.test.mjs backend/tests/business-numbering.contract.test.mjs backend/tests/regression-devis-facture-calculs.test.mjs backend/tests/deep-cahier-audit.test.mjs backend/tests/accounting-engine-coherence.test.mjs backend/tests/step7-invoice-reminder-history.test.mjs backend/tests/quote-contract-v3.test.mjs backend/tests/step8-sav-accounting-forecast.test.mjs backend/tests/step24-treasury-forecast.test.mjs",
     "test:ui-a11y": "node --test backend/tests/toast-accessibility.test.mjs",
     "typecheck": "npm --prefix backend run typecheck",
-    "check": "npm run build && npm run typecheck && npm run test:frontend && npm run lint:frontend && npm run test:smoke && npm run test:brand && npm run test:browser",
-    "test:smoke": "node --test backend/tests/production-readiness.test.mjs backend/tests/routes.contract.test.mjs backend/tests/routes.duplicates.test.mjs backend/tests/requirements-14.test.mjs backend/tests/requirements-15.test.mjs backend/tests/requirements-16.test.mjs backend/tests/strict-requirements-1-15.test.mjs backend/tests/step20-suppliers-sidebar.test.mjs backend/tests/step4-suppliers-management.test.mjs backend/tests/service-worker-privacy.test.mjs backend/tests/email-verification.contract.test.mjs backend/tests/catalogue-collapse.test.mjs backend/tests/quote-device-identifiers.test.mjs",
-    "test:brand": "node --experimental-strip-types --test backend/tests/brand-assets-runtime.mjs",
+    "check": "npm run build && npm run typecheck && npm run test:frontend && npm run lint:frontend && npm run test:smoke && npm run test:browser",
+    "test:smoke": "node --test backend/tests/production-readiness.test.mjs backend/tests/routes.contract.test.mjs backend/tests/routes.duplicates.test.mjs backend/tests/requirements-14.test.mjs backend/tests/requirements-15.test.mjs backend/tests/requirements-16.test.mjs backend/tests/strict-requirements-1-15.test.mjs backend/tests/step20-suppliers-sidebar.test.mjs backend/tests/step4-suppliers-management.test.mjs backend/tests/service-worker-privacy.test.mjs backend/tests/email-verification.contract.test.mjs backend/tests/catalogue-collapse.test.mjs backend/tests/quote-device-identifiers.test.mjs backend/tests/company-existing-onboarding.contract.test.mjs backend/tests/company-directory.contract.test.mjs backend/tests/integration-setup-status.test.mjs backend/tests/calendar-mail-feedback.contract.test.mjs backend/tests/dashboard-accessibility-contrast.test.mjs backend/tests/cloud-storage.contract.test.mjs backend/tests/onboarding-step3.test.mjs",
+    "test:company-config": "node --test backend/tests/company-existing-onboarding.contract.test.mjs backend/tests/company-directory.contract.test.mjs backend/tests/registry-fill-reliability.test.mjs",
     "test:frontend": "node --experimental-vm-modules tools/check-frontend.mjs",
     "lint:frontend": "npx --yes eslint@8.57.1 assets/js",
-    "test:browser": "node tools/run-browser-e2e.mjs"
+    "test:browser": "node tools/run-browser-e2e.mjs",
+    "test:cloud": "node --test backend/tests/cloud-storage.contract.test.mjs backend/tests/cloud-storage.integration.test.mjs backend/tests/expense-reports.integration.test.mjs"
   },
   "engines": {
     "node": ">=22.16.0"

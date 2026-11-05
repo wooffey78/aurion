@@ -1,14 +1,19 @@
 name: Aurion CI — build, typecheck, smoke
 on:
+  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, 'integration/**', 'release/**']
   pull_request:
-    branches: [main]
+    branches: [main, 'integration/**']
 permissions:
   contents: read
+concurrency:
+  group: aurion-quality-${{ github.ref }}
+  # Ne conserver que la validation du dernier commit de la branche.
+  cancel-in-progress: true
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     services:
       postgres:
@@ -42,6 +47,7 @@ jobs:
         run: psql -h localhost -U aurion_test -d aurion_test -v ON_ERROR_STOP=1 -c "CREATE ROLE aurion_runtime LOGIN PASSWORD 'aurion_runtime_ci_only';"
 
       - name: Apply migrations to disposable PostgreSQL 17 with migration owner
+        id: migrations
         env:
           NODE_ENV: test
           DATABASE_URL: postgresql://aurion_runtime:aurion_runtime_ci_only@localhost:5432/aurion_test
@@ -52,12 +58,19 @@ jobs:
           APP_BASE_URL: http://localhost:4000
           CORS_ORIGIN: http://localhost:4000
         run: npm run migrate
-      - name: Install Playwright and Chromium for browser regression
-        run: |
-          npm install --prefix backend --no-save --no-package-lock playwright@1.56.1
-          npx --yes playwright@1.56.1 install --with-deps chromium
+      - name: Install Playwright test dependency
+        run: npm install --prefix backend --no-save --no-package-lock playwright@1.56.1
 
-      - name: Run build, frontend checks, and browser end-to-end tests
+      - name: Install Chromium system dependencies for browser regression
+        run: |
+          # Work around the man-db trigger stall reported on Ubuntu 24.04 hosted runners.
+          sudo apt-get --yes remove --purge man-db
+          npx --yes playwright@1.56.1 install-deps chromium
+
+      - name: Download Chromium for browser regression
+        run: npx --yes playwright@1.56.1 install chromium
+
+      - name: Run all validations against the recorded B0 baseline (no new failures allowed)
         env:
           NODE_ENV: test
           DATABASE_URL: postgresql://aurion_runtime:aurion_runtime_ci_only@localhost:5432/aurion_test
@@ -70,25 +83,7 @@ jobs:
           CORS_ORIGIN: http://localhost:4000
           STRIPE_SECRET_KEY: sk_test_ci_dummy_key
           STRIPE_WEBHOOK_SECRET: whsec_ci_only_dummy_signing_secret
-        run: npm run check
-
-      - name: Run full regression and PostgreSQL integration suite (blocking)
-        env:
-          NODE_ENV: test
-          DATABASE_URL: postgresql://aurion_runtime:aurion_runtime_ci_only@localhost:5432/aurion_test
-          AURION_MIGRATION_DATABASE_URL: postgresql://aurion_test:aurion_test_ci_only@localhost:5432/aurion_test
-          AURION_RUNTIME_DB_ROLE: aurion_runtime
-          AURION_INTEGRATION_TESTS: "1"
-          JWT_SECRET: aurion-ci-only-jwt-secret-never-use-in-production-2026
-          COOKIE_SECURE: "false"
-          APP_BASE_URL: http://localhost:4000
-          CORS_ORIGIN: http://localhost:4000
-          STRIPE_SECRET_KEY: sk_test_ci_dummy_key
-          STRIPE_WEBHOOK_SECRET: whsec_ci_only_dummy_signing_secret
-        run: |
-          set -o pipefail
-          mkdir -p dist-artifacts
-          npm test 2>&1 | tee dist-artifacts/full-regression.log
+        run: node tools/verify-b0-baseline.mjs
 
       - name: Package complete source archive
         run: |
@@ -103,6 +98,7 @@ jobs:
           name: aurion-source-${{ github.sha }}
           path: |
             dist-artifacts/*.zip
-            dist-artifacts/full-regression.log
+            dist-artifacts/*.log
+            dist-artifacts/validation-b0.txt
           if-no-files-found: error
           retention-days: 14

@@ -25,3 +25,7 @@ La connexion Google est un mode d'authentification supplémentaire. Elle utilise
 5. Tester avec un compte Aurion existant dont l'adresse correspond à une adresse Google vérifiée, puis vérifier qu'un compte non reconnu ne peut pas être créé via cette route.
 
 Le flux vérifie l'état anti-CSRF, utilise PKCE, vérifie le jeton d'identité côté serveur (audience du client OAuth et adresse vérifiée) et crée une session Aurion à l'aide du mécanisme de session/jeton de renouvellement déjà en place. Si `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` ou `APP_BASE_URL` est absent, le bouton Google est masqué et le mode mot de passe / clés d'accès reste disponible.
+
+## Stockage documentaire (15.4.0)
+
+Ajouter l’URI `https://<ORIGINE>/cloud/google/callback` et activer Google Drive API : voir `docs/CLOUD-STOCKAGE-15.4.0.md`.

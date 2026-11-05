@@ -16,8 +16,9 @@ function legalFormOptionsCount() {
 }
 
 test('step25: onboarding offers legal-form select backed by all server options', () => {
-  assert.match(onboarding, /<select id="legalForm">/);
-  assert.match(onboarding, /let legalForms=\[\];/);
+  // D6 (15.4.0) : nouveau parcours, même liste serveur des formes juridiques.
+  assert.match(onboarding, /<select id="ob-legal">/);
+  assert.match(onboarding, /legalForms:\[\]/);
   const count = legalFormOptionsCount();
   assert.equal(count, 24);
   assert.match(onboarding, /legalForms\.map\(/);
@@ -30,9 +31,10 @@ test('step25: organization settings exposes the same legal-form list instead of 
 });
 
 test('step25: automatic detection can still assign a detected label to the select', () => {
-  assert.match(onboarding, /legal_form:merged\.legal_form/);
-  assert.match(settings, /const legalSelect=\$\('#slegal'\)/);
-  assert.match(settings, /if\(legalSelect\)legalSelect\.value=next\.legal_form\|\|''/);
+  // D4 (15.4.0) : la forme détectée est proposée puis ajoutée au select si besoin, dans le parcours et les Paramètres.
+  assert.match(onboarding, /if\(el\.tagName==='SELECT'&&!\[\.\.\.el\.options\]\.some\(o=>o\.value===value\)\)el\.add\(new Option\(value,value\)\)/);
+  assert.match(settings, /registryFieldMap=\{name:'#sname',siret:'#ssiret',siren:'#ssiren',legal_form:'#slegal'/);
+  assert.match(settings, /if\(el\.tagName==='SELECT'&&!\[\.\.\.el\.options\]\.some\(o=>o\.value===value\)\)el\.add\(new Option\(value,value\)\)/);
   assert.match(settings, /const detectLegal=async\(\)=>/);
   assert.match(settings, /api\.detectLegalForm\(/);
 });

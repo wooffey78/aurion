@@ -16,12 +16,16 @@ if (!enabled) {
   process.env.AURION_ENCRYPTION_KEY ||= 'integration-only-encryption-key-please-32-chars';
   process.env.AURION_ENCRYPTION_KEY_VERSION ||= 'ci-k1';
   process.env.AURION_SUPPORT_EMAIL ||= 'support@example.invalid';
+  process.env.AURION_STORAGE_BACKEND = 's3';
+  process.env.AURION_S3_BUCKET ||= 'aurion-stripe-tests-only';
+  process.env.AURION_S3_ACCESS_KEY ||= 'ci-only-access-key';
+  process.env.AURION_S3_SECRET_KEY ||= 'ci-only-secret-key';
   process.env.APP_BASE_URL = 'https://aurion.integration.test';
   process.env.CORS_ORIGIN = 'https://aurion.integration.test';
   process.env.STRIPE_SECRET_KEY ||= 'sk_test_integration_not_real';
   process.env.STRIPE_WEBHOOK_SECRET ||= 'whsec_aurion_integration_test_secret';
 
-  const [{ buildApp }, { db }, { ensureLegalDocuments }] = await Promise.all([
+  const [{ buildApp }, { db }, { ensureLegalDocuments, legalDocumentsReadyForContracts }] = await Promise.all([
     import('../dist/app.js'),
     import('../dist/db.js'),
     import('../dist/services/account.js'),
@@ -31,6 +35,26 @@ if (!enabled) {
   const createdOrganizations = new Set();
   const createdUsers = new Set();
   let registrationIpCounter = 1;
+
+  // Fixture isolée : simule des documents déjà publiés uniquement dans la base PostgreSQL jetable de CI.
+  // Les fichiers juridiques du dépôt restent des brouillons et aucune règle de production n'est contournée.
+  const ciLegalFixtureVersion = 'ci-fixture-15.3.20';
+  async function seedCiPublishedLegalDocuments() {
+    const documents = [
+      ['cgv', 'CGV de test — fixture CI'],
+      ['privacy', 'Confidentialité de test — fixture CI'],
+      ['legal-notice', 'Mentions légales de test — fixture CI'],
+      ['cookies', 'Cookies de test — fixture CI'],
+    ];
+    for (const [kind, title] of documents) {
+      await db.query('update legal_documents set is_current=false where kind=$1 and is_current=true', [kind]);
+      await db.query(`insert into legal_documents(kind,version,title,body,is_current,is_draft,published_at)
+        values($1,$2,$3,'Fixture technique CI uniquement — document fictif non publiable.',true,false,now())
+        on conflict(kind,version) do update set title=excluded.title,body=excluded.body,is_current=true,is_draft=false,published_at=now()`,
+        [kind, ciLegalFixtureVersion, title]);
+    }
+    assert.equal(await legalDocumentsReadyForContracts(), true, 'la fixture CI doit satisfaire les quatre catégories contractuelles');
+  }
 
   async function registerAccount() {
     const registrationIp = `192.0.2.${registrationIpCounter++}`;
@@ -105,6 +129,10 @@ if (!enabled) {
     assert.equal(result.rowCount, 1);
     return result.rows[0];
   }
+
+  await app.ready();
+  await ensureLegalDocuments();
+  await seedCiPublishedLegalDocuments();
 
   test('retour Checkout: la session payée n’active l’abonnement qu’une fois', async () => {
     const account = await registerAccount();
@@ -561,17 +589,17 @@ if (!enabled) {
   });
 
   test('la configuration Stripe de test a bien été initialisée', async () => {
-    await ensureLegalDocuments();
+    assert.equal(await legalDocumentsReadyForContracts(), true, 'documents contractuels de fixture CI disponibles');
     assert.ok((await db.query('select 1')).rowCount === 1);
   });
 
-  await app.ready();
-  await ensureLegalDocuments();
   test.after(async () => {
     for (const organizationId of createdOrganizations) {
       await db.query('delete from organizations where id=$1', [organizationId]).catch(() => {});
     }
     for (const userId of createdUsers) await db.query('delete from users where id=$1', [userId]).catch(() => {});
+    await db.query('delete from legal_documents where version=$1', [ciLegalFixtureVersion]).catch(() => {});
+    await ensureLegalDocuments().catch(() => {});
     await app.close();
     await db.end();
   });

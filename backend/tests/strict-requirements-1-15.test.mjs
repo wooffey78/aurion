@@ -89,18 +89,22 @@ test('requirement 5 detects activity profile and legal form immediately when an 
 test('requirement 5 uses detected profile metadata to prefill configuration choices without overwriting choices',()=>{
   assert.match(business,/detect-profile'[\s\S]*modules:p\.modules/);
   assert.match(onboarding,/api\.detectProfile\(/);
-  assert.match(onboarding,/configuration-detection-status/);
-  assert.match(onboarding,/select&&\!select\.value/);
+  // D6 (15.4.0) : le métier est proposé dans l'étape « Votre activité », sans écraser un choix existant.
+  assert.match(onboarding,/ob-profile-help/);
+  assert.match(onboarding,/sel&&!sel\.value/);
 });
 
 test('requirement 15 re-runs registry detection when saved identifiers already exist',()=>{
-  assert.match(settings,/isValidRegistryIdentifier\(S\.company\?\.siret\)\|\|isValidRegistryIdentifier\(S\.company\?\.siren\)/);
-  assert.match(onboarding,/val\('siret'\)\s*\|\|\s*val\('siren'\)/);
+  // D4 (15.4.0) : plus de relance automatique ; l'identifiant enregistré est prérempli et la détection se fait au clic.
+  assert.match(settings,/\$\('#ssiret'\)\.value\.trim\(\)\|\|\$\('#ssiren'\)\.value\.trim\(\)/);
+  assert.match(onboarding,/field\('ob-identifier','SIRET ou SIREN',c\.siret\|\|c\.siren\|\|''/);
 });
 
 test('requirements 5/15 provide automatic registry and configuration detection seams',()=>{
-  assert.match(settings,/api\.supplierLookup\(/);
-  assert.match(onboarding,/api\.supplierLookup\(/);
+  // D4 (15.4.0) : implémentation unique partagée (company-detect.js) pour le parcours et les Paramètres.
+  assert.match(read('assets/js/core/company-detect.js'),/api\.supplierLookup\(/);
+  assert.match(settings,/detectCompany\(/);
+  assert.match(onboarding,/detectCompany\(/);
   assert.match(settings,/api\.detectLegalForm\(/);
   assert.match(settings,/api\.detectProfile\(/);
   assert.match(settings,/api\.detectFiscal\(/);

@@ -18,7 +18,7 @@ const listen=(server,port=0,host='127.0.0.1')=>new Promise((resolve,reject)=>{
 });
 const freePort=async()=>{const server=net.createServer();const port=await listen(server);await new Promise(resolve=>server.close(resolve));return port};
 const port=await freePort(),baseUrl=`http://127.0.0.1:${port}`;
-const env={...process.env,NODE_ENV:'test',HOST:'127.0.0.1',PORT:String(port),APP_BASE_URL:baseUrl,CORS_ORIGIN:baseUrl,COOKIE_SECURE:'false'};
+const env={...process.env,NODE_ENV:'test',AURION_LOCAL_EVALUATION_MODE:'true',HOST:'127.0.0.1',PORT:String(port),APP_BASE_URL:baseUrl,CORS_ORIGIN:baseUrl,COOKIE_SECURE:'false'};
 let serverLog='';
 const app=spawn(process.execPath,['backend/dist/server.js'],{cwd:root,env,stdio:['ignore','pipe','pipe']});
 app.stdout.on('data',chunk=>{serverLog+=chunk.toString();if(serverLog.length>12000)serverLog=serverLog.slice(-12000)});
@@ -38,22 +38,100 @@ try{
   await waitForApp();
   browser=await chromium.launch({headless:true});
   const context=await browser.newContext({viewport:{width:1440,height:1000}});
-  await context.addInitScript(()=>{try{localStorage.setItem('aurion.biometric.choice','declined')}catch{}});
+  await context.addInitScript(apiUrl=>{window.AURION_API_URL=apiUrl;try{localStorage.setItem('aurion.biometric.choice','declined')}catch{}},baseUrl);
   const page=await context.newPage();
-  page.on('console',message=>{if(message.type()==='error')errors.push('console: '+message.text())});
-  page.on('pageerror',error=>errors.push('pageerror: '+(error.stack||error.message)));
+  const httpFailures=[];
+  page.on('response',response=>{
+    if(response.status()>=400)httpFailures.push({status:response.status(),url:response.url(),method:response.request().method()});
+  });
+  await page.addInitScript(()=>{
+    window.__aurionSecurityViolations=[];
+    document.addEventListener('securitypolicyviolation',event=>{
+      window.__aurionSecurityViolations.push({
+        directive:event.violatedDirective,
+        blockedURI:event.blockedURI,
+        sourceFile:event.sourceFile,
+        lineNumber:event.lineNumber,
+        sample:event.sample
+      });
+    });
+  });
+  page.on('console',message=>{
+    if(message.type()==='error')errors.push({text:message.text(),location:message.location()});
+  });
+  page.on('pageerror',error=>errors.push({type:'pageerror',message:error.stack||error.message}));
   page.on('dialog',dialog=>dialog.dismiss());
+  let registrationResponse=null;
+  const onboardingResponses=[];
+  page.on('response',async response=>{
+    const pathname=new URL(response.url()).pathname;
+    if(pathname==='/auth/register'){
+      registrationResponse={status:response.status(),body:await response.text().catch(()=> '')};
+    }
+    if(pathname==='/organization'||pathname==='/activities/detect-profile'||pathname.startsWith('/modules/')){
+      onboardingResponses.push({path:pathname,status:response.status(),body:(await response.text().catch(()=> '')).slice(0,1800)});
+    }
+  });
 
   await page.goto(baseUrl,{waitUntil:'domcontentloaded'});
+  const registrationStatusPromise=page.waitForResponse(response=>{try{return new URL(response.url()).pathname==='/auth/registration-status'}catch{return false}},{timeout:15000});
   await page.getByRole('link',{name:/Commencer/}).click();
   await page.locator('#auth').waitFor({state:'visible'});
+  const statusResponse=await registrationStatusPromise;
+  const registrationStatus={httpStatus:statusResponse.status(),...await statusResponse.json()};
+  if(registrationStatus.available!==true||registrationStatus.localEvaluation!==true){
+    throw new Error('Le mode évaluation local doit être disponible pour le test navigateur. Réponse : '+JSON.stringify(registrationStatus)+'\n'+serverLog);
+  }
+  try{
+    await page.waitForFunction(()=>document.querySelector('#terms')?.textContent?.includes('installation locale')&&!document.querySelector('#submit')?.disabled,null,{timeout:10000});
+  }catch(error){
+    const ui={terms:await page.locator('#terms').textContent().catch(()=>''),submitDisabled:await page.locator('#submit').isDisabled().catch(()=>null)};
+    throw new Error('Le formulaire n’a pas répercuté le mode local malgré /auth/registration-status : '+JSON.stringify(registrationStatus)+' ; état UI : '+JSON.stringify(ui)+'\n'+serverLog+'\n'+error.message);
+  }
   const email=`aurion-e2e-${Date.now()}@example.test`;
   const password='Aurion-Test-2026!xY';
+  await page.locator('#full-name').fill('Aurion Test');
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(password);
   await page.locator('#terms input').check();
   await page.locator('#submit').click();
-  await page.locator('#sidebar').waitFor({state:'visible',timeout:20000});
+
+  // Parcours 15.4.0 : Vous → Entreprise → Activité, puis étapes facultatives.
+  try{
+    await page.locator('#ob-first').waitFor({state:'visible',timeout:20000});
+    await page.locator('#ob-last').waitFor({state:'visible',timeout:5000});
+  }catch(error){
+    const authError=await page.locator('#error').textContent().catch(()=> '');
+    throw new Error('L’inscription n’a pas ouvert la première étape « Vous » du parcours 15.4.0. Erreur UI : '+authError+' ; réponse API : '+JSON.stringify(registrationResponse)+'\\n'+serverLog+'\\n'+error.message);
+  }
+
+  await page.locator('#ob-first').fill('Aurion');
+  await page.locator('#ob-last').fill('Test');
+  await page.locator('#ob-next').click();
+
+  await page.locator('#ob-name').waitFor({state:'visible',timeout:20000});
+  await page.locator('#ob-name').fill('Aurion E2E Entreprise');
+  await page.locator('#ob-activity').fill('Maintenance et réparation');
+  await page.locator('#ob-next').click();
+
+  await page.locator('#ob-custom').waitFor({state:'visible',timeout:20000});
+  await page.locator('#ob-custom').fill('Maintenance et réparation');
+  await page.locator('#ob-next').click();
+
+  // Logo, messagerie, signature et cloud sont facultatifs : leur report est explicite.
+  for(const optionalStep of ['Votre logo','Votre messagerie','Votre signature e-mail','Vos documents']){
+    await page.locator('#onboarding-slot #ob-skip').waitFor({state:'visible',timeout:20000});
+    await page.locator('#onboarding-slot #ob-skip').click();
+  }
+
+  await page.getByRole('heading',{name:'Récapitulatif'}).waitFor({state:'visible',timeout:20000});
+  await page.locator('#ob-next').click();
+  try{
+    await page.locator('#sidebar').waitFor({state:'visible',timeout:20000});
+  }catch(error){
+    const diagnostics={url:page.url(),hash:await page.evaluate(()=>location.hash).catch(()=>''),body:await page.locator('#app').innerText().catch(()=>''),html:await page.locator('#app').evaluate(el=>el.innerHTML.slice(0,5000)).catch(()=>''),errors};
+    throw new Error('Le tableau de bord ne s’est pas affiché après la configuration : '+JSON.stringify(diagnostics)+'\\n'+serverLog+'\\n'+error.message);
+  }
   const viewIds=await page.locator('.nav [data-view]').evaluateAll(nodes=>[...new Set(nodes.map(node=>node.getAttribute('data-view')).filter(Boolean))]);
   if(!viewIds.length)throw new Error('Aucune vue de tableau de bord n’a été rendue dans la navigation.');
   for(const viewId of viewIds){
@@ -65,11 +143,42 @@ try{
   await page.goto(baseUrl,{waitUntil:'domcontentloaded'});
   await page.getByRole('link',{name:'Se connecter'}).click();
   await page.locator('#auth').waitFor({state:'visible'});
+  const landingLoginState=await page.evaluate(()=>({fullNameHidden:document.querySelector('#full-name-field')?.hidden,fullNameRequired:document.querySelector('#full-name')?.required,termsHidden:document.querySelector('#terms')?.hidden,termsRequired:document.querySelector('#terms input')?.required}));
+  if(!landingLoginState.fullNameHidden||landingLoginState.fullNameRequired||!landingLoginState.termsHidden||landingLoginState.termsRequired){
+    throw new Error('Le lien « Se connecter » de la page d’accueil n’ouvre pas le mode connexion : '+JSON.stringify(landingLoginState)+' ; URL : '+page.url());
+  }
+  const loginFormState=await page.evaluate(()=>({fullNameHidden:document.querySelector('#full-name-field')?.hidden,fullNameRequired:document.querySelector('#full-name')?.required,termsHidden:document.querySelector('#terms')?.hidden,termsRequired:document.querySelector('#terms input')?.required}));
+  if(!loginFormState.fullNameHidden||loginFormState.fullNameRequired||!loginFormState.termsHidden||loginFormState.termsRequired){
+    throw new Error('Le formulaire n’est pas réellement passé en mode connexion : '+JSON.stringify(loginFormState));
+  }
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(password);
+  const loginResponsePromise=page.waitForResponse(response=>{try{return new URL(response.url()).pathname==='/auth/login'}catch{return false}},{timeout:15000});
   await page.locator('#submit').click();
-  await page.locator('#sidebar').waitFor({state:'visible',timeout:20000});
-  if(errors.length)throw new Error('Erreurs navigateur détectées:\n'+errors.join('\n'));
+  let loginResponse;
+  try{loginResponse=await loginResponsePromise}catch(error){
+    const diagnostics={url:page.url(),hash:await page.evaluate(()=>location.hash).catch(()=>''),body:await page.locator('#app').innerText().catch(()=>''),errors};
+    throw new Error('Le formulaire de connexion n’a pas appelé /auth/login : '+JSON.stringify(diagnostics)+'\\n'+serverLog+'\\n'+error.message);
+  }
+  const loginBody=await loginResponse.text().catch(()=> '');
+  if(!loginResponse.ok())throw new Error('Le serveur refuse la reconnexion (HTTP '+loginResponse.status()+') : '+loginBody+'\\n'+serverLog);
+  try{
+    await page.waitForFunction(()=>location.hash==='#/dashboard'||document.querySelector('#passkey-later'),null,{timeout:20000});
+  }catch(error){
+    const diagnostics={url:page.url(),hash:await page.evaluate(()=>location.hash).catch(()=>''),body:await page.locator('#app').innerText().catch(()=>''),errors};
+    throw new Error('La réponse /auth/login est positive mais Aurion ne passe ni au tableau de bord ni à la proposition de clé d’accès : '+JSON.stringify(diagnostics)+'\\n'+serverLog+'\\n'+error.message);
+  }
+  if(await page.locator('#passkey-later').isVisible().catch(()=>false))await page.locator('#passkey-later').click();
+  try{
+    await page.locator('#sidebar').waitFor({state:'visible',timeout:20000});
+  }catch(error){
+    const diagnostics={url:page.url(),hash:await page.evaluate(()=>location.hash).catch(()=>''),body:await page.locator('#app').innerText().catch(()=>''),html:await page.locator('#app').evaluate(el=>el.innerHTML.slice(0,5000)).catch(()=>''),errors};
+    throw new Error('La connexion n’a pas ouvert le tableau de bord après le choix éventuel de clé d’accès : '+JSON.stringify(diagnostics)+'\\n'+serverLog+'\\n'+error.message);
+  }
+  if(errors.length){
+    const securityViolations=await page.evaluate(()=>window.__aurionSecurityViolations||[]).catch(()=>[]);
+    throw new Error('Erreurs navigateur détectées : '+JSON.stringify({errors,httpFailures,securityViolations}));
+  }
   console.log('Frontend Playwright OK: inscription immédiate, navigation entre '+viewIds.length+' vues, déconnexion et connexion; aucune erreur console.');
 }finally{
   if(browser)await browser.close().catch(()=>{});

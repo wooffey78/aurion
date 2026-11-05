@@ -20,7 +20,8 @@ assert.match(catalog,/api\.updateSupply\(/,'Étape 32: modification fourniture')
 assert.match(catalog,/supplies:api\.deleteSupply/,'Étape 32: suppression fourniture via le dispatcher de catégorie');
 assert.match(catalog,/await confirmDelete\([\s\S]*?fn\(id\)/,'Étape 32: suppression confirmée avant appel API');
 assert.match(settings,/api\.updateOrganization\(/,'Étape 33: paramètres persistés');
-assert.match(settings,/api\.supplierLookup\(/,'Étape 33: auto-détection entreprise');
+// D4 (15.4.0) : détection au clic via l'implémentation partagée company-detect.js.
+assert.match(settings,/detectCompany\(identifier,/,'Étape 33: détection entreprise par SIRET/SIREN');
 assert.match(docs,/api\.createSav\(/,'Étape 34: création SAV');
 assert.match(docs,/api\.updateSav\(/,'Étape 34: modification SAV');
 assert.match(docs,/api\.deleteSav\(/,'Étape 34: suppression SAV');

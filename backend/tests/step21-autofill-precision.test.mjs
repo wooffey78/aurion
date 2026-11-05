@@ -11,6 +11,7 @@ test('étape 21: détection client passe par la fusion respectueuse des valeurs 
 });
 
 test('étape 21: Paramètres mémorise uniquement les valeurs réellement détectées', () => {
-  assert.match(settings, /let registryDetected=\{\};/);
+  // D4 (15.4.0) : plus de mémoire « détectée » globale ; seules les propositions acceptées une à une sont écrites.
+  assert.match(settings, /let registryCandidate=null;/);
   assert.doesNotMatch(settings, /let registryDetected=\{\.\.\.S\.company\};/);
 });

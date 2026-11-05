@@ -12,6 +12,8 @@ const schema=z.object({
  COOKIE_SECURE:z.enum(['true','false']).default('false').transform(v=>v==='true'),
  GOOGLE_CLIENT_ID:z.string().default(''), GOOGLE_CLIENT_SECRET:z.string().default(''), GOOGLE_REDIRECT_URI:z.string().default(''),
  GOOGLE_TOKEN_ENCRYPTION_KEY:z.string().default(''), GOOGLE_CALENDAR_ID:z.string().default('primary'),
+ // Stockage documentaire cloud (15.4.0) : retour OAuth distinct de la messagerie et seuils d'alerte de quota centralisés.
+ GOOGLE_DRIVE_REDIRECT_URI:z.string().default(''), AURION_CLOUD_QUOTA_THRESHOLDS:z.string().regex(/^\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*$/).default('80,90,95,100'),
  MAIL_FROM_NAME:z.string().default('Aurion'), AURION_ENCRYPTION_KEY:z.string().default(''), AURION_ENCRYPTION_KEY_VERSION:z.string().trim().min(1).default('k1'), AURION_ENCRYPTION_KEY_PREVIOUS:z.string().default(''), AURION_ENCRYPTION_KEY_PREVIOUS_VERSION:z.string().default(''), AURION_ENCRYPTION_LEGACY_JWT_KEY:z.enum(['true','false']).default('false').transform(v=>v==='true'), APP_BASE_URL:z.string().default(''), PLATFORM_SMTP_HOST:z.string().default(''), PLATFORM_SMTP_PORT:z.coerce.number().int().default(465), PLATFORM_SMTP_SECURITY:z.enum(['ssl','starttls','none']).default('ssl'), PLATFORM_SMTP_USER:z.string().default(''), PLATFORM_SMTP_PASS:z.string().default(''), PLATFORM_SMTP_FROM:z.string().default(''), RATE_LIMIT_MAX:z.coerce.number().int().min(60).default(1500), BILLING_VAT_RATE_BPS:z.coerce.number().int().min(0).max(100000).default(0), STRIPE_SECRET_KEY:z.string().default(''), STRIPE_WEBHOOK_SECRET:z.string().default(''), BANK_TRANSFER_IBAN:z.string().default(''), BANK_TRANSFER_BIC:z.string().default(''), BANK_TRANSFER_HOLDER:z.string().default('Aurion'),
  REMINDER_WORKER_INTERVAL_MS:z.coerce.number().int().min(10000).default(60000), AURION_SUPPORT_EMAIL:z.string().email().default('support@example.invalid'),
  AURION_STORAGE_BACKEND:z.enum(['local','s3']).default('local'), AURION_S3_ENDPOINT:z.string().default('https://s3.de.io.cloud.ovh.net'), AURION_S3_REGION:z.string().default('de'), AURION_S3_BUCKET:z.string().default(''), AURION_S3_ACCESS_KEY:z.string().default(''), AURION_S3_SECRET_KEY:z.string().default('')
@@ -34,6 +36,11 @@ if(parsed.NODE_ENV==='production'){
   let redirect: URL;
   try { redirect = new URL(parsed.GOOGLE_REDIRECT_URI); } catch { throw new Error('GOOGLE_REDIRECT_URI HTTPS doit être défini lorsque Google est activé.'); }
   if(redirect.protocol!=='https:' || redirect.username || redirect.password || redirect.origin!==baseUrl.origin || redirect.pathname!=='/integrations/google/callback' || redirect.search || redirect.hash)throw new Error('GOOGLE_REDIRECT_URI doit correspondre à APP_BASE_URL/integrations/google/callback en production.');
+  if(parsed.GOOGLE_DRIVE_REDIRECT_URI.trim()){
+   let drive: URL;
+   try { drive = new URL(parsed.GOOGLE_DRIVE_REDIRECT_URI); } catch { throw new Error('GOOGLE_DRIVE_REDIRECT_URI doit être une URL HTTPS valide.'); }
+   if(drive.protocol!=='https:' || drive.origin!==baseUrl.origin || drive.pathname!=='/cloud/google/callback' || drive.search || drive.hash || drive.username || drive.password)throw new Error('GOOGLE_DRIVE_REDIRECT_URI doit correspondre exactement à APP_BASE_URL + /cloud/google/callback en production.');
+  }
   if(!process.env.GOOGLE_TOKEN_ENCRYPTION_KEY?.trim() || parsed.GOOGLE_TOKEN_ENCRYPTION_KEY.trim().length<32)throw new Error('GOOGLE_TOKEN_ENCRYPTION_KEY doit être défini avec au moins 32 caractères lorsque Google est activé en production.');
  }
  if(!process.env.AURION_SUPPORT_EMAIL?.trim())throw new Error('AURION_SUPPORT_EMAIL doit être défini en production.');

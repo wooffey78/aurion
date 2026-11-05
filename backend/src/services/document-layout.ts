@@ -9,16 +9,16 @@ const pdfkit=async()=>(await import('pdfkit')).default as unknown as typeof PDFK
 import AdmZip from 'adm-zip';
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle,
-  ShadingType, ImageRun, Footer, HeightRule, TableLayoutType, VerticalAlign,
+  ShadingType, Footer, HeightRule, TableLayoutType, VerticalAlign,
 } from 'docx';
 
-import type { Theme } from './theme.js';
+type Theme = { accent: string; dark: string; font: 'sans' | 'serif'; radius: 'round' | 'square'; customized: boolean };
 export interface DocModel {
   theme: Theme;
   legal: string[];
   kind: 'quote' | 'invoice';
   title: string; number: string; date: string;
-  company: { name: string; activity: string; siret: string; address?: string; postalCode?: string; city?: string; website?: string; logo: { data: Buffer; type: 'png' | 'jpg' } | null };
+  company: { name: string; activity: string; siret: string; address?: string; postalCode?: string; city?: string; website?: string };
   client: { name: string; address: string; interventionAddress?: string };
   interventionLabel: string; intervention: string;
   device?: { serialNumber?: string; imei?: string };
@@ -84,9 +84,8 @@ export async function buildPdf(m: DocModel): Promise<Buffer> {
     const label = (t: string, x: number, y: number, w: number) => doc.font(FB).fontSize(7.5).fillColor(muted).text(t.toUpperCase(), x, y, { width: w, characterSpacing: 1.3 });
     const need = (y: number, h: number) => { if (y + h > 770) { doc.addPage(); return 56; } return y; };
 
-    // 1 — en-tête : logo + entreprise (gauche) ; type de document, numéro, date (droite) ; filet d'accent
-    let tx = L;
-    if (m.company.logo) { try { doc.image(m.company.logo.data, L, 52, { fit: [60.2, 60.2] }); tx = L + 74; } catch { /* logo illisible */ } }
+    // 1 — en-tête de l’entreprise et du document
+    const tx = L;
     doc.font(FB).fontSize(17).fillColor(ink).text(m.company.name || 'Entreprise', tx, 56, { width: 270 });
     doc.font(FR).fontSize(9.5).fillColor(muted);
     if (m.company.activity) doc.text(m.company.activity, tx, doc.y + 2, { width: 270 });
@@ -234,7 +233,6 @@ export async function buildDocx(m: DocModel): Promise<Buffer> {
   const kids: (Paragraph | Table)[] = [];
   // 1 — en-tête
   const left: Paragraph[] = [];
-  if (m.company.logo) { const s = fitSize(m.company.logo.data, 81.6, 81.6); left.push(new Paragraph({ spacing: { after: 100 }, children: [new ImageRun({ type: m.company.logo.type, data: m.company.logo.data, transformation: { width: s.w, height: s.h } })] })); }
   left.push(p(m.company.name || 'Entreprise', { size: 32, bold: true }));
   if (m.company.activity) left.push(p(m.company.activity, { size: 19, color: MUTED, before: 30 }));
   if (m.company.siret) left.push(p(`SIRET ${m.company.siret}`, { size: 19, color: MUTED }));
@@ -367,9 +365,7 @@ export function buildOdt(m: DocModel): Buffer {
     cellStyle('Csign', 'fo:padding="0.3cm" fo:border="0.7pt solid #cbd5e1"'),
   ].join('');
 
-  const logo = m.company.logo, ext = logo?.type === 'jpg' ? 'jpg' : 'png';
-  const ls = logo ? fitSize(logo.data, 78, 78) : null;
-  const logoXml = logo && ls ? `<text:p text:style-name="Pmeta"><draw:frame draw:name="Logo" text:anchor-type="as-char" svg:width="${(ls.w * 0.0265 * 1.02).toFixed(2)}cm" svg:height="${(ls.h * 0.0265 * 1.02).toFixed(2)}cm"><draw:image xlink:href="Pictures/logo.${ext}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame></text:p>` : '';
+  const logoXml = '';
   const P = (s: string, t: string) => `<text:p text:style-name="${s}">${x(t)}</text:p>`;
   const cell = (style: string, inner: string) => `<table:table-cell table:style-name="${style}" office:value-type="string">${inner}</table:table-cell>`;
   const tbl = (name: string, cols: string[], rows: string) => `<table:table table:name="${name}" table:style-name="Tfull">${cols.map(c => `<table:table-column table:style-name="Col${c}"/>`).join('')}${rows}</table:table>`;
@@ -407,7 +403,7 @@ export function buildOdt(m: DocModel): Buffer {
   const content = `<?xml version="1.0" encoding="UTF-8"?><office:document-content ${NS} office:version="1.2"><office:automatic-styles>${themed}</office:automatic-styles><office:body><office:text>${body}</office:text></office:body></office:document-content>`;
   const stylesXml = `<?xml version="1.0" encoding="UTF-8"?><office:document-styles ${NS} office:version="1.2"><office:font-face-decls><style:font-face style:name="${FN}" svg:font-family="${FN}" style:font-family-generic="${m.theme.font === 'serif' ? 'roman' : 'swiss'}"/></office:font-face-decls><office:styles><style:default-style style:family="paragraph"><style:paragraph-properties fo:line-height="135%"/><style:text-properties ${FONT} fo:font-size="10.5pt" fo:color="#0f172a" fo:language="fr" fo:country="FR"/></style:default-style><style:style style:name="Standard" style:family="paragraph" style:class="text"/><style:style style:name="Footer" style:family="paragraph"><style:paragraph-properties fo:text-align="center"/><style:text-properties ${FONT} fo:font-size="8pt" fo:color="#94a3b8"/></style:style></office:styles><office:automatic-styles><style:page-layout style:name="pm1"><style:page-layout-properties fo:page-width="21cm" fo:page-height="29.7cm" fo:margin-top="2cm" fo:margin-bottom="1.9cm" fo:margin-left="2.2cm" fo:margin-right="2.2cm"/><style:footer-style><style:header-footer-properties fo:min-height="0.6cm" fo:margin-top="0.4cm"/></style:footer-style></style:page-layout></office:automatic-styles><office:master-styles><style:master-page style:name="Standard" style:page-layout-name="pm1"><style:footer><text:p text:style-name="Footer">${x(footerText(m))}</text:p></style:footer></style:master-page></office:master-styles></office:document-styles>`;
   const meta = `<?xml version="1.0" encoding="UTF-8"?><office:document-meta ${NS} office:version="1.2"><office:meta><dc:title xmlns:dc="http://purl.org/dc/elements/1.1/">${x(`${m.title} ${m.number}`)}</dc:title></office:meta></office:document-meta>`;
-  const pic = logo ? `<manifest:file-entry manifest:full-path="Pictures/logo.${ext}" manifest:media-type="image/${ext === 'jpg' ? 'jpeg' : 'png'}"/>` : '';
+  const pic = '';
   const manifest = `<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="styles.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="meta.xml" manifest:media-type="text/xml"/>${pic}</manifest:manifest>`;
   const zip = new AdmZip();
   zip.addFile('mimetype', Buffer.from('application/vnd.oasis.opendocument.text'));
@@ -415,7 +411,6 @@ export function buildOdt(m: DocModel): Buffer {
   zip.addFile('content.xml', Buffer.from(content, 'utf8'));
   zip.addFile('styles.xml', Buffer.from(stylesXml, 'utf8'));
   zip.addFile('meta.xml', Buffer.from(meta, 'utf8'));
-  if (logo) zip.addFile(`Pictures/logo.${ext}`, logo.data);
   zip.addFile('META-INF/manifest.xml', Buffer.from(manifest, 'utf8'));
   return zip.toBuffer();
 }
@@ -424,7 +419,7 @@ export function buildOdt(m: DocModel): Buffer {
 export function starterModel(kind: 'quote' | 'invoice'): DocModel {
   return {
     kind, title: '{{DOCUMENT_TITLE}}', number: '{{DOCUMENT_NUMBER}}', date: '{{DATE}}',
-    company: { name: '{{COMPANY_NAME}}', activity: '{{COMPANY_ACTIVITY}}', siret: '{{SIRET}}', address: '{{COMPANY_ADDRESS}}', postalCode: '{{COMPANY_POSTAL_CODE}}', city: '{{COMPANY_CITY}}', website: '{{COMPANY_WEBSITE}}', logo: null },
+    company: { name: '{{COMPANY_NAME}}', activity: '{{COMPANY_ACTIVITY}}', siret: '{{SIRET}}', address: '{{COMPANY_ADDRESS}}', postalCode: '{{COMPANY_POSTAL_CODE}}', city: '{{COMPANY_CITY}}', website: '{{COMPANY_WEBSITE}}' },
     client: { name: '{{CLIENT_NAME}}', address: '{{CLIENT_ADDRESS}}' },
     interventionLabel: 'Prestation', intervention: '{{INTERVENTION}}',
     device: { serialNumber: '{{SERIAL_NUMBER}}', imei: '{{IMEI}}' },

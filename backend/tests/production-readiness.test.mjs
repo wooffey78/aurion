@@ -24,7 +24,8 @@ test('Render blueprint targets the existing Frankfurt service and external produ
   assert.match(render, /type: web/);
   assert.match(render, /name: aurion/);
   assert.match(render, /region: frankfurt/);
-  assert.match(render, /plan: starter/);
+  // Le Blueprint reprend le plan du service existant : aucun passage payant implicite.
+  assert.doesNotMatch(render, /^\s+plan:\s/m, 'le plan existant ne doit pas être remplacé implicitement');
   assert.doesNotMatch(render, /type: pserv|type: postgres|type: keyvalue/);
   assert.match(render, /key: DATABASE_URL\s+sync: false/);
   assert.match(render, /key: AURION_MIGRATION_DATABASE_URL\s+sync: false/);
