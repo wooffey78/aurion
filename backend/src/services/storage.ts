@@ -36,7 +36,7 @@ function validatePrivateKey(value: string) {
   return key;
 }
 
-type S3Config = { bucket: string; accessKey: string; secretKey: string; endpoint: URL; region: string };
+type S3Config = { bucket: string; accessKey: string; secretKey: string; endpoint: URL; region: string; forcePathStyle: boolean };
 function s3Config(): S3Config | null {
   const mode = String(process.env.AURION_STORAGE_BACKEND || '').trim().toLowerCase();
   const bucket = String(process.env.AURION_S3_BUCKET || '').trim();
@@ -45,22 +45,28 @@ function s3Config(): S3Config | null {
   const secretKey = String(process.env.AURION_S3_SECRET_KEY || '');
   const endpointText = String(process.env.AURION_S3_ENDPOINT || 'https://s3.de.io.cloud.ovh.net').trim();
   const region = String(process.env.AURION_S3_REGION || 'de').trim();
+  const forcePathStyle = String(process.env.AURION_S3_FORCE_PATH_STYLE || '').trim().toLowerCase() === 'true';
   if (!bucket || !accessKey || !secretKey) throw new Error('S3_STORAGE_CONFIGURATION_INCOMPLETE');
   const endpoint = new URL(endpointText);
   if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw new Error('S3_ENDPOINT_MUST_BE_HTTPS');
   // Dot-free names keep virtual-host TLS certificates valid for bucket.s3.<region>.io.cloud.ovh.net.
   if (!/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(bucket)) throw new Error('INVALID_S3_BUCKET');
-  return { bucket, accessKey, secretKey, endpoint, region };
+  return { bucket, accessKey, secretKey, endpoint, region, forcePathStyle };
 }
 export function privateStorageMode(): 'local' | 's3' { return s3Config() ? 's3' : 'local'; }
 const sha256 = (value: Buffer | string) => createHash('sha256').update(value).digest('hex');
 const hmac = (key: Buffer | string, value: string) => createHmac('sha256', key).update(value).digest();
 const encodeKey = (key: string) => String(key).split('/').map(part => encodeURIComponent(part).replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)).join('/');
-function s3ObjectUrl(config: S3Config, key: string) {
+export function s3ObjectUrl(config: S3Config, key: string) {
   const url = new URL(config.endpoint.toString());
-  // OVHcloud's virtual-host bucket endpoint keeps the request path canonical and supports AWS SigV4.
-  url.hostname = `${config.bucket}.${url.hostname}`;
-  url.pathname = `/${encodeKey(key)}`;
+  if (config.forcePathStyle) {
+    // Neon Object Storage requires path-style addressing; keep the endpoint host unchanged.
+    url.pathname = `/${encodeKey(config.bucket)}/${encodeKey(key)}`;
+  } else {
+    // OVHcloud supports virtual-host bucket addressing.
+    url.hostname = `${config.bucket}.${url.hostname}`;
+    url.pathname = `/${encodeKey(key)}`;
+  }
   return url;
 }
 async function s3Request(method: 'GET' | 'PUT' | 'DELETE' | 'HEAD', key: string, body?: Buffer, contentType?: string) {
