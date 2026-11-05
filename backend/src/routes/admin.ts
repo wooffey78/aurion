@@ -14,8 +14,16 @@ const hashToken=(token:string)=>crypto.createHash('sha256').update(token).digest
 
 export async function adminRoutes(app:FastifyInstance){
   app.addHook('preHandler',app.requireAuth);
-  app.addHook('preHandler',async(request,reply)=>{if(!(await isAdmin(request.auth!.userId)))return reply.code(403).send({error:'FORBIDDEN',message:'Compte administrateur requis.'})});
-  app.get('/admin/me',async r=>({admin:true,userId:r.auth!.userId}));
+  app.addHook('preHandler',async(request,reply)=>{
+    // /admin/me is an authenticated capability probe used by every dashboard session.
+    // Return a non-admin result from that route instead of generating an expected 403.
+    if(request.url.split('?')[0]==='/admin/me')return;
+    if(!(await isAdmin(request.auth!.userId)))return reply.code(403).send({error:'FORBIDDEN',message:'Compte administrateur requis.'});
+  });
+  app.get('/admin/me',async r=>{
+    const admin=await isAdmin(r.auth!.userId);
+    return admin?{admin:true,userId:r.auth!.userId}:{admin:false};
+  });
   app.get('/admin/stats',async()=>{
     const users=Number((await query('select count(*)::int n from users')).rows[0].n);
     const free=Number((await query(`select count(*)::int n from subscriptions where status in ('expired','canceled') or (status='trialing' and trial_ends_at<=now())`)).rows[0].n);
