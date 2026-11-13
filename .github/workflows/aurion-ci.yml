@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .node-version
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - name: Install backend dependencies
@@ -70,7 +70,7 @@ jobs:
       - name: Download Chromium for browser regression
         run: npx --yes playwright@1.56.1 install chromium
 
-      - name: Run all validations against the recorded B0 baseline (no new failures allowed)
+      - name: Run all validations with strict zero-tolerance gate
         env:
           NODE_ENV: test
           DATABASE_URL: postgresql://aurion_runtime:aurion_runtime_ci_only@localhost:5432/aurion_test
