@@ -11,7 +11,7 @@
     "start": "node dist/migrate.js && node scripts/start-server.mjs",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test",
+    "test": "node --experimental-strip-types --test",
     "db:migrate": "tsx src/migrate.ts",
     "migrate:prod": "node dist/migrate.js",
     "db:tool": "node dist/dbtool.js",

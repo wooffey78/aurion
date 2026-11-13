@@ -1,19 +1,15 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { compareWithBaseline, evaluateCommand, parseTapFailures } from './ci-gate-policy.mjs';
 
 const root = process.cwd();
 const artifactDir = path.join(root, 'dist-artifacts');
 mkdirSync(artifactDir, { recursive: true });
 const baseline = JSON.parse(readFileSync(path.join(root, 'docs/BASELINE-TESTS-B0-15.3.20.json'), 'utf8'));
-const strict = process.env.AURION_BASELINE_STRICT === '1';
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const findings = [];
 const summaries = [];
-
-function parseFailures(output) {
-  return [...output.matchAll(/^\s*not ok \d+ - (.+?)\s*$/gm)].map(match => match[1].trim());
-}
 
 function addFinding(ok, message) {
   summaries.push((ok ? 'OK — ' : 'ÉCHEC — ') + message);
@@ -50,101 +46,68 @@ function run(args, name) {
   });
 }
 
-function knownBrowserFailure(output) {
-  return output.includes(baseline.browser.message) &&
-    output.includes(baseline.browser.waitingFor) &&
-    output.includes(baseline.browser.location);
+function summarizeFailure(label, result) {
+  const evaluation = evaluateCommand({ exitCode: result.code, output: result.output });
+  if (evaluation.ok) {
+    addFinding(true, label + ' : code 0, aucun échec TAP.');
+    return evaluation;
+  }
+  const detail = evaluation.failures.length
+    ? evaluation.failures.join(' | ')
+    : (result.error || 'code de sortie ' + evaluation.exitCode + ' sans détail TAP');
+  addFinding(false, label + ' : échec obligatoire — ' + detail + '. Journal : ' + result.logPath);
+  return evaluation;
+}
+
+function baselineDiagnostics(label, observed, historical) {
+  const comparison = compareWithBaseline(observed, historical);
+  summaries.push('DIAGNOSTIC — ' + label + ' : ' + comparison.stillHistorical.length +
+    ' échec(s) correspondant à l’ancienne baseline, ' + comparison.newFailures.length +
+    ' nouveau(x), ' + comparison.resolvedHistorical.length +
+    ' ancien(s) non reproduit(s). Cette comparaison n’accorde aucune tolérance.');
 }
 
 async function main() {
-  console.log('Validation Aurion — référence ' + baseline.reference.version + ' / ' + baseline.reference.commit);
-  console.log('Mode : ' + (strict ? 'STRICT (zéro échec autorisé)' : 'BASELINE B0 (aucun nouvel échec autorisé)'));
+  console.log('Validation CI stricte Aurion');
+  console.log('Référence historique à titre de diagnostic uniquement : ' + baseline.reference.version + ' / ' + baseline.reference.commit);
+  console.log('Politique : tout code non nul, toute assertion TAP en échec et tout échec navigateur bloquent la validation.');
 
   const check = await run(['run', 'check'], 'controle-complet');
   const reachedSmoke = /^> aurion@\S+ test:smoke$/m.test(check.output);
   const reachedBrowser = /^> aurion@\S+ test:browser$/m.test(check.output);
-  const smokeFailures = parseFailures(check.output);
-
-  if (!reachedSmoke) {
-    addFinding(false, 'npm run check s’est arrêté avant les tests smoke (code ' + check.code + ').');
-  } else {
-    const added = smokeFailures.filter(name => !baseline.smoke.failures.includes(name));
-    if (added.length) {
-      addFinding(false, 'Nouveaux échecs smoke : ' + added.join(' | '));
-    } else if (strict && smokeFailures.length) {
-      addFinding(false, 'Mode strict : ' + smokeFailures.length + ' échec(s) smoke subsistent.');
-    } else {
-      const resolved = baseline.smoke.failures.filter(name => !smokeFailures.includes(name));
-      addFinding(true, 'Smoke : ' + smokeFailures.length + ' échec(s) de référence, aucun nouveau ; résolus depuis B0 : ' + resolved.length + '.');
-    }
-  }
-
-  if (check.code === 0) {
-    addFinding(true, 'npm run check : toutes les commandes incluses ont réussi.');
-  } else if (!reachedSmoke) {
-    addFinding(false, 'npm run check a échoué avant la suite smoke. Consultez controle-complet.log.');
-  } else if (smokeFailures.some(name => !baseline.smoke.failures.includes(name))) {
-    addFinding(false, 'npm run check a échoué avec des tests smoke nouveaux.');
-  } else if (reachedBrowser) {
-    if (knownBrowserFailure(check.output) && !strict) {
-      addFinding(true, 'Playwright dans npm run check : seul le timeout B0 exact est encore présent.');
-    } else if (strict && knownBrowserFailure(check.output)) {
-      addFinding(false, 'Mode strict : le timeout Playwright de B0 subsiste.');
-    } else {
-      addFinding(false, 'Playwright dans npm run check présente un échec navigateur nouveau ou différent.');
-    }
-  } else if (smokeFailures.length && !strict) {
-    addFinding(true, 'npm run check s’arrête sur les échecs smoke de référence, après build/typecheck/frontend/lint.');
-  } else {
-    addFinding(false, 'npm run check a échoué sans échec de référence explicatif.');
-  }
+  const checkEvaluation = summarizeFailure('npm run check (build, typecheck, frontend, lint, smoke, navigateur)', check);
+  if (!reachedSmoke) addFinding(false, 'Le pipeline npm run check n’a pas atteint la suite smoke.');
+  if (reachedSmoke) baselineDiagnostics('Smoke', parseTapFailures(check.output), baseline.smoke.failures);
 
   if (!reachedBrowser) {
     const browser = await run(['run', 'test:browser'], 'controle-navigateur');
-    if (browser.code === 0) {
-      addFinding(true, 'Playwright indépendant : tests navigateur réussis.');
-    } else if (knownBrowserFailure(browser.output) && !strict) {
-      addFinding(true, 'Playwright indépendant : timeout strictement identique à la baseline B0, consigné.');
-    } else {
-      addFinding(false, 'Playwright indépendant : échec nouveau, différent ou interdit en mode strict.');
-    }
+    summarizeFailure('Playwright indépendant', browser);
+  } else if (!checkEvaluation.ok) {
+    summaries.push('INFO — Playwright a été appelé dans npm run check ; consulter controle-complet.log pour son diagnostic détaillé.');
   }
 
   const full = await run(['test'], 'regression-complete');
-  const fullFailures = parseFailures(full.output);
-  const newFullFailures = fullFailures.filter(name => !baseline.full.failures.includes(name));
-  if (newFullFailures.length) {
-    addFinding(false, 'Nouveaux échecs de régression complète : ' + newFullFailures.join(' | '));
-  } else if (strict && fullFailures.length) {
-    addFinding(false, 'Mode strict : ' + fullFailures.length + ' échec(s) de régression complète subsistent.');
-  } else {
-    const resolved = baseline.full.failures.filter(name => !fullFailures.includes(name));
-    addFinding(true, 'Régression complète : ' + fullFailures.length + ' échec(s) de référence, aucun nouveau ; résolus depuis B0 : ' + resolved.length + '.');
-  }
-  if (full.code !== 0 && (!fullFailures.length || newFullFailures.length || strict)) {
-    addFinding(false, 'npm test a terminé en erreur au-delà de la tolérance B0 (code ' + full.code + ').');
-  }
+  const fullEvaluation = summarizeFailure('npm test (suite backend complète)', full);
+  baselineDiagnostics('Suite complète', parseTapFailures(full.output), baseline.full.failures);
 
   const report = [
-    '# Résultat de validation Aurion',
-    'Référence : ' + baseline.reference.version + ' — ' + baseline.reference.commit,
-    'Run de référence : ' + baseline.reference.workflowRunUrl,
-    'Mode : ' + (strict ? 'STRICT' : 'BASELINE B0'),
+    '# Résultat de validation CI stricte Aurion',
+    'Référence historique (diagnostic uniquement) : ' + baseline.reference.version + ' — ' + baseline.reference.commit,
+    'Run historique : ' + baseline.reference.workflowRunUrl,
+    'Politique : zéro tolérance ; la baseline ne permet jamais de faire passer un échec.',
     '',
     ...summaries.map(item => '- ' + item),
     '',
-    'Échecs smoke observés : ' + smokeFailures.length,
-    ...smokeFailures.map(name => '  - ' + name),
+    'Échecs smoke observés : ' + (reachedSmoke ? parseTapFailures(check.output).length : 'suite non atteinte'),
     '',
-    'Échecs suite complète observés : ' + fullFailures.length,
-    ...fullFailures.map(name => '  - ' + name),
+    'Échecs suite complète observés : ' + parseTapFailures(full.output).length,
     '',
-    'Conclusion : ' + (findings.length ? 'ÉCHEC' : 'VALIDATION BASELINE B0'),
+    'Conclusion : ' + (findings.length ? 'ÉCHEC — CORRECTIONS REQUISES' : 'VALIDATION STRICTE'),
     ''
   ].join('\n');
   writeFileSync(path.join(artifactDir, 'validation-b0.txt'), report, 'utf8');
   console.log(report);
-  process.exitCode = findings.length ? 1 : 0;
+  process.exitCode = findings.length || !fullEvaluation.ok ? 1 : 0;
 }
 
 main().catch(error => {
