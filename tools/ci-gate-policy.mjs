@@ -4,7 +4,7 @@
  * jamais un échec courant en succès.
  */
 export function parseTapFailures(output = '') {
-  return [...String(output).matchAll(/^\\s*not ok \\d+ - (.+?)\\s*$/gm)]
+  return [...String(output).matchAll(/^\s*not ok \d+ - (.+?)\s*$/gm)]
     .map(match => match[1].trim());
 }
 
