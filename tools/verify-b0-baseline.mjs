@@ -49,19 +49,22 @@ function run(args, name) {
 function summarizeFailure(label, result) {
   const evaluation = evaluateCommand({ exitCode: result.code, output: result.output });
   if (evaluation.ok) {
-    addFinding(true, `${label} : code 0, aucun échec TAP.`);
+    addFinding(true, label + ' : code 0, aucun échec TAP.');
     return evaluation;
   }
   const detail = evaluation.failures.length
     ? evaluation.failures.join(' | ')
-    : (result.error || `code de sortie ${evaluation.exitCode} sans détail TAP`);
-  addFinding(false, `${label} : échec obligatoire — ${detail}. Journal : ${result.logPath}`);
+    : (result.error || 'code de sortie ' + evaluation.exitCode + ' sans détail TAP');
+  addFinding(false, label + ' : échec obligatoire — ' + detail + '. Journal : ' + result.logPath);
   return evaluation;
 }
 
 function baselineDiagnostics(label, observed, historical) {
   const comparison = compareWithBaseline(observed, historical);
-  summaries.push(`DIAGNOSTIC — ${label} : ${comparison.stillHistorical.length} échec(s) correspondant à l’ancienne baseline, ${comparison.newFailures.length} nouveau(x), ${comparison.resolvedHistorical.length} ancien(s) non reproduit(s). Cette comparaison n’accorde aucune tolérance.`);
+  summaries.push('DIAGNOSTIC — ' + label + ' : ' + comparison.stillHistorical.length +
+    ' échec(s) correspondant à l’ancienne baseline, ' + comparison.newFailures.length +
+    ' nouveau(x), ' + comparison.resolvedHistorical.length +
+    ' ancien(s) non reproduit(s). Cette comparaison n’accorde aucune tolérance.');
 }
 
 async function main() {
@@ -70,8 +73,8 @@ async function main() {
   console.log('Politique : tout code non nul, toute assertion TAP en échec et tout échec navigateur bloquent la validation.');
 
   const check = await run(['run', 'check'], 'controle-complet');
-  const reachedSmoke = /^> aurion@\\S+ test:smoke$/m.test(check.output);
-  const reachedBrowser = /^> aurion@\\S+ test:browser$/m.test(check.output);
+  const reachedSmoke = /^> aurion@\S+ test:smoke$/m.test(check.output);
+  const reachedBrowser = /^> aurion@\S+ test:browser$/m.test(check.output);
   const checkEvaluation = summarizeFailure('npm run check (build, typecheck, frontend, lint, smoke, navigateur)', check);
   if (!reachedSmoke) addFinding(false, 'Le pipeline npm run check n’a pas atteint la suite smoke.');
   if (reachedSmoke) baselineDiagnostics('Smoke', parseTapFailures(check.output), baseline.smoke.failures);
@@ -101,7 +104,7 @@ async function main() {
     '',
     'Conclusion : ' + (findings.length ? 'ÉCHEC — CORRECTIONS REQUISES' : 'VALIDATION STRICTE'),
     ''
-  ].join('\\n');
+  ].join('\n');
   writeFileSync(path.join(artifactDir, 'validation-b0.txt'), report, 'utf8');
   console.log(report);
   process.exitCode = findings.length || !fullEvaluation.ok ? 1 : 0;
