@@ -17,6 +17,21 @@ test('calendar feedback distinguishes agenda synchronization from client notific
   assert.match(core, /agenda n’a pas été mis à jour/);
 });
 
+test('la conversion d’un devis en facture rapporte le statut réel de l’e-mail', () => {
+  const docs = read('../../assets/js/pages/dash/docs.js');
+  assert.doesNotMatch(docs, /Facture \$\{r\.number\} créée et envoyée/);
+  assert.match(docs, /emailToast\(r\.emailStatus/);
+  const business = read('../src/routes/business.ts');
+  assert.match(business, /return \{number:converted\.number,emailStatus\}/);
+});
+
+test('l’envoi d’un document par e-mail annonce l’envoi, pas un simple enregistrement', () => {
+  const docs = read('../../assets/js/pages/dash/docs.js');
+  assert.match(docs, /done:'E-mail envoyé avec la pièce jointe\.'/);
+  const core = read('../../assets/js/pages/dash/core.js');
+  assert.match(core, /done='Enregistré'/);
+});
+
 test('agenda setup explains direct Google sync versus iCalendar email invitations', () => {
   const agenda = read('../../assets/js/pages/dash/other.js');
   const mailbox = read('../../assets/js/pages/mailbox.js');

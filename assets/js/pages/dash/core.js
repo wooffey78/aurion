@@ -9,7 +9,7 @@ export const active=()=>S.activities.find(a=>a.id===getActiveActivity())||S.acti
 export const prof=()=>S.profile||{};
 
 /** Fenêtre modale de formulaire. `submit(modal)` peut lever une erreur : elle s'affiche dans la fenêtre. */
-export function modalForm(title,fields,submit,{label='Enregistrer'}={}){
+export function modalForm(title,fields,submit,{label='Enregistrer',done='Enregistré'}={}){
   document.body.insertAdjacentHTML('beforeend',`<div class="modal-backdrop" id="generic-modal"><form class="modal glass" id="generic-form"><div class="section-title"><h2>${title}</h2><button type="button" class="icon-btn modal-close" aria-label="Fermer">×</button></div>${fields}<div class="button-row"><button type="button" class="btn secondary modal-close">Annuler</button><button class="btn primary" type="submit">${label}</button></div><div id="generic-error" class="error" hidden></div></form></div>`);
   const m=document.querySelector('#generic-modal');
   m.querySelectorAll('input[type=number]').forEach(x=>{if(String(x.value)==='0'){x.value='';x.placeholder='0'}});
@@ -22,7 +22,7 @@ export function modalForm(title,fields,submit,{label='Enregistrer'}={}){
     const submitButton=m.querySelector('button[type=submit]');
     const submitLabel=submitButton?.textContent||label;
     if(submitButton){submitButton.disabled=true;submitButton.textContent='Enregistrement…'}
-    try{await submit(m);m.remove();toast('Enregistré','success');await hooks.refresh();}
+    try{await submit(m);m.remove();toast(done,'success');await hooks.refresh();}
     catch(x){
       if(submitButton){submitButton.disabled=false;submitButton.textContent=submitLabel}
       submitting=false;
@@ -35,7 +35,7 @@ export function modalForm(title,fields,submit,{label='Enregistrer'}={}){
   return m;
 }
 
-/** Fenêtre de confirmation au design Aurion (remplace confirm() du navigateur). Renvoie une promesse : true / false. */
+/** Fenêtre de confirmation au design Aurion (remplace la confirmation native du navigateur). Renvoie une promesse : true / false. */
 export function askConfirm({title='Confirmer',message='',confirmLabel='Confirmer',cancelLabel='Annuler',danger=false}={}){
   return new Promise(resolve=>{
     const root=document.createElement('div');
@@ -48,6 +48,34 @@ export function askConfirm({title='Confirmer',message='',confirmLabel='Confirmer
     root.querySelector('[data-a="no"]').onclick=()=>done(false);root.querySelector('[data-a="yes"]').onclick=()=>done(true);
     document.body.append(root);
     root.querySelector(danger?'[data-a="no"]':'[data-a="yes"]').focus();
+  });
+}
+
+/** Dialogue de saisie au design Aurion (remplace la saisie native du navigateur). Renvoie {id: valeur} ou null si annulé. */
+export function askFields({title='Saisie',message='',fields=[],confirmLabel='Valider',cancelLabel='Annuler'}={}){
+  return new Promise(resolve=>{
+    const root=document.createElement('div');
+    root.className='modal-backdrop';
+    root.innerHTML=`<form class="modal glass" role="dialog" aria-modal="true" aria-labelledby="ask-fields-title"><div class="section-title"><h2 id="ask-fields-title">${e(title)}</h2></div>${message?`<p class="muted">${e(message)}</p>`:''}${fields.map(f=>`<label class="field" for="ask-field-${e(f.id)}"><span>${e(f.label)}</span><input id="ask-field-${e(f.id)}" name="${e(f.id)}" value="${e(f.value||'')}" ${f.required?'required':''} ${f.maxlength?`maxlength="${Number(f.maxlength)}"`:''} ${f.placeholder?`placeholder="${e(f.placeholder)}"`:''}></label>`).join('')}<p class="error" id="ask-fields-error" role="alert" hidden></p><div class="button-row"><button type="button" class="btn secondary" data-a="no">${e(cancelLabel)}</button><button type="submit" class="btn primary">${e(confirmLabel)}</button></div></form>`;
+    const form=root.querySelector('form');
+    const done=value=>{document.removeEventListener('keydown',onKey,true);root.remove();resolve(value)};
+    const onKey=ev=>{if(ev.key==='Escape'){ev.stopPropagation();done(null)}};
+    document.addEventListener('keydown',onKey,true);
+    root.addEventListener('click',ev=>{if(ev.target===root)done(null)});
+    root.querySelector('[data-a="no"]').onclick=()=>done(null);
+    form.onsubmit=ev=>{
+      ev.preventDefault();
+      const out={};
+      for(const f of fields){
+        const input=form.elements.namedItem(f.id);
+        const value=String(input?.value||'').trim();
+        if(f.required&&!value){const err=root.querySelector('#ask-fields-error');err.textContent=`${f.label} : valeur obligatoire.`;err.hidden=false;input?.focus();return}
+        out[f.id]=value;
+      }
+      done(out);
+    };
+    document.body.append(root);
+    form.querySelector('input')?.focus();
   });
 }
 
@@ -85,11 +113,13 @@ export async function downloadAuthed(path,filename){
 }
 
 export function emailToast(status,noun='Document'){
-  if(status==='sent')return toast(`${noun} enregistré et envoyé par e-mail.`,'success');
-  if(status==='mail_not_configured')return toast(`${noun} enregistré. Configurez votre messagerie (Paramètres) pour l’envoyer.`,'info');
-  if(status==='client_email_missing')return toast(`${noun} enregistré. Le client n’a pas d’adresse e-mail.`,'info');
-  if(String(status).startsWith('failed'))return toast(`${noun} enregistré, mais l’e-mail n’a pas pu être envoyé : ${String(status).slice(7)}`,'error');
-  toast(`${noun} enregistré.`,'success');
+  // Formulations neutres : le message reste grammatical quel que soit le nom transmis et n'annonce
+  // un envoi que lorsque le fournisseur l'a confirmé.
+  if(status==='sent')return toast(`${noun} : envoi par e-mail confirmé.`,'success');
+  if(status==='mail_not_configured')return toast(`${noun} : enregistré. Configurez votre messagerie (Paramètres) pour l’envoyer.`,'info');
+  if(status==='client_email_missing')return toast(`${noun} : enregistré. Le client n’a pas d’adresse e-mail.`,'info');
+  if(String(status).startsWith('failed'))return toast(`${noun} : enregistré, mais l’e-mail n’a pas pu être envoyé (${String(status).slice(7)}).`,'error');
+  toast(`${noun} : enregistré.`,'success');
 }
 export function calendarToast(c,verb){
   if(!c)return toast(`Rendez-vous ${verb}.`,'success');

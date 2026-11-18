@@ -3,7 +3,7 @@ import{api,getActiveActivity,setActiveActivity}from'../core/api.js';
 import{appLogo,toast}from'../core/ui.js';
 import{invalidateSession}from'../core/session.js';
 import{go,routeQuery}from'../core/router.js';
-import{S,e,hooks,active,prof,money}from'./dash/core.js';
+import{S,e,hooks,active,prof,money,askConfirm}from'./dash/core.js';
 import*as catalog from'./dash/catalog.js';
 import{suppliers}from'./dash/suppliers.js';
 import*as quote from'./dash/quote.js';
@@ -119,7 +119,7 @@ export async function refresh(id=S.view){
     try{const saved=await api.getDraft();if(saved?.draft&&typeof saved.draft==='object'&&!Array.isArray(saved.draft))savedDraft=saved.draft}catch{}
     if(S.startBlankQuote){
       S.startBlankQuote=false;
-      const replaceExisting=savedDraft&&window.confirm('Un brouillon de devis/facture est déjà synchronisé avec votre compte. Voulez-vous le remplacer par un nouveau document ? Choisissez « Annuler » pour reprendre le brouillon existant.');
+      const replaceExisting=Boolean(savedDraft)&&await askConfirm({title:'Remplacer le brouillon synchronisé ?',message:'Un brouillon de devis/facture est déjà synchronisé avec votre compte. Voulez-vous le remplacer par un nouveau document ?',confirmLabel:'Remplacer le brouillon',cancelLabel:'Reprendre le brouillon'});
       if(savedDraft&&!replaceExisting){S.quoteDraft=savedDraft;if(savedDraft.documentType==='invoice')S.documentType='invoice';else if(savedDraft.documentType==='quote')S.documentType='quote';}
       else{S.quoteDraft=null;if(savedDraft){try{await api.deleteDraft()}catch{}}}
     }else if(savedDraft){S.quoteDraft=savedDraft;if(savedDraft.documentType==='invoice')S.documentType='invoice';else if(savedDraft.documentType==='quote')S.documentType='quote';}

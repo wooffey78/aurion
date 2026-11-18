@@ -77,7 +77,8 @@ export function bind(){
       const rawInterval=m.querySelector('#convertReminderInterval').value.trim();const interval=rawInterval===''?0:Math.min(365,Math.max(0,Number(rawInterval)));
       const invoiceAddressSource=m.querySelector('#convertAddressSource').value;
       const r=await api.convertQuote(q.id,true,{dueAt,reminderIntervalDays:interval,invoiceAddressSource});
-      toast(`Facture ${r.number} créée et envoyée. Les calculs comptables restent en attente du règlement.`,'success');
+      // Le serveur renvoie le statut réel de l'envoi : ne jamais annoncer « envoyée » sans confirmation du fournisseur.
+      emailToast(r.emailStatus,`Facture ${r.number}`);
       await hooks.refresh('invoices');
     },{label:'Créer et envoyer'});
     m.querySelector('#convertDueAt').value=new Date(Date.now()+7*86400000).toISOString().slice(0,10);
@@ -125,6 +126,6 @@ export function bind(){
       async m=>{
         await api.sendDocumentEmail(q.document_type==='invoice'?'invoice':'quote',q.id,m.querySelector('#message').value);
 
-      },{label:'Envoyer'});
+      },{label:'Envoyer',done:'E-mail envoyé avec la pièce jointe.'});
   });
 }
