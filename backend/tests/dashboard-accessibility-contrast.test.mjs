@@ -14,7 +14,7 @@ function contrast(a,b) {
 test('dashboard navigation has a programmatic label and announces the current page', () => {
   const dashboard=read('../../assets/js/pages/dashboard.js');
   assert.match(dashboard, /nav class="nav" aria-label="Navigation principale"/);
-  assert.match(dashboard, /aria-current="\$\{k===id\?'page':'false'\}"/);
+  assert.match(dashboard, /aria-current="\$\{item\.id===id\?'page':'false'\}"/);
   assert.match(dashboard, /heading\.focus\(\{preventScroll:true\}\)/);
 });
 

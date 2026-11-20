@@ -10,7 +10,7 @@ let acc=null;
 let avatarObjectUrl='';
 const eur=c=>(c/100).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
 const fdate=d=>d?new Date(d).toLocaleDateString('fr-FR'):'—';
-const STATUS={admin:['Accès administrateur','ok'],vip:['Accès gratuit','ok'],trialing:['Essai gratuit','ok'],active:['Actif','ok'],past_due:['Paiement en retard','warn'],canceled:['Résilié','warn'],expired:['Essai terminé','warn']};
+const STATUS={admin:['Accès administrateur','ok'],vip:['Accès gratuit','ok'],trialing:['Essai gratuit','ok'],active:['Actif','ok'],no_billing:['Sans abonnement',''],past_due:['Paiement en retard','warn'],canceled:['Résilié','warn'],expired:['Essai terminé','warn']};
 
 export const view=()=>`<div class="page-head"><div><span class="eyebrow">MON COMPTE</span><h1>Compte & sécurité</h1><p>Vos informations personnelles, votre mot de passe et votre abonnement.</p></div></div><div id="account-body" class="account-grid"><p class="muted">Chargement…</p></div>`;
 
@@ -18,11 +18,22 @@ export async function bind(){
   const root=document.querySelector('#account-body');
   try{acc=await api.account()}catch(x){root.innerHTML=`<p class="error">${e(x.message)}</p>`;return}
   const u=acc.user,s=acc.subscription,[label,tone]=STATUS[s.status]||[s.status,''];
+  // Sans moyen de paiement configuré, aucun abonnement ne peut être souscrit : on n'affiche ni
+  // tarifs ni bouton « Souscrire » qui ne pourraient rien faire.
+  const canSubscribe=!!s.paymentEnabled;
+  const expiredAccess=`Votre accès est en lecture seule. Téléchargez vos données avant le ${fdate(s.dataReadOnlyUntil)}.`;
+  // Ne jamais promettre une souscription quand aucun moyen de paiement n'est configuré :
+  // les offres et le bouton sont alors masqués, et l'avis doit le dire explicitement.
+  const expiredNotice=canSubscribe
+    ?`${expiredAccess} Vous pouvez souscrire à tout moment.`
+    :`${expiredAccess} Aucun moyen de paiement n’est configuré sur cette installation : aucun abonnement ne peut être souscrit. Contactez l’éditeur si vous souhaitez rétablir votre accès.`;
   const subscriptionNotice=s.status==='admin'
     ?'<div class="notice"><b>Accès administrateur.</b> Votre espace bénéficie d’un accès complet sans abonnement ni période d’essai.</div>'
     :s.status==='vip'
     ?'<div class="notice"><b>Accès gratuit.</b> Votre espace bénéficie d’un accès complet sans abonnement ni période d’essai.</div>'
-    :`<div class="notice ${s.readOnly?'warn-notice':''}">${s.status==='expired'?`Votre accès est en lecture seule. Téléchargez vos données avant le ${fdate(s.dataReadOnlyUntil)}. Vous pouvez souscrire à tout moment.`:'Statut de votre abonnement.'}</div>`;
+    :s.status==='no_billing'
+    ?'<div class="notice"><b>Sans abonnement.</b> La facturation n’est pas configurée sur cette installation : votre accès est complet, sans paiement, sans essai et sans échéance.</div>'
+    :`<div class="notice ${s.readOnly?'warn-notice':''}">${s.status==='expired'?expiredNotice:'Statut de votre abonnement.'}</div>`;
   const avatarMarkup=u.avatarUrl?`<img class="account-avatar-image" id="avatar-preview" alt="Avatar du compte">`:`<div class="avatar-lg" id="avatar-preview">${e((u.fullName||u.email)[0].toUpperCase())}</div>`;
   root.innerHTML=`
    <section class="panel stack"><h2>Profil</h2>
@@ -45,9 +56,9 @@ export async function bind(){
    <section class="panel stack wide-panel"><div class="section-title"><h2>Abonnement</h2><span class="chip ${tone}">${e(label)}</span></div>
     ${s.status==='trialing'?`<div class="trial-card"><div class="trial-days"><b>${s.daysLeft}</b><span>jour${s.daysLeft>1?'s':''} d’essai restant${s.daysLeft>1?'s':''}</span></div><div class="trial-info"><p>Essai gratuit de 60 jours : <b>aucune carte bancaire requise</b> et <b>aucun prélèvement automatique</b> à la fin de l’essai.</p><small class="muted">Début : ${fdate(s.trialStartedAt)} · Fin : ${fdate(s.trialEndsAt)}</small>${s.daysLeft<=7?'<div class="button-row"><button class="btn primary" id="sub-alert">S’abonner</button><button class="btn secondary" id="sub-export-alert">Télécharger mes données</button></div>':''}</div></div>`:subscriptionNotice}
     ${s.cancelAtPeriodEnd?'<div class="notice warn-notice">Vous avez demandé à ne pas poursuivre après l’essai. <button class="link-btn" id="sub-resume">Annuler cette demande</button></div>':''}
-    <div class="plan-grid">${s.plans.map(p=>`<div class="plan-card"><span class="eyebrow">${p.billing_interval==='year'?'ANNUEL':'MENSUEL'}</span><b>${eur(Number(p.price_ttc_cents??p.price_ht_cents))} <small>TTC / ${p.billing_interval==='year'?'an':'mois'}</small></b><small class="muted">${p.billing_interval==='year'?'Tarif TTC annuel calculé selon la configuration fiscale.':'Tarif TTC mensuel calculé selon la configuration fiscale.'} Paiement ponctuel, sans renouvellement automatique.</small><div class="button-row"><button class="btn primary small sub-card" data-plan="${e(p.code)}">Souscrire</button></div></div>`).join('')}</div>
-    <div class="button-row"><button class="btn secondary" id="sub-info">Souscrire</button><button class="btn secondary" id="account-download">Télécharger mes données</button>${!s.cancelAtPeriodEnd&&['trialing','active'].includes(s.status)?'<button class="btn danger" id="sub-cancel">Ne pas poursuivre / résilier</button>':''}</div>
-    <p class="help">Paiement par carte via une page sécurisée du prestataire ou par virement bancaire. Chaque période est payée séparément : aucun prélèvement et aucun renouvellement automatique.</p>
+    ${canSubscribe?`<div class="plan-grid">${s.plans.map(p=>`<div class="plan-card"><span class="eyebrow">${p.billing_interval==='year'?'ANNUEL':'MENSUEL'}</span><b>${eur(Number(p.price_ttc_cents??p.price_ht_cents))} <small>TTC / ${p.billing_interval==='year'?'an':'mois'}</small></b><small class="muted">${p.billing_interval==='year'?'Tarif TTC annuel calculé selon la configuration fiscale.':'Tarif TTC mensuel calculé selon la configuration fiscale.'} Paiement ponctuel, sans renouvellement automatique.</small><div class="button-row"><button class="btn primary small sub-card" data-plan="${e(p.code)}">Souscrire</button></div></div>`).join('')}</div>`:'<div class="notice"><b>Aucun moyen de paiement configuré.</b> Aucun abonnement ne peut être souscrit depuis cette installation. Votre accès reste complet, sans paiement et sans échéance.</div>'}
+    <div class="button-row">${canSubscribe?'<button class="btn secondary" id="sub-info">Souscrire</button>':''}<button class="btn secondary" id="account-download">Télécharger mes données</button>${!s.cancelAtPeriodEnd&&['trialing','active'].includes(s.status)?'<button class="btn danger" id="sub-cancel">Ne pas poursuivre / résilier</button>':''}</div>
+    ${canSubscribe?'<p class="help">Paiement par carte via une page sécurisée du prestataire ou par virement bancaire. Chaque période est payée séparément : aucun prélèvement et aucun renouvellement automatique.</p>':''}
    </section>
    <section class="panel stack wide-panel" id="account-company"><div class="section-title"><h2>Mon entreprise</h2><button type="button" class="btn secondary small" data-go-settings>Modifier dans Paramètres</button></div><div class="storage-grid"><article><span>Dénomination</span><b>${e(S.company?.name||'—')}</b></article><article><span>SIRET / SIREN</span><b>${e(S.company?.siret||S.company?.siren||'—')}</b></article><article><span>Forme juridique</span><b>${e(S.company?.legal_form||'—')}</b></article><article><span>Adresse</span><b>${e([S.company?.address,[S.company?.postal_code,S.company?.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')||'—')}</b></article><article><span>Activité</span><b>${e(S.company?.custom_activity||S.company?.activity||'—')}</b></article><article><span>N° de TVA</span><b>${e(S.company?.configuration_data?.vat_number||'—')}</b></article></div><small class="help">Ces informations proviennent de la même fiche que Paramètres et le parcours d’accueil.</small></section>
    <section class="panel stack wide-panel" id="account-withdrawal"><div class="section-title"><h2>Rétractation</h2><span class="pill">Contrat Aurion</span></div>

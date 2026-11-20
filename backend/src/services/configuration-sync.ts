@@ -38,7 +38,7 @@ export async function applyConfigurationQuestionnaire(orgId: string, configurati
 }
 
 export async function syncPrimaryActivityFromOrganization(orgId: string, options: { forceIdentity?: boolean } = {}) {
-  const orgRow=(await query('select id,name,activity,custom_activity,legal_form,configuration_incomplete from organizations where id=$1',[orgId])).rows[0];
+  const orgRow=(await query("select id,name,activity,custom_activity,legal_form,configuration_incomplete,coalesce(configuration_data->>'naf_code','') as naf_code from organizations where id=$1",[orgId])).rows[0];
   if(!orgRow)return null;
   const activity=(await query(`select * from activities where organization_id=$1 and code='principale' order by created_at asc limit 1`,[orgId])).rows[0];
   if(!activity)return null;
@@ -56,11 +56,18 @@ export async function syncPrimaryActivityFromOrganization(orgId: string, options
   const identityChanged=clean(activity.name)!==clean(nextName)||clean(activity.description)!==clean(nextDescription||'')||clean(activity.legal_form)!==clean(nextLegalForm);
   if(nextLegalForm && (options.forceIdentity || !clean(activity.legal_form))){ sets.push(`legal_form=$${vals.length+1}`); vals.push(nextLegalForm); }
   const legalFormWasFilled=!clean(activity.legal_form)&&!!nextLegalForm;
-  const needsFiscalDetection=!!nextLegalForm && (!activity.configuration_defined || legalFormWasFilled || identityChanged);
+  // Réparation d'une activité créée avant la détection : aucun taux et aucune cotisation
+  // enregistrés alors que la configuration est marquée comme définie. On ne remplace jamais
+  // une valeur déclarée par l'utilisateur, on complète uniquement un champ resté vide.
+  const missingContributions=!activity.urssaf_rate && !(await query('select 1 from activity_contributions where activity_id=$1 limit 1',[activity.id])).rowCount;
+  // La forme juridique non renseignée ne bloque plus la détection : le régime micro est supposé
+  // (Aurion s'adresse aux micro-entrepreneurs) et signalé comme hypothèse à confirmer.
+  const effectiveLegalForm=nextLegalForm||'EI_MICRO';
+  const needsFiscalDetection=(!!nextLegalForm||missingContributions) && (!activity.configuration_defined || legalFormWasFilled || identityChanged || missingContributions);
   if(needsFiscalDetection){
-    const detected=detectFiscalSettings(nextLegalForm,p.code,nextName,nextDescription||'');
-    const autoSocial=!activity.configuration_defined||activity.social_auto_detected===true||legalFormWasFilled;
-    const autoVat=!activity.configuration_defined||activity.vat_auto_detected===true||legalFormWasFilled;
+    const detected=detectFiscalSettings(effectiveLegalForm,p.code,nextName,nextDescription||'',{nafCode:orgRow.naf_code||null});
+    const autoSocial=missingContributions||!activity.configuration_defined||activity.social_auto_detected===true||legalFormWasFilled;
+    const autoVat=missingContributions||!activity.configuration_defined||activity.vat_auto_detected===true||legalFormWasFilled;
     if(autoSocial){sets.push(`urssaf_rate=$${vals.length+1}`,`social_regime=$${vals.length+2}`,`social_auto_detected=true`);vals.push(detected.socialRate,detected.socialRegime)}
     if(autoVat){sets.push(`vat_rate=coalesce($${vals.length+1},vat_rate)`,`vat_regime=$${vals.length+2}`,`vat_auto_detected=true`);vals.push(detected.vatRate,detected.vatRegime)}
     if(autoSocial||autoVat)await saveContributionPresets(orgId, activity.id, detected.contributions);

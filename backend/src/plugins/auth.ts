@@ -63,7 +63,9 @@ export default fp(async app=>{
       const admin=((await query(`select 1 from platform_admins pa join organization_members om on om.user_id=pa.user_id where om.organization_id=$1 limit 1`,[request.auth!.organizationId])).rowCount??0)>0;
       if(!vip&&!admin){
         const s=(await query('select status,trial_ends_at,current_period_end from subscriptions where organization_id=$1',[request.auth!.organizationId])).rows[0];
-        const expired=s&&(s.status==='expired'||(s.status==='trialing'&&new Date(s.trial_ends_at).getTime()<Date.now())||(s.status==='active'&&s.current_period_end&&new Date(s.current_period_end).getTime()<Date.now()));
+        // trial_ends_at peut être nul : abonnement sans essai commercial (migration 091).
+        const trialEnded=!!s?.trial_ends_at&&new Date(s.trial_ends_at).getTime()<Date.now();
+        const expired=s&&(s.status==='expired'||(s.status==='trialing'&&trialEnded)||(s.status==='active'&&s.current_period_end&&new Date(s.current_period_end).getTime()<Date.now()));
         const retentionEnded=!!(s?.data_read_only_until && new Date(s.data_read_only_until).getTime()<Date.now());
         const supportAllowed=path==='/support/tickets' && method==='POST';
         const billingAllowed=path.startsWith('/billing/') || path==='/auth/logout';

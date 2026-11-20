@@ -190,6 +190,98 @@ const DEFS: Record<string, Def> = {
     doc: ['Type de prestation', 'Frais événement', 'DEVIS ÉVÉNEMENTIEL', 'FACTURE ÉVÉNEMENTIEL'],
     calc: { items: true, title: 'Frais événement', placeholder: 'Ex. Location sono', shipping: 'Déplacement (HT)', hint: 'Les frais externes restent au coût d’achat : le client voit la prestation et la quantité.' },
   },
+  // Profils étendus 15.4.36 : dix métiers supplémentaires, chacun avec son catalogue complet,
+  // ses pièces, ses garanties et son vocabulaire documentaire.
+  'home-care': {
+    title: 'Aide à la personne / services à domicile', summary: 'Accompagnement, aide aux courses, portage de repas et présence de nuit.', item: 'Fournitures & repas', service: 'Prestations', device: 'Bénéficiaires', quote: 'Devis aide à domicile',
+    modules: ['Clients', 'Bénéficiaires', 'Prestations', 'Agenda', 'Documents'],
+    services: [['Aide aux courses et au quotidien', 60], ['Accompagnement aux rendez-vous', 60], ['Aide à la toilette (non médicalisée)', 45], ['Préparation de repas à domicile', 60], ['Portage de repas (par repas)', 15], ['Présence de nuit', 480], ['Sortie accompagnée', 90], ['Aide administrative (démarches)', 60], ['Garde d’animaux à domicile', 30]],
+    parts: ['Produits d’hygiène', 'Denrées pour repas', 'Fournitures ménagères', 'Frais de déplacement'],
+    warranty: ['Prestation déclarée services à la personne (avantage fiscal selon conditions)'],
+    doc: ['Type d’aide', 'Fournitures fournies', 'DEVIS AIDE À DOMICILE', 'FACTURE AIDE À DOMICILE'],
+    calc: { items: true, title: 'Fournitures et repas', placeholder: 'Ex. Portage de 5 repas', shipping: 'Déplacement (HT)', hint: 'Les fournitures restent au coût d’achat interne : le client voit la prestation et la quantité.' },
+  },
+  wellness: {
+    title: 'Bien-être / naturopathie / sophrologie', summary: 'Séances individuelles, bilans, ateliers collectifs et accompagnement.', item: 'Produits & supports', service: 'Séances', device: 'Fiches de suivi', quote: 'Devis séance bien-être',
+    modules: ['Clients', 'Prestations', 'Produits', 'Agenda', 'Fiches de suivi'],
+    services: [['Séance de naturopathie', 60], ['Bilan de vitalité', 90], ['Séance de sophrologie', 60], ['Réflexologie plantaire', 60], ['Massage bien-être', 60], ['Atelier collectif (par participant)', 30], ['Programme d’accompagnement (mois)', 120], ['Consultation en visioconférence', 45]],
+    parts: ['Huiles essentielles', 'Produits de soin', 'Supports pédagogiques', 'Location de salle'],
+    warranty: ['Reprise offerte sous 7 jours'],
+    doc: ['Type de séance', 'Produits fournis', 'DEVIS BIEN-ÊTRE', 'FACTURE BIEN-ÊTRE'],
+    calc: { items: true, title: 'Produits et supports (facultatif)', placeholder: 'Ex. Flacon d’huile essentielle', shipping: 'Déplacement (HT)', hint: 'Ne saisissez que les produits et frais externes : votre temps de séance constitue la prestation.' },
+  },
+  agriculture: {
+    title: 'Agriculture / maraîchage / vente à la ferme', summary: 'Paniers de saison, vente directe, plants et prestations agricoles.', item: 'Intrants & semences', service: 'Productions', device: 'Parcelles', quote: 'Devis agricole',
+    modules: ['Clients', 'Parcelles', 'Catalogue', 'Fournisseurs', 'Agenda'],
+    services: [['Panier de légumes (par panier)', 45], ['Vente à la ferme (forfait)', 60], ['Plants et semis (lot)', 30], ['Prestation de débroussaillage', 180], ['Tonte / entretien de parcelle', 120], ['Visite pédagogique de la ferme', 90], ['Prestation de récolte (journée)', 420], ['Livraison de paniers (tournée)', 60]],
+    parts: ['Semences', 'Plants', 'Terreau / compost', 'Emballages paniers', 'Carburant / matériel'],
+    warranty: ['Produits frais : conformité et traçabilité'],
+    doc: ['Type de production', 'Intrants et fournitures', 'DEVIS AGRICOLE', 'FACTURE AGRICOLE'],
+    calc: { items: true, title: 'Intrants et fournitures', placeholder: 'Ex. Lot de 50 plants', shipping: 'Livraison (HT)', hint: 'Les intrants restent au coût d’achat interne : le client voit la production et la quantité.' },
+  },
+  hospitality: {
+    title: 'Hébergement touristique / chambres d’hôtes / location meublée', summary: 'Nuitées, petits-déjeuners, séjours et entretien du logement.', item: 'Fournitures & accueil', service: 'Séjours', device: 'Logements', quote: 'Devis séjour',
+    modules: ['Clients', 'Logements', 'Séjours', 'Agenda', 'Documents'],
+    services: [['Nuitée (par personne)', 60], ['Nuitée (forfait logement)', 60], ['Petit-déjeuner (par personne)', 20], ['Table d’hôtes (par personne)', 45], ['Ménage de fin de séjour', 90], ['Linge de maison (forfait)', 30], ['Arrivée tardive / accueil personnalisé', 30], ['Séjour semaine (forfait)', 480]],
+    parts: ['Linge de lit', 'Produits d’accueil', 'Denrées petit-déjeuner', 'Produits d’entretien'],
+    warranty: ['Annulation selon conditions du séjour'],
+    doc: ['Type de séjour', 'Fournitures et accueil', 'DEVIS SÉJOUR', 'FACTURE SÉJOUR'],
+    calc: { items: true, title: 'Fournitures d’accueil', placeholder: 'Ex. Linge de lit supplémentaire', shipping: 'Frais annexes (HT)', hint: 'Les fournitures restent internes : le client voit le séjour et la quantité.' },
+  },
+  'real-estate': {
+    title: 'Immobilier / mandataire / gestion locative', summary: 'Estimation, mandats, visites, gestion locative et états des lieux.', item: 'Frais & diagnostics', service: 'Mandats', device: 'Biens', quote: 'Devis immobilier',
+    modules: ['Clients', 'Biens', 'Mandats', 'Agenda', 'Documents'],
+    services: [['Estimation d’un bien', 90], ['Mandat de vente (forfait)', 120], ['Visite accompagnée', 60], ['Gestion locative (mois)', 60], ['État des lieux d’entrée', 90], ['État des lieux de sortie', 90], ['Rédaction de bail', 120], ['Reportage photo du bien', 60], ['Recherche de locataire', 180]],
+    parts: ['Frais de diagnostics', 'Publicité / annonces', 'Frais de déplacement', 'Fournitures de signature'],
+    warranty: ['Mandat régi par la loi Hoguet (carte professionnelle requise le cas échéant)'],
+    doc: ['Type de mission', 'Frais et débours', 'DEVIS IMMOBILIER', 'FACTURE IMMOBILIER'],
+    calc: { items: true, title: 'Frais et débours', placeholder: 'Ex. Diagnostics obligatoires', shipping: 'Déplacement (HT)', hint: 'Les frais restent au coût réel : le client voit le débours et la quantité.' },
+  },
+  security: {
+    title: 'Sécurité / gardiennage / télésurveillance', summary: 'Gardiennage, rondes, contrôle d’accès et surveillance d’événements.', item: 'Matériel de sécurité', service: 'Prestations', device: 'Sites surveillés', quote: 'Devis sécurité',
+    modules: ['Clients', 'Sites', 'Prestations', 'Agenda', 'Documents'],
+    services: [['Gardiennage d’événement (par agent / heure)', 60], ['Ronde de surveillance', 60], ['Contrôle d’accès', 60], ['Surveillance de chantier (nuit)', 480], ['Installation de caméra', 180], ['Maintenance du système d’alarme', 90], ['Intervention après alarme', 60], ['Audit de sûreté', 180]],
+    parts: ['Caméra', 'Central d’alarme', 'Détecteur', 'Badges / contrôle d’accès', 'Câblage'],
+    warranty: ['Garantie 1 an sur le matériel installé'],
+    doc: ['Type de prestation', 'Matériel installé', 'DEVIS SÉCURITÉ', 'FACTURE SÉCURITÉ'],
+    calc: { items: true, title: 'Matériel de sécurité', placeholder: 'Ex. Caméra extérieure', shipping: 'Transport du matériel (HT)', hint: 'Le matériel reste au coût d’achat interne : le client voit le matériel et la quantité.' },
+  },
+  'music-audio': {
+    title: 'Musique / son / studio', summary: 'Prestations live, enregistrement, mixage, mastering et sonorisation.', item: 'Matériel & licences', service: 'Prestations', device: 'Projets', quote: 'Devis musique',
+    modules: ['Clients', 'Projets', 'Prestations', 'Agenda', 'Documents'],
+    services: [['Prestation live (par heure)', 120], ['Enregistrement studio (par heure)', 60], ['Mixage d’un titre', 180], ['Mastering d’un titre', 90], ['Sonorisation d’événement', 240], ['Composition / arrangement', 240], ['Cours de musique (heure)', 45], ['Podcast (enregistrement + montage)', 120]],
+    parts: ['Location de matériel', 'Licences musicales', 'Consommables studio', 'Frais de déplacement'],
+    warranty: ['Cession de droits précisée au devis'],
+    doc: ['Type de prestation', 'Matériel et licences', 'DEVIS MUSIQUE', 'FACTURE MUSIQUE'],
+    calc: { items: true, title: 'Matériel et licences', placeholder: 'Ex. Location de sono', shipping: 'Transport du matériel (HT)', hint: 'Les frais techniques restent internes : le client voit le matériel et la quantité.' },
+  },
+  writing: {
+    title: 'Rédaction / traduction / copywriting', summary: 'Articles, traductions, relecture, contenus web et transcription.', item: 'Frais & outils', service: 'Prestations', device: 'Projets', quote: 'Devis rédaction',
+    modules: ['Clients', 'Projets', 'Prestations', 'Agenda', 'Documents'],
+    services: [['Article de blog (par article)', 120], ['Fiche produit (par fiche)', 45], ['Traduction (par page)', 90], ['Relecture / correction', 60], ['Newsletter', 90], ['Copywriting page de vente', 180], ['Transcription audio (par heure)', 60], ['Dossier de presse', 240]],
+    parts: ['Licence de correcteur', 'Banque d’images', 'Frais de déplacement', 'Outils / abonnements'],
+    warranty: ['Deux séries de corrections incluses'],
+    doc: ['Type de prestation', 'Frais et outils', 'DEVIS RÉDACTION', 'FACTURE RÉDACTION'],
+    calc: { items: false, title: '', placeholder: '', shipping: 'Frais annexes (HT)', hint: 'Votre temps de rédaction constitue la prestation : aucun coût interne à saisir.' },
+  },
+  childcare: {
+    title: 'Garde d’enfants / assistante maternelle', summary: 'Garde à domicile, périscolaire, sorties d’école et aide aux devoirs.', item: 'Jeux & fournitures', service: 'Prestations', device: 'Enfants', quote: 'Devis garde d’enfants',
+    modules: ['Clients', 'Enfants', 'Prestations', 'Agenda', 'Documents'],
+    services: [['Garde à domicile (heure)', 60], ['Garde périscolaire (heure)', 60], ['Sortie d’école', 30], ['Journée complète de garde', 480], ['Garde de nuit', 480], ['Aide aux devoirs', 60], ['Atelier créatif (par enfant)', 30], ['Garde pendant les vacances (jour)', 480]],
+    parts: ['Jeux et activités', 'Fournitures créatives', 'Repas et goûters', 'Frais de déplacement'],
+    warranty: ['Agrément / déclaration à vérifier selon le mode de garde'],
+    doc: ['Type de garde', 'Fournitures fournies', 'DEVIS GARDE D’ENFANTS', 'FACTURE GARDE D’ENFANTS'],
+    calc: { items: true, title: 'Fournitures et activités (facultatif)', placeholder: 'Ex. Kit d’activités créatives', shipping: 'Déplacement (HT)', hint: 'Les fournitures restent au coût d’achat interne : le client voit la prestation et la quantité.' },
+  },
+  retail: {
+    title: 'Commerce de détail / boutique', summary: 'Vente d’articles, click & collect, emballage et livraison locale.', item: 'Articles en stock', service: 'Ventes', device: 'Commandes', quote: 'Devis commercial',
+    modules: ['Clients', 'Catalogue', 'Commandes', 'Fournisseurs', 'Documents'],
+    services: [['Vente d’un article', 15], ['Click & collect (préparation)', 15], ['Emballage cadeau', 10], ['Livraison locale', 60], ['Commande sur mesure', 120], ['Retrait en boutique', 10], ['Gravure / personnalisation', 30]],
+    parts: ['Article en stock', 'Emballage', 'Étiquettes / présentoir', 'Frais de port'],
+    warranty: ['Garantie légale de conformité 2 ans'],
+    doc: ['Désignation', 'Articles', 'DEVIS COMMERCIAL', 'FACTURE COMMERCIAL'],
+    calc: { items: true, title: 'Articles et fournitures', placeholder: 'Ex. Article en stock', shipping: 'Frais de port (HT)', hint: 'Le prix d’achat reste interne : le client voit l’article et la quantité.' },
+  },
   'generic-services': {
     title: 'Services professionnels', summary: 'Catalogue libre : prestations et articles personnalisables.', item: 'Articles / ressources', service: 'Prestations', device: 'Dossiers', quote: 'Devis',
     modules: ['Clients', 'Catalogue', 'Prestations', 'Agenda', 'Documents'],
@@ -197,7 +289,109 @@ const DEFS: Record<string, Def> = {
     parts: [], warranty: ['Garantie 3 mois', 'Garantie 12 mois'],
     doc: ['Prestation', 'Articles', 'DEVIS', 'FACTURE'],
     calc: { items: true, title: 'Articles / fournitures', placeholder: 'Ex. Fourniture', shipping: 'Frais annexes (HT)', hint: 'Les coûts d’achat restent internes : le client voit l’article et la quantité.' },
-  },
+    },
+};
+
+// Enrichissement du catalogue de TOUS les profils (15.4.36) : prestations et pièces
+// supplémentaires pertinentes, ajoutées sans réécrire l'historique.
+const EXTRA_SERVICES: Record<string, [string, number][]> = {
+  'smartphone-repair': [['Remplacement dos en verre', 45], ['Nettoyage connecteur', 20], ['Remplacement bouton power', 35], ['Diagnostic express (15 min)', 15]],
+  'computer-repair': [['Montage PC sur mesure', 120], ['Clonage de disque', 60], ['Récupération après panne', 120], ['Installation imprimante / scanner', 30], ['Audit de sécurité', 90]],
+  plumbing: [['Détartrage chauffe-eau', 90], ['Pose de mitigeur thermostatique', 90], ['Recherche de fuite par caméra', 120], ['Entretien sanitaire annuel', 90]],
+  electrical: [['Remplacement de prise', 30], ['Diagnostic de tableau', 45], ['Installation de thermostat connecté', 60], ['Certification Consuel (accompagnement)', 120]],
+  auto: [['Contrôle technique (préparation)', 45], ['Recharge de clim', 60], ['Géométrie / parallélisme', 90], ['Remplacement amortisseurs', 240], ['Diagnostic de fuite', 60]],
+  'web-development': [['Audit d’accessibilité', 180], ['Migration d’hébergement', 120], ['Intégration de paiement', 240], ['Formation client (2 h)', 120], ['TMA mensuelle', 300]],
+  creative: [['Motion design', 360], ['Direction artistique', 240], ['Shooting produit (10 visuels)', 300], ['Déclinaison réseaux sociaux', 120]],
+  beauty: [['Soin barbe', 30], ['Extensions de cils', 90], ['Soin des pieds', 45], ['Forfait mariée (essai + jour J)', 300], ['Diagnostic capillaire', 30]],
+  cleaning: [['Nettoyage de moquette', 120], ['Remise en état après déménagement', 300], ['Entretien de copropriété (mois)', 240], ['Nettoyage de terrasse', 120], ['Désinfection', 120]],
+  consulting: [['Diagnostic stratégique', 240], ['Atelier d’intelligence collective', 420], ['Mentorat (mois)', 180], ['Étude de marché', 480], ['Codéveloppement (séance)', 180]],
+  building: [['Pose de plinthe', 90], ['Réfection de salle de bain', 960], ['Pose de terrasse bois', 720], ['Enduit décoratif', 480], ['Petite démolition', 240]],
+  catering: [['Petit-déjeuner d’entreprise (par personne)', 15], ['Cocktail dînatoire (par personne)', 35], ['Bûche / entremet sur commande', 120], ['Atelier cupcake (par personne)', 45], ['Livraison de commande', 45]],
+  couture: [['Ourlet de pantalon (machine)', 20], ['Reprise de doublure', 45], ['Coussin sur mesure', 60], ['Nappes et linge de maison', 90], ['Retouche de robe', 60]],
+  transport: [['Course simple (forfait)', 30], ['Transport de palettes', 180], ['Déménagement (forfait 2 personnes)', 480], ['Livraison de meubles', 90], ['Mise à disposition (demi-journée)', 240]],
+  pets: [['Bain + séchage', 45], ['Épilation / tonte', 60], ['Promenade de groupe', 60], ['Garde de week-end (2 jours)', 120], ['Bilan comportemental', 90]],
+  lessons: [['Cours de groupe (par personne)', 30], ['Stage vacances (5 séances)', 300], ['Préparation brevet / bac', 120], ['Cours adulte (heure)', 60], ['Bilan de niveau', 45]],
+  sport: [['Séance duo', 90], ['Programme 4 semaines', 240], ['Bilan nutritionnel', 60], ['Cours collectif (par personne)', 30], ['Préparation compétition', 300]],
+  handcraft: [['Réparation de bijou', 45], ['Personnalisation (gravure)', 30], ['Lot de 10 pièces', 300], ['Atelier enfant', 60], ['Emballage soigné', 15]],
+  events: [['Décoration de salle', 240], ['Location de mobilier', 120], ['Traiteur / coordination', 240], ['Animation musicale', 180], ['Photobooth', 180]],
+  'home-care': [['Aide à la déclaration administrative', 60], ['Accompagnement sortie culturelle', 120], ['Préparation de menus', 45], ['Veille de nuit (forfait)', 540]],
+  wellness: [['Séance duo', 90], ['Bilan personnalisé', 90], ['Atelier bien-être en entreprise', 240], ['Suivi mensuel', 60]],
+  agriculture: [['Abonnement panier (mois)', 60], ['Marché / stand (journée)', 300], ['Prestation de fauchage', 180], ['Accueil à la ferme (groupe)', 120]],
+  hospitality: [['Séjour week-end (2 nuits)', 120], ['Dîner d’hôtes (par personne)', 45], ['Location de vélo', 30], ['Ménage en cours de séjour', 60]],
+  'real-estate': [['Visite virtuelle', 120], ['Dossier de vente complet', 240], ['Suivi de travaux', 180], ['Recherche de bien (mois)', 240]],
+  security: [['Agent cynophile (heure)', 90], ['Mise en service d’alarme', 120], ['Contrôle d’accès (installation)', 240], ['Astreinte mensuelle', 120]],
+  'music-audio': [['Arrangement musical', 180], ['Voix off / doublage', 90], ['Location de studio (demi-journée)', 120], ['Réparation d’instrument', 90]],
+  writing: [['Livre blanc', 480], ['Script vidéo', 120], ['Traduction technique (page)', 120], ['Optimisation SEO d’un article', 90]],
+  childcare: [['Garde partagée (2 familles)', 60], ['Accompagnement activités', 90], ['Garde d’urgence (heure)', 90], ['Forfait semaine complète', 480]],
+  retail: [['Commande spéciale (acompte)', 30], ['Livraison à domicile', 60], ['Cadeau emballé', 15], ['Retour / échange', 15]],
+  'generic-services': []
+};
+
+const EXTRA_PARTS: Record<string, string[]> = {
+  'smartphone-repair': ['Bouton power', 'Nappe de chargement', 'Grille de haut-parleur'],
+  'computer-repair': ['Pâte thermique', 'Ventilateur', 'Carte réseau', 'Clé USB de restauration'],
+  plumbing: ['Mitigeur thermostatique', 'Flexible inox', 'Réducteur de pression'],
+  electrical: ['Thermostat connecté', 'Parafoudre', 'Boîte d’encastrement'],
+  auto: ['Amortisseur', 'Filtre habitacle', 'Liquide de frein', 'Bougie de préchauffage'],
+  'web-development': ['Nom de domaine (renouvellement)', 'Certificat SSL', 'Service d’e-mail transactionnel'],
+  creative: ['Banque vidéo', 'Police de caractères', 'Location studio photo'],
+  beauty: ['Extension de cils', 'Produit barbe', 'Cire chaude'],
+  cleaning: ['Moquette / injecteur-extracteur', 'Désinfectant', 'Sacs de déchets verts'],
+  consulting: ['Licence d’outil collaborative', 'Location de salle', 'Supports imprimés'],
+  building: ['Plinthe', 'Terreau / gravier', 'Lame de terrasse'],
+  catering: ['Vaisselle jetable', 'Nappage', 'Boîte à gâteau'],
+  couture: ['Biais', 'Doublure', 'Bouton pression'],
+  transport: ['Sangles', 'Couverture de protection', 'Location de diable'],
+  pets: ['Croquettes', 'Shampoing hypoallergénique', 'Jouet'],
+  lessons: ['Manuel scolaire', 'Cahier d’exercices', 'Abonnement plateforme'],
+  sport: ['Bande de résistance', 'Tapis de yoga', 'Haltères'],
+  handcraft: ['Perles', 'Fil de laiton', 'Vernis de finition'],
+  events: ['Guirlande lumineuse', 'Nappage', 'Location de tonnelle'],
+  'home-care': ['Produits d’hygiène', 'Barres d’appui', 'Denrées repas'],
+  wellness: ['Huile de massage', 'Diffuseur', 'Tisane'],
+  agriculture: ['Graines', 'Paillage', 'Cagette'],
+  hospitality: ['Draps', 'Serviettes', 'Café / thé'],
+  'real-estate': ['Panneau à vendre', 'Kit de signature', 'Pub annonce'],
+  security: ['Caméra IP', 'Détecteur de mouvement', 'Badge'],
+  'music-audio': ['Câble XLR', 'Médiator', 'Licence de sample'],
+  writing: ['Abonnement correcteur', 'Photo d’illustration', 'Licence de police'],
+  childcare: ['Couches', 'Goûter', 'Kit créatif'],
+  retail: ['Article en stock', 'Papier cadeau', 'Étiquette'],
+  'generic-services': []
+};
+
+// Vocabulaire complémentaire de détection : utilisé quand les règles historiques ne
+// reconnaissent aucun métier précis (aucune régression sur les détections existantes).
+const EXTRA_KEYWORDS: Record<string, string[]> = {
+  'smartphone-repair': ['réparation téléphone', 'réparation tablette', 'écran cassé', 'vitre arrière'],
+  'computer-repair': ['réparation ordinateur', 'dépannage mac', 'sauvegarde de données', 'montage pc'],
+  plumbing: ['salle de bains', 'chauffe-eau', 'fuite d’eau', 'robinetterie', 'sanitaire'],
+  electrical: ['tableau électrique', 'mise aux normes', 'photovoltaïque', 'borne de recharge'],
+  auto: ['contrôle technique', 'carrosserie', 'pneumatique', 'mécanique auto'],
+  'web-development': ['site vitrine', 'application web', 'développeur freelance', 'e-commerce'],
+  creative: ['identité visuelle', 'montage vidéo', 'community management', 'shooting photo'],
+  beauty: ['coiffure', 'onglerie', 'soin du visage', 'barbier', 'épilation'],
+  cleaning: ['entretien de locaux', 'nettoyage vitres', 'jardinage', 'espaces verts'],
+  consulting: ['coaching professionnel', 'formation professionnelle', 'audit organisationnel'],
+  building: ['rénovation', 'maçonnerie', 'plâtrerie', 'menuiserie', 'peinture bâtiment'],
+  catering: ['traiteur', 'pâtisserie', 'food truck', 'buffet', 'cake design'],
+  couture: ['retoucherie', 'confection', 'ourlet', 'robe sur mesure'],
+  transport: ['livraison', 'déménagement', 'vtc', 'chauffeur privé', 'coursier'],
+  pets: ['toilettage', 'promenade de chien', 'pension canine', 'éducation canine'],
+  lessons: ['soutien scolaire', 'cours particuliers', 'professeur', 'tutorat'],
+  sport: ['coach sportif', 'personal trainer', 'yoga', 'pilates', 'fitness'],
+  handcraft: ['artisan créateur', 'bijoux faits main', 'céramique', 'poterie', 'bougies'],
+  events: ['wedding planner', 'organisation de mariage', 'animation', 'soirée événementielle'],
+  'home-care': ['aide à domicile', 'aide à la personne', 'auxiliaire de vie', 'portage de repas', 'services à la personne'],
+  wellness: ['naturopathe', 'sophrologue', 'réflexologue', 'bien-être', 'massage relaxant'],
+  agriculture: ['maraîcher', 'agriculture biologique', 'producteur local', 'vente à la ferme', 'permaculture'],
+  hospitality: ['chambres d’hôtes', 'gîte', 'location meublée', 'airbnb', 'séjour touristique'],
+  'real-estate': ['agent immobilier', 'mandataire immobilier', 'gestion locative', 'estimation immobilière'],
+  security: ['gardiennage', 'télésurveillance', 'agent de sécurité', 'contrôle d’accès'],
+  'music-audio': ['musicien', 'studio d’enregistrement', 'mixage', 'sonorisation', 'ingénieur du son'],
+  writing: ['rédacteur web', 'traducteur', 'copywriter', 'relecture', 'rédaction'],
+  childcare: ['garde d’enfants', 'assistante maternelle', 'nounou', 'périscolaire', 'aide aux devoirs'],
+  retail: ['boutique', 'commerce de détail', 'épicerie', 'primeur', 'vente en ligne'],
 };
 
 const RULES: [string, RegExp][] = [
@@ -226,14 +420,27 @@ const RULES: [string, RegExp][] = [
 export const PROFILE_CODES = Object.keys(DEFS);
 export function listProfiles() { return PROFILE_CODES.map(c => ({ code: c, title: DEFS[c]!.title, summary: DEFS[c]!.summary })); }
 
+/** Métier reconnu par le vocabulaire complémentaire (score de mots-clés), ou null. */
+function keywordProfile(text: string) {
+  let best: string | null = null, bestScore = 0;
+  for (const [code, words] of Object.entries(EXTRA_KEYWORDS)) {
+    const score = words.reduce((total, word) => total + (text.includes(word) ? 1 : 0), 0);
+    if (score > bestScore) { best = code; bestScore = score; }
+  }
+  return best;
+}
+
 export function profileFor(name: string, description: string = '', override?: string | null): Profile {
   const s = (name + ' ' + description).toLowerCase();
-  let code = override && DEFS[override] ? override : (RULES.find(([, re]) => re.test(s))?.[0] || 'generic-services');
+  let code = override && DEFS[override] ? override : (RULES.find(([, re]) => re.test(s))?.[0] || keywordProfile(s) || 'generic-services');
   const d = DEFS[code]!;
+  const servicesExtra: [string, number][] = EXTRA_SERVICES[code] || [];
+  const services: [string, number][] = [...d.services, ...servicesExtra];
+  const parts: string[] = [...new Set([...d.parts, ...(EXTRA_PARTS[code] || [])])];
   return {
     code, title: code === 'generic-services' && name ? name : d.title, summary: d.summary,
     clientLabel: 'Clients', itemLabel: d.item, serviceLabel: d.service, deviceLabel: d.device, quoteLabel: d.quote, modules: d.modules,
-    suggestedParts: d.parts, suggestedServices: d.services.map(x => x[0]), serviceMinutes: Object.fromEntries(d.services), warranty: d.warranty,
+    suggestedParts: parts, suggestedServices: services.map(x => x[0]), serviceMinutes: Object.fromEntries(services), warranty: d.warranty,
     doc: { interventionLabel: d.doc[0], itemsLabel: d.doc[1], quantityLabel: d.doc[4] || 'Qté', quoteTitle: d.doc[2], invoiceTitle: d.doc[3] },
     calc: { items: d.calc.items, itemsTitle: d.calc.title, itemPlaceholder: d.calc.placeholder, shipping: d.calc.shipping !== false, shippingLabel: d.calc.shipping || '', hint: d.calc.hint },
   };

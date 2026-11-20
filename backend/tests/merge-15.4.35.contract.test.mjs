@@ -128,13 +128,19 @@ test('suggestions : mots-clés élargis + indices NAF → métier, jamais impos�
 });
 
 test('détection automatique : la TVA dérivée du SIREN remplit le champ vide', () => {
-  assert.match(registryFillJs, /vat_number: detected\.vatNumber \?\? detected\.vat_number/);
+  assert.match(registryFillJs, /export function frenchVatFromSiren\(/);
+  assert.match(registryFillJs, /const detectedVat\s*=\s*clean\(detected\.vatNumber \?\? detected\.vat_number\)\s*\|\|\s*frenchVatFromSiren\(/);
+  assert.match(registryFillJs, /vat_number: detectedVat/);
 });
 
 test('cotisations : détection par catégorie micro avec micro-social + CFP pour tout profil', () => {
   assert.match(fiscalTs, /PROFILE_MICRO_CATEGORY/);
-  assert.match(fiscalTs, /profileCategory==='vente_bic'/);
-  assert.match(fiscalTs, /profileCategory==='services_bnc'||profileCategory==='services_bnc_cipav'/);
+  assert.match(fiscalTs, /export function detectContributionPresets\(/);
+  // CFP différenciée commerce / artisanat et branche CIPAV distincte (15.4.37).
+  assert.match(fiscalTs, /services_bic_commercial/);
+  assert.match(fiscalTs, /services_bic_artisan/);
+  assert.match(fiscalTs, /services_bnc_cipav/);
+  assert.match(fiscalTs, /23\.2/);
   // Les taux de référence restent officiels et distincts de l'impôt (bloc 8).
   const referentialTs = read('backend/src/services/micro-referential.ts');
   assert.match(referentialTs, /socialRate: 12\.3/);
@@ -184,15 +190,18 @@ test('documents juridiques : révision technique 4.0 du 20 novembre 2026 sur les
   assert.match(read('docs/POLITIQUE-CONFIDENTIALITE.md'), /legal\/suppression-compte/);
 });
 
-test('versions harmonisées 15.4.35 partout (manifestes, lockfiles, service worker)', () => {
+test('versions harmonisées 15.4.38 partout (manifestes, lockfiles, service worker)', () => {
   const pkg = JSON.parse(read('package.json'));
   const bpkg = JSON.parse(read('backend/package.json'));
   const lock = JSON.parse(read('package-lock.json'));
   const block = JSON.parse(read('backend/package-lock.json'));
   for (const [name, v] of [['package.json', pkg.version], ['backend/package.json', bpkg.version], ['package-lock.json', lock.version], ['backend/package-lock.json', block.version]]) {
-    assert.equal(v, '15.4.35', `${name} : version ${v}`);
+    assert.equal(v, '15.4.38', `${name} : version ${v}`);
   }
-  assert.equal(read('VERSION.txt').trim(), '15.4.35');
-  assert.match(read('sw.js'), /aurion-shell-v15\.4\.35-r1/);
-  assert.match(read('index.html'), /v=15\.4\.35-r1/);
+  assert.equal(lock.packages[''].version, '15.4.38', 'package-lock.json : packages[""].version');
+  assert.equal(block.packages[''].version, '15.4.38', 'backend/package-lock.json : packages[""].version');
+  assert.equal(read('VERSION.txt').trim(), '15.4.38');
+  assert.equal(read('backend/VERSION.txt').trim(), '15.4.38', 'backend/VERSION.txt');
+  assert.match(read('sw.js'), /aurion-shell-v15\.4\.38-r1/);
+  assert.match(read('index.html'), /v=15\.4\.38-r1/);
 });

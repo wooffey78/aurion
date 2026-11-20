@@ -191,7 +191,7 @@ export function bind(){
     const currentActivity=S.activities.find(activity=>activity.id===getActiveActivity())||S.activities[0];
     if(!legalForm||!currentActivity)return;
     try{
-      const fiscal=await api.detectFiscal({legalForm,name:currentActivity.name||'',description:currentActivity.description||'',profileCode:currentActivity.profile_code});
+      const fiscal=await api.detectFiscal({legalForm,name:currentActivity.name||'',description:currentActivity.description||'',profileCode:currentActivity.profile_code,nafCode:S.company?.configuration_data?.naf_code||''});
       const updated=await api.updateActivity(currentActivity.id,{name:currentActivity.name,description:currentActivity.description||'',legalForm,urssafRate:String(fiscal.socialRate??currentActivity.urssaf_rate??0),vatRate:Number(fiscal.vatRate??currentActivity.vat_rate??20),autoFiscalDetect:true,profileCode:currentActivity.profile_code});
       S.activities=S.activities.map(activity=>activity.id===currentActivity.id?{...activity,...updated}:activity);
     }catch(error){toast('La mise à jour fiscale automatique a échoué : '+(error?.message||error),'error')}
@@ -253,7 +253,7 @@ export function bind(){
     const markAuto=(el,value)=>{if(!el||value===null||value===undefined)return;el.value=value;el.dataset.autoValue=String(value);el.dataset.manualEdited='false'};
     const update=async()=>{
       const lf=(legalInput?.value||orgLegal).trim();if(!lf)return;
-      try{const r=await api.detectFiscal({legalForm:lf,name:v(form,'name'),description:v(form,'description'),profileCode:form.querySelector('#profileCode')?.value||''});if(vatInput&&r.vatRate!==null&&r.vatRate!==undefined&&(!vatInput.value||vatInput.dataset.autoValue===vatInput.value))markAuto(vatInput,r.vatRate);if(socialInput&&(!socialInput.value||socialInput.dataset.autoValue===socialInput.value))markAuto(socialInput,r.socialRate??'');const d=form.querySelector('#fiscal-detection');if(d)d.textContent=`${r.socialRegime} · ${r.vatRegime}`;const c=form.querySelector('#fiscal-contributions');if(c)c.innerHTML=renderContributions(r.contributions||[]);form.dataset.autoCgv=r.cgvText||'';}catch(x){toast(x.message,'error')}
+      try{const r=await api.detectFiscal({legalForm:lf,name:v(form,'name'),description:v(form,'description'),profileCode:form.querySelector('#profileCode')?.value||'',nafCode:S.company?.configuration_data?.naf_code||''});if(vatInput&&r.vatRate!==null&&r.vatRate!==undefined&&(!vatInput.value||vatInput.dataset.autoValue===vatInput.value))markAuto(vatInput,r.vatRate);if(socialInput&&(!socialInput.value||socialInput.dataset.autoValue===socialInput.value))markAuto(socialInput,r.socialRate??'');const d=form.querySelector('#fiscal-detection');if(d)d.textContent=`${r.socialRegime} · ${r.vatRegime}${r.vatToConfirm?' · ⚠ régime de TVA à confirmer':''}`;const c=form.querySelector('#fiscal-contributions');if(c)c.innerHTML=renderContributions(r.contributions||[]);form.dataset.autoCgv=r.cgvText||'';}catch(x){toast(x.message,'error')}
     };
     form.querySelector('#name')?.addEventListener('input',()=>{clearTimeout(timer);timer=window.setTimeout(update,200)});
     form.querySelector('#description')?.addEventListener('input',()=>{clearTimeout(timer);timer=window.setTimeout(update,250)});

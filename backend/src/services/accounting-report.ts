@@ -6,6 +6,20 @@ const pdfkit = async () => (await import('pdfkit')).default as unknown as typeof
 const eur = (n: unknown) => { const v = Number(n || 0); const [i, d] = Math.abs(v).toFixed(2).split('.'); return `${v < 0 ? '-' : ''}${i!.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0')},${d}\u00A0€`; };
 const MONTHS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 
+/** Kilométrage comptable : le mode « client_price » est facturé au client ; le mode « margin »
+ * est un coût interne déjà inclus une seule fois dans les coûts directs. */
+export function mileageAccounting(document: any) {
+  const mode = String(document?.mileage_mode || 'margin');
+  const total = Math.max(0, Number(document?.mileage_total || 0));
+  const km = Math.max(0, Number(document?.mileage_km || 0));
+  const internalRate = Math.max(0, Number(document?.mileage_internal_rate || 0));
+  return {
+    mode,
+    billed: mode === 'client_price' ? total : 0,
+    internalDirect: mode === 'margin' ? (internalRate > 0 ? km * internalRate : total) : 0,
+  };
+}
+
 function estimateDocumentContributions(document: any): { amount: number; source: 'snapshot' | 'legacy' } {
   const snapshot = Array.isArray(document?.contribution_snapshot)
     ? document.contribution_snapshot.filter((row: any) => row && row.rate !== null && row.rate !== undefined && Number.isFinite(Number(row.rate)))
@@ -14,7 +28,7 @@ function estimateDocumentContributions(document: any): { amount: number; source:
     const ht = Math.max(0, Number(document?.total_ht || 0));
     return { amount: Math.round((ht * Math.max(0, Number(document?.urssaf_rate || 0)) / 100) * 100) / 100, source: 'legacy' };
   }
-  const billedMileageHt = document?.mileage_mode === 'client_price' ? Math.max(0, Number(document?.mileage_total || 0)) : 0;
+  const billedMileageHt = mileageAccounting(document).billed;
   const caHt = Math.max(0, Number(document?.total_ht || 0) - billedMileageHt);
   const grossMargin = Number(document?.margin || 0);
   let provisionalProfit = grossMargin;
@@ -52,8 +66,34 @@ export async function accountingReportPdf(organizationId: string, activityId: st
   const byIdx = new Map(months.map(m => [new Date(m.month).getUTCMonth(), m]));
   const totals = months.reduce((t, m) => ({ revenueHt: t.revenueHt + m.revenueHt, vat: t.vat + m.vat, purchases: t.purchases + m.purchases, social: t.social + m.social, invoices: t.invoices + m.invoiceCount }), { revenueHt: 0, vat: 0, purchases: 0, social: 0, invoices: 0 });
 
-  const details=(await query(`select q.id,q.number,q.document_type,q.created_at,q.payment_status,q.part_cost,q.shipping_cost,q.mileage_km,q.mileage_rate,q.mileage_total,q.mileage_mode,q.contribution_snapshot,q.margin,q.margin_coefficient_percent,q.coefficient_value,q.coefficient_unit,q.coefficient_basis,q.vat_rate,q.urssaf_rate,q.total_ht,q.total_tva,q.total_ttc,c.name client_name,
-      coalesce((select json_agg(json_build_object('label',qi.label,'quantity',qi.quantity,'unitCost',qi.unit_cost,'unitPrice',qi.unit_price,'saleCoefficientPercent',qi.sale_coefficient_percent,'suppliers',coalesce((select json_agg(json_build_object('name',s.name,'purchasePrice',sp.purchase_price,'reference',sp.supplier_reference) order by sp.purchase_price) from supplier_parts sp join suppliers s on s.id=sp.supplier_id where sp.part_id=qi.part_id),'[]'::json))) order by qi.position) from quote_items qi where qi.quote_id=q.id),'[]'::json) items
+  const details=(await query(`select q.id,q.number,q.document_type,q.created_at,q.payment_status,q.part_cost,q.shipping_cost,q.mileage_km,q.mileage_rate,q.mileage_client_rate,q.mileage_internal_rate,q.mileage_total,q.mileage_mode,q.contribution_snapshot,q.margin,q.margin_coefficient_percent,q.coefficient_value,q.coefficient_unit,q.coefficient_basis,q.vat_rate,q.urssaf_rate,q.total_ht,q.total_tva,q.total_ttc,c.name client_name,
+      coalesce((
+        select json_agg(
+          json_build_object(
+            'label',qi.label,
+            'quantity',qi.quantity,
+            'unitCost',qi.unit_cost,
+            'unitPrice',qi.unit_price,
+            'saleCoefficientPercent',qi.sale_coefficient_percent,
+            'suppliers',coalesce((
+              select json_agg(
+                json_build_object(
+                  'name',s.name,
+                  'purchasePrice',sp.purchase_price,
+                  'reference',sp.supplier_reference
+                )
+                order by sp.purchase_price
+              )
+              from supplier_parts sp
+              join suppliers s on s.id=sp.supplier_id
+              where sp.part_id=qi.part_id
+            ),'[]'::json)
+          )
+          order by qi.position
+        )
+        from quote_items qi
+        where qi.quote_id=q.id
+      ),'[]'::json) items
       from quotes q left join clients c on c.id=q.client_id where q.organization_id=$1 and q.activity_id=$2 and extract(year from q.created_at)=$3 order by q.created_at desc`,[organizationId,activityId,year])).rows;
   const entries=(await query(`select entry_date,entry_type,amount,label from accounting_entries where organization_id=$1 and activity_id=$2 and extract(year from entry_date)=$3 order by entry_date desc,created_at desc`,[organizationId,activityId,year])).rows;
   const PDFDocument = await pdfkit();
@@ -109,7 +149,14 @@ export async function accountingReportPdf(organizationId: string, activityId: st
     // Détail comptable complet : factures, pièces, fournisseurs, coefficients, marge, TVA, cotisations et écritures.
     const newPage=(title:string)=>{doc.addPage();y=56;doc.font('Helvetica-Bold').fontSize(15).fillColor(ink).text(title,L,y,{width:W});y=88;};
     const writeLine=(text:string,bold=false)=>{if(y>760){newPage('Export comptable — suite')}doc.font(bold?'Helvetica-Bold':'Helvetica').fontSize(8.5).fillColor(ink).text(text,L,y,{width:W});y+=15;};
-    if(details.length){newPage('Détail des documents comptables');for(const q of details){writeLine(`${q.document_type==='invoice'?'FACTURE':'DEVIS'} ${q.number} · ${new Date(q.created_at).toLocaleDateString('fr-FR')} · ${q.client_name||'Sans client'}`,true);writeLine(`Statut paiement : ${q.payment_status||'—'} · Total TTC ${eur(q.total_ttc)} · HT ${eur(q.total_ht)} · TVA ${eur(q.total_tva)}`);writeLine(`Achats HT ${eur(q.part_cost)} · Livraison ${eur(q.shipping_cost)} · Frais km ${eur(q.mileage_total)} (${Number(q.mileage_km||0).toLocaleString('fr-FR')} km × ${Number(q.mileage_rate||0).toLocaleString('fr-FR',{maximumFractionDigits:4})} €/km) · Marge ${eur(q.margin)} · Coefficient ${Number(q.coefficient_value!=null?q.coefficient_value:q.margin_coefficient_percent||0).toLocaleString('fr-FR')} ${q.coefficient_unit==='euro'?'€':'%'} (${q.coefficient_basis==='margin'?'marge':'pièces'}) · Taux URSSAF historique ${Number(q.urssaf_rate||0).toLocaleString('fr-FR')} %`);
+    if(details.length){newPage('Détail des documents comptables');for(const q of details){
+      const mileage=mileageAccounting(q);
+      const mileageKm=Number(q.mileage_km||0).toLocaleString('fr-FR');
+      const mileageRate=Number(mileage.mode==='client_price'?(q.mileage_client_rate??q.mileage_rate):q.mileage_internal_rate||0).toLocaleString('fr-FR',{maximumFractionDigits:4});
+      const mileageText=mileage.mode==='client_price'
+        ? `Frais km facturés ${eur(mileage.billed)} (${mileageKm} km × ${mileageRate} €/km)`
+        : `Frais km facturés ${eur(0)} · coût interne ${eur(mileage.internalDirect)}${Number(q.mileage_internal_rate||0)>0?` (${mileageKm} km × ${mileageRate} €/km)`:''} (coût interne, non facturé)`;
+      writeLine(`${q.document_type==='invoice'?'FACTURE':'DEVIS'} ${q.number} · ${new Date(q.created_at).toLocaleDateString('fr-FR')} · ${q.client_name||'Sans client'}`,true);writeLine(`Statut paiement : ${q.payment_status||'—'} · Total TTC ${eur(q.total_ttc)} · HT ${eur(q.total_ht)} · TVA ${eur(q.total_tva)}`);writeLine(`Achats HT ${eur(q.part_cost)} · Livraison ${eur(q.shipping_cost)} · ${mileageText} · Marge ${eur(q.margin)} · Coefficient ${Number(q.coefficient_value!=null?q.coefficient_value:q.margin_coefficient_percent||0).toLocaleString('fr-FR')} ${q.coefficient_unit==='euro'?'€':'%'} (${q.coefficient_basis==='margin'?'marge':'pièces'}) · Taux URSSAF historique ${Number(q.urssaf_rate||0).toLocaleString('fr-FR')} %`);
       for(const i of (q.items||[])){const suppliers=(i.suppliers||[]).map((z:any)=>`${z.name} ${eur(z.purchasePrice)}`).join(' ; ')||'Aucun fournisseur rattaché';writeLine(`  • ${i.quantity} × ${i.label} · achat ${eur(i.unitCost)} · vente ${eur(i.unitPrice)} · coef ${Number(i.saleCoefficientPercent||0).toLocaleString('fr-FR')} % · ${suppliers}`);}
       const contributionEstimate=estimateDocumentContributions(q);writeLine(`  Cotisations estimées (${contributionEstimate.source==='snapshot'?'taux et assiettes figés dans le document':'taux historique de secours'}) : ${eur(contributionEstimate.amount)} · TVA : ${eur(q.total_tva)} · Marge nette estimée : ${eur(Number(q.margin||0)-contributionEstimate.amount)}`);y+=8;
     }}
@@ -126,11 +173,11 @@ export async function accountingReportPdf(organizationId: string, activityId: st
 export async function accountingReportCsv(organizationId: string, activityId: string, year: number) {
   const activityContributions=(await query('select name,rate,basis,variable from activity_contributions where activity_id=$1 order by position,name',[activityId])).rows;
   const contributionSummary=activityContributions.map(c=>`${c.name}: ${c.rate===null||c.rate===undefined?'variable':Number(c.rate).toLocaleString('fr-FR',{maximumFractionDigits:4})+' %'} (${c.basis||'assiette variable'})`).join(' | ');
-  const rows=(await query(`select q.number,q.document_type,q.created_at,q.payment_status,q.total_ht,q.total_tva,q.total_ttc,q.part_cost,q.shipping_cost,q.mileage_km,q.mileage_rate,q.mileage_total,q.mileage_mode,q.contribution_snapshot,q.margin,q.margin_coefficient_percent,q.coefficient_value,q.coefficient_unit,q.coefficient_basis,q.vat_rate,q.urssaf_rate,c.name client_name
+  const rows=(await query(`select q.number,q.document_type,q.created_at,q.payment_status,q.total_ht,q.total_tva,q.total_ttc,q.part_cost,q.shipping_cost,q.mileage_km,q.mileage_rate,q.mileage_client_rate,q.mileage_internal_rate,q.mileage_total,q.mileage_mode,q.contribution_snapshot,q.margin,q.margin_coefficient_percent,q.coefficient_value,q.coefficient_unit,q.coefficient_basis,q.vat_rate,q.urssaf_rate,c.name client_name
     from quotes q left join clients c on c.id=q.client_id
     where q.organization_id=$1 and q.activity_id=$2 and extract(year from q.created_at)=$3 order by q.created_at asc`,[organizationId,activityId,year])).rows;
   const esc=(v:unknown)=>`"${String(v??'').replace(/"/g,'""')}"`;
-  const head=['Type','Numéro','Date','Client','Statut paiement','HT','TVA','TTC','Achats HT','Livraison HT','Km','€/km','Frais km','Marge','Coefficient','Unité coefficient','Base coefficient','TVA %','Taux URSSAF historique %','Cotisations estimées (document)','Cotisations configurées activité','Origine estimation'];
-  const lines=rows.map(r=>{const estimate=estimateDocumentContributions(r);return [r.document_type==='invoice'?'Facture':'Devis',r.number,new Date(r.created_at).toLocaleDateString('fr-FR'),r.client_name||'',r.payment_status||'',Number(r.total_ht||0).toFixed(2),Number(r.total_tva||0).toFixed(2),Number(r.total_ttc||0).toFixed(2),Number(r.part_cost||0).toFixed(2),Number(r.shipping_cost||0).toFixed(2),Number(r.mileage_km||0).toFixed(2),Number(r.mileage_rate||0).toFixed(4),Number(r.mileage_total||0).toFixed(2),Number(r.margin||0).toFixed(2),Number(r.coefficient_value!=null?r.coefficient_value:r.margin_coefficient_percent||0).toFixed(2),r.coefficient_unit==='euro'?'€':'%',r.coefficient_basis==='margin'?'Marge':'Pièces',Number(r.vat_rate||0).toFixed(2),Number(r.urssaf_rate||0).toFixed(3),estimate.amount.toFixed(2),contributionSummary,estimate.source].map(esc).join(';')});
+  const head=['Type','Numéro','Date','Client','Statut paiement','HT','TVA','TTC','Achats HT','Livraison HT','Km','€/km','Frais km','Marge','Coefficient','Unité coefficient','Base coefficient','TVA %','Taux URSSAF historique %','Cotisations estimées (document)','Cotisations configurées activité','Origine estimation','Mode km','Frais km internes'];
+  const lines=rows.map(r=>{const estimate=estimateDocumentContributions(r);const mileage=mileageAccounting(r);return [r.document_type==='invoice'?'Facture':'Devis',r.number,new Date(r.created_at).toLocaleDateString('fr-FR'),r.client_name||'',r.payment_status||'',Number(r.total_ht||0).toFixed(2),Number(r.total_tva||0).toFixed(2),Number(r.total_ttc||0).toFixed(2),Number(r.part_cost||0).toFixed(2),Number(r.shipping_cost||0).toFixed(2),Number(r.mileage_km||0).toFixed(2),Number(mileage.mode==='client_price'?(r.mileage_client_rate??r.mileage_rate):r.mileage_internal_rate||0).toFixed(4),mileage.billed.toFixed(2),Number(r.margin||0).toFixed(2),Number(r.coefficient_value!=null?r.coefficient_value:r.margin_coefficient_percent||0).toFixed(2),r.coefficient_unit==='euro'?'€':'%',r.coefficient_basis==='margin'?'Marge':'Pièces',Number(r.vat_rate||0).toFixed(2),Number(r.urssaf_rate||0).toFixed(3),estimate.amount.toFixed(2),contributionSummary,estimate.source,mileage.mode==='client_price'?'Client':'Marge',mileage.internalDirect.toFixed(2)].map(esc).join(';')});
   return Buffer.from('\ufeff'+[head.map(esc).join(';'),...lines].join('\r\n'),'utf8');
 }

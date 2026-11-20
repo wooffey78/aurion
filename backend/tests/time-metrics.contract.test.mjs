@@ -26,3 +26,11 @@ test('la fiche client ne transforme plus une estimation sans session en temps é
   assert.match(clients, /const estimatedMinutes=Number\(tm\?\.manual_minutes\|\|0\)/);
   assert.doesNotMatch(clients, /estimatedMinutes=Number\(c\?\.estimated_minutes/);
 });
+
+test('la fiche client n’affiche pas un faux « 0,0 min » sans session terminée', () => {
+  const sheet = readFileSync(new URL('../../assets/js/pages/dash/clientsheet.js', import.meta.url), 'utf8');
+  assert.match(clients, /timeSessionCount:Number\(tm\?\.completed_sessions\|\|0\)/);
+  assert.match(sheet, /st\.timeSessionCount/);
+  assert.match(sheet, /Aucune session terminée/);
+  assert.match(sheet, /\?`\$\{Number\(st\.actualMinutes\|\|0\)\.toFixed\(1\)\} min`:'—'/);
+});

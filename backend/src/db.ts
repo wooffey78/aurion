@@ -115,3 +115,28 @@ export async function adminQuery<T extends pg.QueryResultRow = pg.QueryResultRow
   }
   return adminDb.query<T>(text, values);
 }
+
+/**
+ * Transaction d'administration : UNE connexion, BEGIN/COMMIT/ROLLBACK, pour les traitements
+ * inter-entreprises qui doivent être atomiques (suppression de compte, reprises).
+ * Les verrous de ligne (`select … for update`) pris dans `work` couvrent toute la transaction.
+ */
+export async function adminTransaction<T>(work:(client:pg.PoolClient)=>Promise<T>):Promise<T>{
+  if (!adminDb) {
+    const error = new Error('Pool d’administration non configuré (AURION_ADMIN_DATABASE_URL).') as Error & { statusCode?: number; code?: string };
+    error.code = 'ADMIN_DB_NOT_CONFIGURED'; error.statusCode = 503;
+    throw error;
+  }
+  const client = await adminDb.connect();
+  try {
+    await client.query('begin');
+    const result = await work(client);
+    await client.query('commit');
+    return result;
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}

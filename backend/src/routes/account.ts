@@ -312,9 +312,14 @@ export async function accountRoutes(app: FastifyInstance) {
 
     priv.get('/billing/subscription', async request => subscriptionState(request.auth!.organizationId));
     priv.get('/billing/history', async request => ({ events: (await query('select kind,detail,created_at from subscription_events where organization_id=$1 order by created_at desc limit 50', [request.auth!.organizationId])).rows }));
+    // Résiliation/reprise : uniquement pour un abonnement réel (essai ou actif). 'no_billing'
+    // n'est pas un abonnement : aucun drapeau de résiliation ne doit pouvoir y être posé.
+    const subscribableState=async(org:string)=>(await query('select status from subscriptions where organization_id=$1',[org])).rows[0]?.status;
     priv.post('/billing/subscription/cancel', async (request, reply) => {
       if (!['owner', 'admin'].includes(request.auth!.role)) return reply.code(403).send({ error: 'FORBIDDEN' });
       const org = request.auth!.organizationId;
+      const current=await subscribableState(org);
+      if(!current||!['trialing','active'].includes(current))return reply.code(409).send({error:'NO_ACTIVE_SUBSCRIPTION',message:'Aucun abonnement en cours : aucune résiliation n’est nécessaire.'});
       await query("update subscriptions set cancel_at_period_end=true,canceled_at=now(),updated_at=now() where organization_id=$1", [org]);
       await subscriptionEvent(org, 'cancel_requested');
       return subscriptionState(org);
@@ -322,6 +327,8 @@ export async function accountRoutes(app: FastifyInstance) {
     priv.post('/billing/subscription/resume', async (request, reply) => {
       if (!['owner', 'admin'].includes(request.auth!.role)) return reply.code(403).send({ error: 'FORBIDDEN' });
       const org = request.auth!.organizationId;
+      const current=await subscribableState(org);
+      if(!current||!['trialing','active'].includes(current))return reply.code(409).send({error:'NO_ACTIVE_SUBSCRIPTION',message:'Aucun abonnement en cours à reprendre.'});
       await query("update subscriptions set cancel_at_period_end=false,canceled_at=null,updated_at=now() where organization_id=$1", [org]);
       await subscriptionEvent(org, 'resume_requested');
       return subscriptionState(org);

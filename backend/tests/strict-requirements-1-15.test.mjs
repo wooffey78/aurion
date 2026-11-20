@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { navigationItems } from '../../assets/js/core/navigation.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read=p=>fs.readFileSync(path.join(root,p),'utf8');
@@ -29,8 +30,10 @@ test('requirement 1 keeps suppliers out of catalogue and in its own sidebar view
 });
 
 test('requirements 7/11/12/14 remain explicit in the implementation',()=>{
-  assert.match(dashboard,/\['suppliers','Fournisseurs'/);
-  assert.match(dashboard,/data-view="admin"/);
+  // Le menu vient d'une définition unique, testée par comportement dans navigation.test.mjs.
+  assert.ok(navigationItems({isAdmin:true}).some(item=>item.id==='suppliers'));
+  assert.ok(navigationItems({isAdmin:true}).some(item=>item.id==='admin'));
+  assert.match(dashboard,/navigationItems\(\{questionnaire:q,modules:profileModules,isAdmin:S\.isPlatformAdmin\}\)/);
   assert.match(other,/Rendez-vous/);
   assert.match(other,/Journal de bord/);
   assert.match(other,/id="forecast-more" hidden/);

@@ -108,6 +108,14 @@ services:
         sync: false
       - key: GOOGLE_DRIVE_REDIRECT_URI
         sync: false
+      - key: AUTH0_DOMAIN
+        sync: false
+      - key: AUTH0_CLIENT_ID
+        sync: false
+      - key: AUTH0_CLIENT_SECRET
+        sync: false
+      - key: AUTH0_REDIRECT_URI
+        sync: false
       - key: GOOGLE_TOKEN_ENCRYPTION_KEY
         sync: false
       - key: AURION_SUPPORT_EMAIL

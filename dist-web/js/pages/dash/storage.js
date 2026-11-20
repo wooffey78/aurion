@@ -7,7 +7,7 @@ import{S,e,toast,askConfirm}from'./core.js';
 import{queueItems,queueCounts,retryQueueItem,discardQueueItem,processCloudQueue,STATUS_LABELS}from'../../core/cloud-sync.js';
 
 const bytes=n=>{if(n===null||n===undefined||!Number.isFinite(Number(n)))return'—';const u=['o','Ko','Mo','Go','To'];let v=Number(n),i=0;while(v>=1024&&i<u.length-1){v/=1024;i++}return`${v.toLocaleString('fr-FR',{maximumFractionDigits:i?1:0})} ${u[i]}`};
-const LEVEL={ok:'Normal',warning:'Avertissement (80 %)',alert:'Alerte importante (90 %)',critical:'Situation critique (95 %)',full:'Stockage saturé',unknown:'Capacité totale non communiquée'};
+const LEVEL={ok:'Normal',warning:'Avertissement (80 %)',alert:'Alerte importante (90 %)',critical:'Situation critique (95 %)',full:'Stockage saturé',unknown:'Capacité indisponible avant connexion'};
 const CONN={connected:['Connecté','ok'],not_connected:['Non connecté','warn'],disconnected:['Déconnecté','warn'],revoked:['Autorisation expirée ou révoquée','warn'],error:['Erreur','warn']};
 
 export const storageSection=()=>`<section class="panel stack settings-section" id="settings-storage" data-settings-text="stockage cloud google drive quota espace documents synchronisation file d'attente">
@@ -31,7 +31,7 @@ async function paint(status){
     <article><span>Fournisseur</span><b>${e(st.providerLabel||'Google Drive (non connecté)')}</b></article>
     <article><span>Compte autorisé</span><b>${e(st.accountEmail||'—')}</b></article>
     <article><span>État de connexion</span><b>${e(label)}</b></article>
-    <article><span>Espace total</span><b>${q?.totalKnown?bytes(q.limitBytes):'Capacité totale non communiquée'}</b></article>
+    <article><span>Espace total</span><b>${q?.totalKnown?bytes(q.limitBytes):'Après connexion Google Drive'}</b></article>
     <article><span>Utilisé sur le compte</span><b>${bytes(q?.usageBytes)}</b>${q?.usageInDriveBytes!=null?`<small class="help">dont Drive : ${bytes(q.usageInDriveBytes)}${q.trashBytes!=null?` · corbeille : ${bytes(q.trashBytes)}`:''}</small>`:''}</article>
     <article><span>Disponible (estimé)</span><b>${q?.availableBytes!=null?bytes(q.availableBytes):'—'}</b></article>
     <article><span>Documents envoyés par Aurion</span><b>${bytes(q?.aurionBytes)}</b><small class="help">selon les métadonnées Aurion</small></article>
@@ -41,7 +41,7 @@ async function paint(status){
   </div>
   <div class="stack"><div class="storage-meter" role="meter" aria-label="Espace utilisé sur le compte cloud" aria-valuemin="0" aria-valuemax="100" ${pct!=null?`aria-valuenow="${pct}" aria-valuetext="${pct} % utilisés"`:'aria-valuetext="Capacité totale non communiquée"'} data-level="${e(q?.level||'unknown')}"><i></i></div>
   <small class="help">${e(LEVEL[q?.level||'unknown']||'')}${pct!=null?` · ${pct.toLocaleString('fr-FR')} % utilisés`:''}${q?.error?' · dernière actualisation en échec, valeur précédente conservée':''}</small></div>
-  ${st.setup?.configured===false?`<div class="notice warn-notice"><b>Connexion Google Drive non configurée sur ce serveur</b><small>Variables manquantes : ${(st.setup.missingConfiguration||[]).map(e).join(', ')}. Voir docs/CLOUD-STOCKAGE-15.4.0.md.</small></div>`:''}
+  ${st.setup?.configured===false?`<div class="notice warn-notice"><b>Connexion Google Drive non configurée sur ce serveur</b><small>Variables manquantes : ${(st.setup.missingConfiguration||[]).map(e=>`<code>${e}</code>`).join(', ')}. En local, ajoutez-les dans <code>backend/.env</code> puis redémarrez Aurion ; sur une instance hébergée, configurez-les côté serveur. Le quota n’est communiqué qu’après la connexion du compte Drive. Voir docs/CLOUD-STOCKAGE-15.4.0.md.</small></div>`:''}
   <div class="button-row"><button type="button" class="btn secondary" id="storage-refresh" ${st.status==='connected'?'':'disabled'}>Actualiser le quota</button><button type="button" class="btn secondary" id="storage-connect" ${st.setup?.configured===false?'disabled':''}>${st.status==='connected'?'Reconnecter le cloud':'Connecter Google Drive'}</button><button type="button" class="btn danger" id="storage-disconnect" ${['connected','revoked','error'].includes(st.status)?'':'disabled'}>Déconnecter le cloud</button><button type="button" class="btn secondary" id="storage-sync">Synchroniser maintenant</button></div>
   <div class="section-title"><h3>File d’attente de cet appareil</h3></div>
   <div class="queue-list" aria-live="polite">${items.map(x=>`<div class="queue-row"><div><b>${e(x.fileName)}</b><small>${e(STATUS_LABELS[x.status]||x.status)} · ${bytes(x.size)}${x.lastError?` · ${e(x.lastError)}`:''}</small></div><div class="button-row">${['error','pending'].includes(x.status)&&x.blob?`<button type="button" class="btn secondary small" data-retry="${e(x.clientRef)}">Relancer</button>`:''}${x.status!=='syncing'?`<button type="button" class="link-btn" data-discard="${e(x.clientRef)}">Retirer</button>`:''}</div></div>`).join('')||'<p class="muted">Aucun document en attente sur cet appareil.</p>'}</div>

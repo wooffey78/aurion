@@ -1,5 +1,14 @@
 const clean = v => String(v ?? '').trim();
 
+/** Clé de TVA intracommunautaire française calculée à partir du SIREN (clé officielle).
+ *  Remplit le champ TVA même quand le registre ne fournit pas `vatNumber`. */
+export function frenchVatFromSiren(siren) {
+  const digits = String(siren ?? '').replace(/\D/g, '');
+  if (digits.length !== 9) return '';
+  const key = (12 + 3 * (Number(digits) % 97)) % 97;
+  return `FR${String(key).padStart(2, '0')}${digits}`;
+}
+
 /** Identifiant suffisamment complet et valide pour interroger le registre public. */
 export function isValidRegistryIdentifier(value) {
   const digits = String(value ?? '').replace(/\D/g, '');
@@ -61,6 +70,7 @@ export function mergeRegistryFields(current = {}, detected = {}, previousAuto = 
   const identifiersValid = (!siret || isValidRegistryIdentifier(siret) && siret.length === 14)
     && (!siren || isValidRegistryIdentifier(siren) && siren.length === 9)
     && (!siret || !siren || siret.slice(0, 9) === siren);
+  const detectedVat = clean(detected.vatNumber ?? detected.vat_number) || frenchVatFromSiren(siren || siret.slice(0, 9));
   const detectedMap = {
     name: detected.legalName ?? detected.name,
     activity: detected.activity,
@@ -74,7 +84,7 @@ export function mergeRegistryFields(current = {}, detected = {}, previousAuto = 
     website: normalizeWebsite(detected.website),
     // La TVA intracommunautaire française est déterminée par le SIREN (clé officielle) :
     // elle est remplie automatiquement lorsque le champ est vide ou prérempli par la détection.
-    vat_number: detected.vatNumber ?? detected.vat_number,
+    vat_number: detectedVat,
   };
   for (const [key, value] of Object.entries(detectedMap)) {
     if (value !== undefined && value !== null && canFill(key, value)) out[key] = clean(value);

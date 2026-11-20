@@ -118,6 +118,26 @@ export async function recordAcceptances(client: { query: (q: string, v?: any[]) 
 }
 
 // ---------------------------------------------------------------- abonnement (paiement désactivé : architecture uniquement)
+/** Facturation commerciale réellement configurée (clé Stripe présente). */
+export function billingConfigured() { return Boolean(process.env.STRIPE_SECRET_KEY); }
+
+/**
+ * Crée l'abonnement initial d'une organisation — point unique utilisé par l'inscription
+ * (`routes/auth.ts`) et par la lecture de l'état d'abonnement (`subscriptionState`).
+ *
+ * Sans facturation configurée, aucune période d'essai n'est imposée et aucun abonnement payant
+ * n'existe : statut 'no_billing', dates nulles (migration 092). L'installation locale ou
+ * auto-hébergée reste en accès complet, sans formule, sans paiement et sans échéance.
+ * Avec Stripe, l'essai commercial de 60 jours est ouvert, avec sa fenêtre de conservation.
+ */
+export async function createInitialSubscription(runner: { query: (q: string, v?: any[]) => Promise<any> }, orgId: string) {
+  if (billingConfigured()) {
+    await runner.query("insert into subscriptions(organization_id,status,trial_started_at,trial_ends_at,data_read_only_until) values($1,'trialing',now(),now()+interval '60 days',now()+interval '120 days') on conflict(organization_id) do nothing", [orgId]);
+  } else {
+    await runner.query("insert into subscriptions(organization_id,status,trial_started_at,trial_ends_at) values($1,'no_billing',null,null) on conflict(organization_id) do nothing", [orgId]);
+  }
+}
+
 export async function subscriptionState(orgId: string) {
   const platform=((await query(`select 1 from platform_admins pa join organization_members om on om.user_id=pa.user_id where om.organization_id=$1 limit 1`,[orgId])).rowCount ?? 0) > 0;
   const vip=((await query(`select 1 from vip_guest_accounts v join organization_members om on om.user_id=v.user_id where om.organization_id=$1 limit 1`,[orgId])).rowCount ?? 0) > 0;
@@ -128,16 +148,19 @@ export async function subscriptionState(orgId: string) {
   await withTenant(orgId, async () => {
     s = (await query('select * from subscriptions where organization_id=$1', [orgId])).rows[0];
     if (!s) {
-      await query("insert into subscriptions(organization_id,status,trial_started_at,trial_ends_at,data_read_only_until) values($1,'trialing',now(),now()+interval '60 days',now()+interval '120 days') on conflict do nothing", [orgId]);
+      await createInitialSubscription({ query }, orgId);
       s = (await query('select * from subscriptions where organization_id=$1', [orgId])).rows[0];
     }
   });
   const now = Date.now();
   let status = s.status as string;
-  const trialEnd = new Date(s.trial_ends_at).getTime();
+  // Dates d'essai nulles = aucun essai commercial ; 'no_billing' = aucune facturation configurée
+  // (ni abonnement payant, ni essai, ni échéance : l'accès reste complet).
+  const trialEnd = s.trial_ends_at ? new Date(s.trial_ends_at).getTime() : 0;
   const periodEnd = s.current_period_end ? new Date(s.current_period_end).getTime() : 0;
   if (status === 'trialing' && trialEnd < now) status = 'expired';
   if (status === 'active' && periodEnd && periodEnd < now) status = 'expired';
+  // 'no_billing' n'expire jamais : aucune date ne doit être inventée ni affichée.
   if (status === 'expired' && s.status !== 'expired') await query("update subscriptions set status='expired',data_read_only_until=coalesce(data_read_only_until,coalesce(current_period_end,trial_ends_at)+interval '60 days'),updated_at=now() where organization_id=$1",[orgId]);
   const end=status==='active'&&periodEnd?periodEnd:trialEnd;
   const daysLeft=(status==='trialing'||status==='active')?Math.max(0,Math.ceil((end-now)/86400000)):0;

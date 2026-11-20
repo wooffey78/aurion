@@ -18,6 +18,16 @@ test('contrat métier v3 — kilométrage déduit : TTC inchangé, marge réduit
   assert.equal(r.grossMargin,66.67);
 });
 
+test('contrat métier v3 — une facture issue d’un devis n’hérite pas de son envoi',()=>{
+  const start=route.indexOf("app.post('/quotes/:id/invoice'");
+  const end=route.indexOf("app.get('/invoices/:id/installments'",start);
+  const conversion=route.slice(start,end);
+  assert.ok(start>0&&end>start);
+  assert.match(conversion,/document_type='invoice',status='issued'/);
+  // Le devis a pu être envoyé : la facture, elle, doit repartir non envoyée.
+  assert.match(conversion,/paid_at=null,sent_at=null/);
+});
+
 test('contrat métier v3 — kilométrage ajouté : TTC = base TTC + surcharge TTC, marge inchangée',()=>{
   const r=pricing({partCost:100,mileageKm:100,mileageInternalRate:.5,mileageClientRate:.5,vatRate:20,targetTtc:200,driver:'ttc',mileageMode:'client_price',urssafRate:0});
   assert.equal(r.totalTtc,260);

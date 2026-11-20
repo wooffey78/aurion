@@ -5,18 +5,88 @@
 // connecte aucun service ; il teste ce que l'opérateur a déjà configuré.
 //   SMTP  : connexion + STARTTLS + AUTH (si identifiants) — aucun e-mail envoyé
 //   Stripe : GET /v1/balance (lecture seule) avec la clé configurée
-//   Google : configuration OAuth déclarée + points de terminaison joignables
+//   Google : configuration OAuth, refresh token réel, scopes, calendriers et quota Drive
 //   PA (plateforme agréée) et paiement client : état déclaratif (aucun appel réseau —
 //     la validation opérationnelle exige le contrat réel et la recette sandbox)
-// Usage : node scripts/check-integrations.mjs [--strict]
-//   --strict : code de sortie 1 si un contrôle configuré échoue (sinon 0).
+//
+// Usage :
+//   node scripts/check-integrations.mjs [--strict] [--google-live]
+//        [--env-file <fichier>] [--environment <label>]
+//        [--local <fichier>] [--staging <fichier>] [--production <fichier>]
+//   --strict        code de sortie 1 si une configuration est incomplète ou un contrôle échoue
+//   --google-live   exige le contrôle réel Google (refresh + calendriers + quota Drive)
+//   --env-file      charge un fichier .env sans écraser les variables déjà définies
+//   --local/...     diagnostic Google lisible par environnement, sans exécuter l'application
+//
+// Le contrôle réel n'est exécuté que si GOOGLE_PREFLIGHT_REFRESH_TOKEN est fourni. Il ne
+// journalise jamais le jeton, le secret client ni le contenu des réponses Google.
 import net from 'node:net';
 import tls from 'node:tls';
+import { existsSync, readFileSync } from 'node:fs';
+import dotenv from 'dotenv';
+import {
+  DEFAULT_GOOGLE_ENDPOINTS,
+  diagnoseGoogleConfiguration,
+  formatGoogleConfiguration,
+  runGoogleLivePreflight,
+} from './lib/google-preflight.mjs';
 
-const strict = process.argv.includes('--strict');
+const USAGE = `Usage : node scripts/check-integrations.mjs [--strict] [--google-live]
+       [--env-file <fichier>] [--environment <label>]
+       [--local <fichier>] [--staging <fichier>] [--production <fichier>]
+
+  --strict        sort 1 si une configuration est incomplète ou un contrôle échoue
+  --google-live   exige le contrôle réel Google (refresh, scopes, calendriers, quota Drive)
+  --env-file      charge un .env sans écraser les variables déjà définies
+  --environment   libellé du diagnostic courant (local, staging, production…)
+  --local, --staging, --production  fichiers .env à diagnostiquer côte à côte
+
+Google réel : GOOGLE_PREFLIGHT_REFRESH_TOKEN (et éventuellement
+GOOGLE_PREFLIGHT_DRIVE_REFRESH_TOKEN) doit être fourni dans l'environnement.`;
+
+const args = process.argv.slice(2);
+if (args.includes('--help') || args.includes('-h')) {
+  console.log(USAGE);
+  process.exit(0);
+}
+const option = (name) => {
+  const index = args.indexOf(name);
+  return index >= 0 ? args[index + 1] : undefined;
+};
+const strict = args.includes('--strict');
+const googleLiveRequired = args.includes('--google-live');
+const environment = option('--environment') || process.env.NODE_ENV || 'local';
+const envFile = option('--env-file');
+const environmentFiles = [
+  ['local', option('--local')],
+  ['staging', option('--staging')],
+  ['production', option('--production')],
+].filter(([, file]) => Boolean(file));
+
+if (envFile) {
+  if (!existsSync(envFile)) {
+    console.error(`ERREUR : fichier d'environnement introuvable : ${envFile}`);
+    process.exit(2);
+  }
+  const loaded = dotenv.parse(readFileSync(envFile, 'utf8'));
+  for (const [key, value] of Object.entries(loaded)) {
+    if (process.env[key] === undefined) process.env[key] = value;
+  }
+}
+for (const [label, file] of environmentFiles) {
+  if (!existsSync(file)) {
+    console.error(`ERREUR : fichier ${label} introuvable : ${file}`);
+    process.exit(2);
+  }
+}
 
 const results = [];
-const report = (name, state, detail) => { results.push({ name, state, detail }); console.log(`${state === 'OK' ? '✔' : state === 'NON CONFIGURÉ' ? '—' : '✖'} ${name} : ${state}${detail ? ` — ${detail}` : ''}`); };
+const report = (name, state, detail) => {
+  results.push({ name, state, detail });
+  const icon = state === 'OK' ? '✔' : state === 'ATTENTION' ? '!' : state === 'NON CONFIGURÉ' || state === 'NON TESTÉ' ? '—' : '✖';
+  console.log(`${icon} ${name} : ${state}${detail ? ` — ${detail}` : ''}`);
+};
+const clean = (value, max = 160) => String(value || '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, max);
 
 // ---- SMTP plateforme (Brevo ou autre) : accusés de réception, réinitialisation, confirmations
 const smtpHost = String(process.env.PLATFORM_SMTP_HOST || '').trim();
@@ -105,18 +175,58 @@ if (!stripeKey) {
 }
 
 // ---- Google OAuth (facultatif : agenda, messagerie, Drive personnel)
-const googleId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
-if (!googleId) {
+// Diagnostic par environnement : noms de variables manquantes uniquement, jamais de valeur.
+for (const [label, file] of environmentFiles) {
+  try {
+    const env = new Map(Object.entries(dotenv.parse(readFileSync(file, 'utf8'))));
+    const diagnostic = diagnoseGoogleConfiguration(env, { environment: label });
+    const state = diagnostic.state === 'configured' ? 'OK' : diagnostic.state === 'disabled' ? 'NON CONFIGURÉ' : 'ÉCHEC';
+    report(`Google configuration (${label})`, state, formatGoogleConfiguration(diagnostic));
+  } catch {
+    report(`Google configuration (${label})`, 'ÉCHEC', 'fichier d’environnement illisible');
+  }
+}
+
+const googleConfig = diagnoseGoogleConfiguration(process.env, { environment });
+if (googleConfig.state === 'disabled') {
   report('Google OAuth', 'NON CONFIGURÉ', 'GOOGLE_CLIENT_ID vide — les connexions Google (facultatives) restent désactivées ; l\'application fonctionne sans.');
+  if (googleLiveRequired) {
+    report('Google — contrôle réel', 'ÉCHEC', '--google-live demandé mais Google n’est pas configuré dans cet environnement');
+  }
+} else if (googleConfig.state === 'incomplete') {
+  report('Google OAuth', 'ÉCHEC', `configuration incomplète : ${googleConfig.missing.join(' ; ')}`);
+  if (googleLiveRequired) {
+    report('Google — contrôle réel', 'ÉCHEC', 'configuration incomplète : le contrôle réel ne peut pas démarrer');
+  }
 } else {
   try {
-    const res = await fetch('https://oauth2.googleapis.com/.well-known/openid-configuration', { signal: AbortSignal.timeout(10_000) });
-    if (res.status === 200) {
-      const okFormat = googleId.endsWith('.apps.googleusercontent.com');
-      report('Google OAuth', okFormat ? 'OK' : 'ÉCHEC', okFormat ? 'points de terminaison joignables, format client_id valide' : 'format client_id inattendu (attendu : …apps.googleusercontent.com)');
-    } else report('Google OAuth', 'ÉCHEC', `réponse HTTP ${res.status} des points de terminaison Google`);
-  } catch (e) {
-    report('Google OAuth', 'ÉCHEC', e.message);
+    const res = await fetch(DEFAULT_GOOGLE_ENDPOINTS.openid, { signal: AbortSignal.timeout(10_000) });
+    if (res.status === 200) report('Google OAuth', 'OK', 'points de terminaison joignables, configuration complète');
+    else report('Google OAuth', 'ÉCHEC', `réponse HTTP ${res.status} des points de terminaison Google`);
+  } catch {
+    report('Google OAuth', 'ÉCHEC', 'points de terminaison Google injoignables (réseau ou délai dépassé)');
+  }
+
+  if (!googleConfig.liveReady) {
+    report('Google — contrôle réel', googleLiveRequired ? 'ÉCHEC' : 'NON TESTÉ',
+      `${googleConfig.liveMissing.join(' ; ') || 'jeton de pré-vol'} absent — refresh token, calendriers et quota Drive non testés`);
+  } else {
+    const live = await runGoogleLivePreflight(process.env, {
+      fetchImpl: fetch,
+      endpoints: DEFAULT_GOOGLE_ENDPOINTS,
+      environment,
+      requireDrive: googleLiveRequired,
+    });
+    for (const check of live.checks) report(check.label, check.state, check.detail);
+    if (Array.isArray(live.calendars) && live.calendars.length) {
+      console.log(`  Calendriers accessibles (${live.calendars.length}) :`);
+      live.calendars.forEach((calendar, index) => {
+        const flags = [];
+        if (calendar.primary) flags.push('principal');
+        if (calendar.accessRole) flags.push(calendar.accessRole);
+        console.log(`    ${index + 1}. ${clean(calendar.summary)}${flags.length ? ` (${flags.join(', ')})` : ''}`);
+      });
+    }
   }
 }
 
@@ -134,6 +244,10 @@ report('Paiement client (D3)', pay ? 'CONFIGURÉ — validation opérationnelle 
       : 'décision D3 non tranchée — l\'outil ne tranche pas à votre place ; le service reste non opérationnel tant que le prestataire n\'est pas choisi et validé.');
 
 const failures = results.filter(r => r.state === 'ÉCHEC').length;
-console.log(`\n== Bilan : ${results.filter(r => r.state === 'OK').length} OK · ${failures} échec(s) · ${results.filter(r => r.state === 'NON CONFIGURÉ').length} non configuré(s) ==`);
+const warnings = results.filter(r => r.state === 'ATTENTION').length;
+const notTested = results.filter(r => r.state === 'NON TESTÉ').length;
+const unconfigured = results.filter(r => r.state === 'NON CONFIGURÉ').length;
+console.log(`\n== Bilan : ${results.filter(r => r.state === 'OK').length} OK · ${failures} échec(s) · ${warnings} attention(s) · ${notTested} non testé(s) · ${unconfigured} non configuré(s) ==`);
 console.log('Un contrôle « NON CONFIGURÉ » est normal avant configuration : il rappelle l\'effet réel (fonction désactivée) sans rien activer.');
 if (strict && failures > 0) process.exit(1);
+if (googleLiveRequired && (failures > 0 || notTested > 0)) process.exit(1);

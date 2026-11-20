@@ -29,6 +29,6 @@ export async function clientSummary(orgId: string, id: string) {
   const estimatedMinutes=Number(tm?.manual_minutes||0), actualMinutes=Number(tm?.actual_seconds||0)/60;
   return {
     client: {...c,last_invoice_address_source:lastBilling}, documents: docs, appointments, devices,
-    stats: { invoiceCount:Number(summary.invoice_count||0), quoteCount:Number(summary.quote_count||0), invoicedTtc:Number(summary.issued_ttc||0), paidTtc:Number(summary.paid_ttc||0), remainingTtc:Number(summary.remaining_ttc||0), pendingQuotesTtc:Number(summary.pending_quotes_ttc||0), appointmentCount, lastActivity: docs[0]?.created_at || appointments[0]?.starts_at || c.created_at, estimatedMinutes, actualMinutes, savedMinutes: Math.max(0,estimatedMinutes-actualMinutes) },
+    stats: { invoiceCount:Number(summary.invoice_count||0), quoteCount:Number(summary.quote_count||0), invoicedTtc:Number(summary.issued_ttc||0), paidTtc:Number(summary.paid_ttc||0), remainingTtc:Number(summary.remaining_ttc||0), pendingQuotesTtc:Number(summary.pending_quotes_ttc||0), appointmentCount, lastActivity: docs[0]?.created_at || appointments[0]?.starts_at || c.created_at, timeSessionCount:Number(tm?.completed_sessions||0), estimatedMinutes, actualMinutes, savedMinutes: Math.max(0,estimatedMinutes-actualMinutes) },
   };
 }

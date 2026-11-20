@@ -1,12 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import crypto from "node:crypto";
 import { CodeChallengeMethod } from 'google-auth-library';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { query, db, applyTenant } from "../db.js";
 import { config } from "../config.js";
 import { hashPassword, verifyPassword } from "../services/passwords.js";
 import { registerSchema, loginSchema } from "../services/validation.js";
 import { signAccessToken } from "../plugins/auth.js";
-import { legalDocumentsReadyForContracts, localEvaluationSignupAllowed, recordAcceptances } from "../services/account.js";
+import { createInitialSubscription, legalDocumentsReadyForContracts, localEvaluationSignupAllowed, recordAcceptances } from "../services/account.js";
 import { createRefreshSession, rotateRefreshSession, revokeRefreshSession, revokeAllRefreshSessions, REFRESH_SECONDS } from '../services/native-sessions.js';
 import { registrationOptions, verifyRegistration, authenticationOptions, verifyAuthentication, issueWebAuthnSession } from '../services/webauthn.js';
 
@@ -44,6 +45,27 @@ export async function authRoutes(app: FastifyInstance) {
 
 const googleLoginConfigured=()=>Boolean(config.GOOGLE_CLIENT_ID&&config.GOOGLE_CLIENT_SECRET&&config.APP_BASE_URL);
 const googleLoginRedirect=()=>new URL('/auth/google/callback',config.APP_BASE_URL).toString();
+const auth0LoginConfigured=()=>Boolean(config.AUTH0_DOMAIN&&config.AUTH0_CLIENT_ID&&config.AUTH0_CLIENT_SECRET&&config.APP_BASE_URL);
+const auth0Issuer=()=>`https://${config.AUTH0_DOMAIN}/`;
+const auth0LoginRedirect=()=>config.AUTH0_REDIRECT_URI||new URL('/auth/auth0/callback',config.APP_BASE_URL).toString();
+let auth0Jwks:any=null;
+let auth0JwksDomain='';
+function auth0KeySet(){
+ if(!auth0Jwks||auth0JwksDomain!==config.AUTH0_DOMAIN){
+  auth0Jwks=createRemoteJWKSet(new URL(`https://${config.AUTH0_DOMAIN}/.well-known/jwks.json`));
+  auth0JwksDomain=config.AUTH0_DOMAIN;
+ }
+ return auth0Jwks;
+}
+const auth0LoginFailure=(reply:any,reason:'not-linked'|'ambiguous'|'generic'='generic')=>{
+ const messages={
+  'not-linked':'Aucun compte Aurion existant ne correspond à cette adresse e-mail Auth0 vérifiée. Créez d’abord votre espace avec le formulaire Aurion, puis réessayez avec la même adresse.',
+  ambiguous:'Ce compte Aurion possède plusieurs espaces ou correspondances. Pour éviter d’ouvrir le mauvais espace, utilisez votre méthode de connexion Aurion habituelle.',
+  generic:'L’authentification Auth0 n’a pas pu être validée. Réessayez ou utilisez votre mot de passe ou une clé d’accès.'
+ };
+ const message=messages[reason];
+ return reply.code(401).type('text/html; charset=utf-8').send(`<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connexion Auth0 impossible · Aurion</title><body style="font:16px system-ui;max-width:620px;margin:12vh auto;padding:24px;color:#252d2a"><h1>Connexion Auth0 impossible</h1><p>${message}</p><p><a href="/#/login">Retour à la connexion Aurion</a></p></body></html>`);
+};
 const googleLoginFailure=(reply:any)=>reply.code(401).type('text/html; charset=utf-8').send('<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connexion Google impossible · Aurion</title><body style="font:16px system-ui;max-width:620px;margin:12vh auto;padding:24px;color:#252d2a"><h1>Connexion Google impossible</h1><p>Votre compte n’a pas pu être authentifié. Réessayez ou utilisez votre mot de passe ou une clé d’accès.</p><p><a href="/#/login">Retour à la connexion Aurion</a></p></body></html>');
 async function googleLoginClient(){
  const {google}=await import('googleapis');
@@ -51,6 +73,81 @@ async function googleLoginClient(){
 }
 
   app.get('/auth/google/status', async () => ({ configured: googleLoginConfigured() }));
+  app.get('/auth/auth0/status', async () => ({ configured: auth0LoginConfigured() }));
+  app.get('/auth/auth0/start', { config: { rateLimit: { max: 8, timeWindow: '15 minutes' } } }, async (_request, reply) => {
+    if (!auth0LoginConfigured()) return reply.code(503).send({ error: 'AUTH0_NOT_CONFIGURED', message: 'La connexion Auth0 n’est pas configurée sur cette installation.' });
+    const state=crypto.randomBytes(32).toString('base64url');
+    const nonce=crypto.randomBytes(32).toString('base64url');
+    const codeVerifier=crypto.randomBytes(48).toString('base64url');
+    const codeChallenge=crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+    reply.setCookie('aurion_auth0_login',JSON.stringify({state,nonce,codeVerifier,createdAt:Date.now()}),{
+      httpOnly:true,secure:config.COOKIE_SECURE,sameSite:'lax',path:'/auth/auth0/callback',maxAge:600
+    });
+    const authorize=new URL('/authorize',`https://${config.AUTH0_DOMAIN}`);
+    authorize.search=new URLSearchParams({
+      response_type:'code',response_mode:'query',client_id:config.AUTH0_CLIENT_ID,
+      redirect_uri:auth0LoginRedirect(),scope:'openid profile email',state,nonce,
+      code_challenge:codeChallenge,code_challenge_method:'S256'
+    }).toString();
+    return reply.redirect(authorize.toString());
+  });
+  app.get('/auth/auth0/callback', { config: { rateLimit: { max: 12, timeWindow: '15 minutes' } } }, async (request, reply) => {
+    const clearTransaction=()=>reply.clearCookie('aurion_auth0_login',{path:'/auth/auth0/callback'});
+    if(!auth0LoginConfigured()){clearTransaction();return auth0LoginFailure(reply);}
+    const saved=request.cookies?.aurion_auth0_login;
+    let transaction:any=null;
+    try{transaction=saved?JSON.parse(saved):null}catch{transaction=null;}
+    const params=request.query as any;
+    const state=String(params?.state||''),code=String(params?.code||'');
+    const age=Number(transaction?.createdAt||0);
+    if(!transaction?.state||!transaction?.nonce||!transaction?.codeVerifier||!state||!code||state!==transaction.state||String(params?.error||'')||!Number.isFinite(age)||Date.now()-age<0||Date.now()-age>10*60*1000){
+      clearTransaction();return auth0LoginFailure(reply);
+    }
+    try{
+      const tokenResponse=await fetch(`https://${config.AUTH0_DOMAIN}/oauth/token`,{
+        method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','accept':'application/json'},
+        body:new URLSearchParams({grant_type:'authorization_code',client_id:config.AUTH0_CLIENT_ID,client_secret:config.AUTH0_CLIENT_SECRET,code,redirect_uri:auth0LoginRedirect(),code_verifier:transaction.codeVerifier}),
+        signal:AbortSignal.timeout(10000)
+      });
+      if(!tokenResponse.ok)throw new Error('AUTH0_TOKEN_EXCHANGE_FAILED');
+      const tokenPayload:any=await tokenResponse.json();
+      if(typeof tokenPayload?.id_token!=='string'||tokenPayload.id_token.length<20)throw new Error('AUTH0_ID_TOKEN_MISSING');
+      const verified=await jwtVerify(tokenPayload.id_token,auth0KeySet(),{issuer:auth0Issuer(),audience:config.AUTH0_CLIENT_ID,algorithms:['RS256'],maxTokenAge:600});
+      const identity:any=verified.payload;
+      const audience=Array.isArray(identity.aud)?identity.aud:[identity.aud];
+      if((audience.length>1&&identity.azp!==config.AUTH0_CLIENT_ID)||identity.nonce!==transaction.nonce||typeof identity.sub!=='string'||!identity.sub||typeof identity.email!=='string'||!identity.email||identity.email_verified!==true){
+        clearTransaction();return auth0LoginFailure(reply);
+      }
+      // Auth0 n'ouvre pas silencieusement un espace ni un compte Aurion. L'adresse doit être
+      // vérifiée par Auth0 et correspondre à un compte Aurion déjà créé. La session finale reste
+      // un jeton Aurion, soumis aux mêmes règles de révocation et d'isolation tenant que les autres logins.
+      const rows=await query<{id:string,email:string,session_version:number,organization_id:string,role:string,membership_count:number,matching_accounts:number}>(
+        `with matched_users as (
+           select u.id,u.email,u.session_version,count(*) over()::int as matching_accounts
+           from users u where lower(u.email)=lower($1)
+         )
+         select u.id,u.email,u.session_version,om.organization_id,om.role,
+                count(*) over(partition by u.id)::int as membership_count,u.matching_accounts
+         from matched_users u join organization_members om on om.user_id=u.id
+         order by case when om.role='owner' then 0 else 1 end
+         limit 2`,
+        [identity.email]
+      );
+      const user=rows.rows[0];
+      clearTransaction();
+      if(!user)return auth0LoginFailure(reply,'not-linked');
+      if(Number(user.matching_accounts)>1||Number(user.membership_count)>1)return auth0LoginFailure(reply,'ambiguous');
+      const sessionVersion=Number(user.session_version||0);
+      const accessToken=await signAccessToken({userId:user.id,organizationId:user.organization_id,role:user.role,sv:sessionVersion});
+      const refresh=await createRefreshSession({userId:user.id,organizationId:user.organization_id,role:user.role,sessionVersion},request);
+      app.setSession(reply,accessToken);
+      app.setRefreshSession(reply,refresh.token);
+      return reply.redirect(new URL('/#/dashboard',config.APP_BASE_URL).toString());
+    }catch(error:any){
+      request.log.warn({code:String(error?.code||error?.name||'AUTH0_CALLBACK_FAILED')},'Auth0 login failed');
+      clearTransaction();return auth0LoginFailure(reply);
+    }
+  });
   app.get('/auth/registration-status', async () => {
     const published = await legalDocumentsReadyForContracts();
     const localEvaluation = !published && localEvaluationSignupAllowed();
@@ -115,8 +212,8 @@ async function googleLoginClient(){
       reply.clearCookie('aurion_google_login',{path:'/auth/google/callback'});
       const sessionVersion=Number(user.session_version||0);
       const accessToken=await signAccessToken({userId:user.id,organizationId:user.organization_id,role:user.role,sv:sessionVersion});
-      app.setSession(reply,accessToken);
       const refresh=await createRefreshSession({userId:user.id,organizationId:user.organization_id,role:user.role,sessionVersion},request);
+      app.setSession(reply,accessToken);
       app.setRefreshSession(reply,refresh.token);
       const origin=new URL(config.APP_BASE_URL).origin;
       return reply.redirect(origin+'/#/dashboard');
@@ -230,10 +327,12 @@ async function googleLoginClient(){
           "insert into activities(organization_id,code,name,description,urssaf_rate,vat_rate) values($1,'principale','Activité principale','À configurer',null,20) on conflict do nothing",
           [orgId],
         );
-        await client.query(
-          "insert into subscriptions(organization_id,status,trial_started_at,trial_ends_at) values($1,'trialing',now(),now()+interval '60 days')",
-          [orgId],
-        );
+        // Facturation absente (installation locale auto-hébergée) : aucune période d'essai n'est
+        // imposée (abonnement 'active', dates d'essai nulles, migration 091). L'instance reste en
+        // accès complet ; l'essai ne démarre que si le paiement est réellement configuré.
+        // Point de création unique, partagé avec subscriptionState() : les deux chemins ne
+        // peuvent plus diverger sur le schéma ni sur la règle d'essai.
+        await createInitialSubscription(client, orgId);
         if ((request.body as any)?.fullName) await client.query("update users set full_name=$1 where id=$2", [String((request.body as any).fullName).trim(), id]);
         await recordAcceptances(client, id, request.ip);
         await client.query("commit");

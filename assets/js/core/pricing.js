@@ -1,4 +1,4 @@
-// GÉNÉRÉ depuis backend/src/services/pricing.ts — moteur financier commun serveur/navigateur.
+// GÉNÉRÉ depuis backend/src/services/pricing.ts (ne pas modifier à la main : npm run sync-pricing à la racine).
 const BASIS_POINTS = 10000n;
 const UNIT_SCALE = 1000000n;
 function num(value, name, min, max) {

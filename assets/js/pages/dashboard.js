@@ -1,8 +1,9 @@
 // Tableau de bord Aurion : coquille (menu, activité active, plein écran) + chargement des données.
 import{api,getActiveActivity,setActiveActivity}from'../core/api.js';
-import{appLogo,toast}from'../core/ui.js';
+import{appLogo,toast,startLocalClock}from'../core/ui.js';
 import{invalidateSession}from'../core/session.js';
 import{go,routeQuery}from'../core/router.js';
+import{hiddenViews,navigationItems}from'../core/navigation.js';
 import{S,e,hooks,active,prof,money,askConfirm}from'./dash/core.js';
 import*as catalog from'./dash/catalog.js';
 import{suppliers}from'./dash/suppliers.js';
@@ -14,7 +15,6 @@ import{home,clients,agenda,accounting,treasury,support,admin}from'./dash/other.j
 import{setCloudOwner}from'../core/cloud-sync.js';
 
 const VIEWS={home,clients,catalog,suppliers,quote,invoices:docs,agenda,accounting,treasury,support,settings,account,admin};
-const NAV=[['home','Tableau de bord','⌂'],['clients','Clients','♙'],['catalog','Catalogue métier','◈'],['suppliers','Fournisseurs','▱'],['invoices','Devis & factures','▧'],['agenda','Agenda','◷'],['accounting','Comptabilité & trésorerie','∑'],['support','Support Aurion','?'],['settings','Paramètres','⚙']];
 
 // Garde-fous de rafraîchissement : ne jamais remplacer l’écran en pleine interaction.
 let metricsRefreshInProgress = false;
@@ -103,32 +103,51 @@ async function load(extras=null,viewId=S.view){
 function show(id){
   const previous=S.view;
   if(id!=='quote')S.editing=null;
-  S.view=id;hooks.closeMenu?.();
   const q=S.company?.configuration_data?.questionnaire||{};
   const profileModules=Array.isArray(S.profile?.modules)?S.profile.modules.map(x=>String(x).toLowerCase()):[];
-  const hidden=new Set();
-  if(q.support==='Non') hidden.add('support');
-  if(q.agenda==='Non') hidden.add('agenda');
-  if(q.accounting==='Non') hidden.add('accounting');
-  if(q.parts==='Non'&&q.stock==='Non') hidden.add('catalog');
-  if(profileModules.length && !profileModules.some(x=>x.includes('agenda')) && q.agenda!=='Oui') hidden.add('agenda');
-  if(hidden.has(id))id='home';
-  const nav=NAV.filter(([k])=>!hidden.has(k)).map(([k,l,i])=>`<button type="button" data-view="${k}" class="${k===id?'active':''}" aria-current="${k===id?'page':'false'}" title="${l}"><i aria-hidden="true">${i}</i>${k==='catalog'?'Catalogue métier':l}</button>`).join('');
+  if(hiddenViews(q,profileModules).has(id))id='home';
+  S.view=id;hooks.closeMenu?.();
+  const nav=navigationItems({questionnaire:q,modules:profileModules,isAdmin:S.isPlatformAdmin}).map(item=>`<button type="button" data-view="${item.id}" class="${item.id===id?'active':''}" aria-current="${item.id===id?'page':'false'}" title="${item.label}"><i aria-hidden="true">${item.icon}</i>${item.label}</button>`).join('');
   const navRoot=document.querySelector('.nav');
-  navRoot.innerHTML=nav+(S.isPlatformAdmin?`<button type="button" data-view="admin" class="${id==='admin'?'active':''}" title="Administration" aria-label="Administration"><i>⚙</i>Administration</button>`:'');
+  navRoot.innerHTML=nav;
   navRoot.onclick=ev=>{
     const b=ev.target.closest('button[data-view]');
-    if(!b||!navRoot.contains(b))return;
-    // Chaque navigation recharge uniquement les jeux de données utiles à l'écran ciblé.
-    // Les listes reflètent ainsi les changements d'un autre appareil sans recharger toute l'application.
-    hooks.refresh(b.dataset.view,{navigation:true}).catch(x=>toast(x.message,'error'));
+    if(b)navigate(b.dataset.view);
   };
   const view=document.querySelector('#view');
   view.innerHTML=VIEWS[id].view();
-  VIEWS[id].bind?.();
+  // Une erreur d'initialisation d'un écran ne doit jamais empêcher la navigation suivante :
+  // la coquille et le menu restent utilisables, l'incident est signalé sans bloquer la vue.
+  try{VIEWS[id].bind?.()}catch(error){toast(error?.message||'Certaines actions de cet écran n’ont pas pu être initialisées.','error')}
   if(id==='accounting'||id==='treasury')lastRenderedFinancialSnapshot=financialSnapshot();
   if(previous!==id){window.requestAnimationFrame(()=>{window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;const main=document.querySelector('#main');if(main)main.scrollTop=0;const heading=view.querySelector('h1');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}});}
-  view.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{if(b.dataset.go==='quote'){S.editing=null;S.quoteDraft=null;S.startBlankQuote=true;S.prefillClient=null;S.documentType='quote'}hooks.refresh(b.dataset.go,{navigation:true}).catch(x=>toast(x.message,'error'))});
+}
+
+// Navigation unique de la coquille : le menu, les cartes d'action et les boutons injectés
+// après le rendu passent tous par ici. Un échec de chargement ne laisse jamais la sidebar
+// bloquée sur un écran mort : la vue cible est rendue avec les données déjà disponibles.
+function navigate(id){
+  if(!id||!VIEWS[id])return;
+  // refresh() fixe lui-même la vue demandée : aucun état à dupliquer ici.
+  hooks.refresh(id,{navigation:true}).catch(x=>{
+    toast(x?.message||'Chargement incomplet.','error');
+    // Une navigation plus récente a pu aboutir entre-temps : ne jamais réafficher l'ancienne.
+    if(x?.status!==401&&S.pendingView===id)show(id);
+  });
+}
+
+let dataGoDelegated=false;
+function installDataGoDelegation(){
+  if(dataGoDelegated)return;dataGoDelegated=true;
+  document.addEventListener('click',ev=>{
+    const b=ev.target instanceof Element?ev.target.closest('[data-go]'):null;
+    if(!b)return;
+    ev.preventDefault();
+    const target=b.dataset.go;
+    if(target==='quote'){S.editing=null;S.quoteDraft=null;S.startBlankQuote=true;S.prefillClient=null;S.documentType='quote'
+    }
+    navigate(target);
+  });
 }
 
 export async function refresh(id=S.view,opts={navigation:false}){
@@ -230,9 +249,11 @@ export async function renderDashboard(){
   S.pendingView=initialView;
   await load([...(EXTRAS[initialView]||[])],initialView);
   if(initialView==='accounting'||initialView==='treasury')lastFinancialRefreshAt=Date.now();
-  lastBackgroundRefreshAt=Date.now();installBackgroundRefresh();
-  document.querySelector('#app').innerHTML=`<div class="dashboard-shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#/dashboard" aria-label="Aurion — retour au tableau de bord" title="Retour au tableau de bord">${appLogo('42')}<span>AURION<small>PRO</small></span></a><button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar"><span></span><span></span><span></span></button><nav class="nav" aria-label="Navigation principale"></nav><div class="sidebar-bottom"><button id="logout" class="nav-logout">Quitter</button><div class="status-dot"><i></i> Système opérationnel</div></div></aside><section class="workspace"><header class="dashboard-top"><div class="activity-switch"><span class="eyebrow" id="shell-company"></span><button id="activity-picker" class="activity-picker"><span>ACTIVITÉ ACTIVE</span><strong id="shell-activity"></strong><small>▾</small></button></div><div class="top-actions"><span class="pill" id="shell-pill"></span><button class="btn secondary small" id="fs-toggle" type="button" title="Activer le plein écran" aria-label="Activer le plein écran" aria-pressed="false"><span class="fs-icon" aria-hidden="true">⛶</span><span class="fs-label">Plein écran</span></button><button class="avatar" id="shell-avatar" title="Mon compte" aria-label="Mon compte"></button></div></header><main id="main" class="content"><div id="view"></div></main></section></div><div id="activity-modal-root"></div>`;
+  lastBackgroundRefreshAt=Date.now();installBackgroundRefresh();installDataGoDelegation();
+  document.querySelector('#app').innerHTML=`<div class="dashboard-shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#/dashboard" aria-label="Aurion — retour au tableau de bord" title="Retour au tableau de bord">${appLogo('42')}<span>AURION<small>PRO</small></span></a><button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar"><span></span><span></span><span></span></button><nav class="nav" aria-label="Navigation principale"></nav><div class="sidebar-bottom"><button id="logout" class="nav-logout">Quitter</button><div class="status-dot"><i></i> Système opérationnel</div></div></aside><section class="workspace"><header class="dashboard-top"><div class="activity-switch"><span class="eyebrow" id="shell-company"></span><button id="activity-picker" class="activity-picker"><span>ACTIVITÉ ACTIVE</span><strong id="shell-activity"></strong><small>▾</small></button></div><div class="top-actions"><span class="pill shell-clock" id="local-clock" aria-label="Heure locale" title="Heure locale de votre appareil"></span><span class="pill" id="shell-pill"></span><button class="btn secondary small" id="fs-toggle" type="button" title="Activer le plein écran" aria-label="Activer le plein écran" aria-pressed="false"><span class="fs-icon" aria-hidden="true">⛶</span><span class="fs-label">Plein écran</span></button><button class="avatar" id="shell-avatar" title="Mon compte" aria-label="Mon compte"></button></div></header><main id="main" class="content"><div id="view"></div></main></section></div><div id="activity-modal-root"></div>`;
   await syncShellAvatar();
+  // Horloge unique de la coquille : visible sur toute la navigation, jamais dupliquée par vue.
+  startLocalClock(document.getElementById('local-clock'));
   // File locale des documents cloud : liée à l'entreprise de la session (jamais d'envoi pour un autre compte de l'appareil).
   setCloudOwner(S.company?.id||'');
   // Bloc 1 — bootstrap hors connexion ATTENDU avant toute écriture possible : identité résolue

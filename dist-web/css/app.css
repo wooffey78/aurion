@@ -1054,8 +1054,11 @@ input:-webkit-autofill,textarea:-webkit-autofill,select:-webkit-autofill{box-sha
 @media (max-width:1050px){.avatar{width:40px;height:40px}}
 /* Bloc 11 — horloge : composant dédié, chiffres tabulaires, secondes discrètes */
 #local-clock{display:inline-flex;align-items:baseline;gap:6px}
-#local-clock .clock-main{font-variant-numeric:tabular-nums;font-size:1.3rem;font-weight:700;color:#cccccc;letter-spacing:.02em}
-#local-clock .clock-sec{font-variant-numeric:tabular-nums;font-size:.82rem;color:var(--muted)}
+/* Horloge de la coquille : visible sur toutes les vues, aux couleurs Aurion. */
+.shell-clock{display:inline-flex;align-items:center;gap:6px;border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 10%,transparent);padding:5px 12px}
+#local-clock .clock-main{font-variant-numeric:tabular-nums;font-size:1.05rem;font-weight:700;color:var(--accent);letter-spacing:.04em}
+#local-clock .clock-sec{font-variant-numeric:tabular-nums;font-size:.74rem;color:color-mix(in srgb,var(--accent) 62%,var(--muted))}
+@media(max-width:720px){.shell-clock{display:none}}
 /* Bloc 9 — harmonisation des encarts touchés (tokens existants, sobre, sans refonte) */
 .month-history summary{display:flex;justify-content:space-between;align-items:center;gap:15px;cursor:pointer;padding:13px 0;border-bottom:1px solid rgba(185,196,190,.1);list-style:none}
 .month-history summary::-webkit-details-marker{display:none}
@@ -1079,5 +1082,5 @@ input:-webkit-autofill,textarea:-webkit-autofill,select:-webkit-autofill{box-sha
    l'ensemble du site (plus sombre que les champs de saisie clairs), et le contour clair
    le rend lisible aussi sur le fond sombre. Le pointeur main des boutons/liens est
    conservé (règles existantes), les champs de texte reçoivent un I-beam sombre. */
-html{cursor:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath d='M4 1 L4 17 L8 13.5 L10.6 19 L13.2 17.6 L10.6 12.4 L15 12 Z' fill='%230d223d' stroke='%23e8f1fb' stroke-width='1.3' stroke-linejoin='round'/%3E%3C/svg%3E") 3 2, auto}
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="submit"]):not([type="button"]),textarea,[contenteditable="true"]{cursor:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='18' viewBox='0 0 16 18'%3E%3Cpath d='M8 2.5 v13 M4 1.5 h8 M4 16.5 h8' fill='none' stroke='%23e8f1fb' stroke-width='3.6' stroke-linecap='round'/%3E%3Cpath d='M8 2.5 v13 M4 1.5 h8 M4 16.5 h8' fill='none' stroke='%230d223d' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E") 8 9, text}
+html{cursor:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath d='M4 1 L4 17 L8 13.5 L10.6 19 L13.2 17.6 L10.6 12.4 L15 12 Z' fill='%2302060c' stroke='%23ffffff' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E") 3 2, auto}
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="submit"]):not([type="button"]),textarea,[contenteditable="true"]{cursor:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='18' viewBox='0 0 16 18'%3E%3Cpath d='M8 2.5 v13 M4 1.5 h8 M4 16.5 h8' fill='none' stroke='%23ffffff' stroke-width='3.8' stroke-linecap='round'/%3E%3Cpath d='M8 2.5 v13 M4 1.5 h8 M4 16.5 h8' fill='none' stroke='%2302060c' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E") 8 9, text}

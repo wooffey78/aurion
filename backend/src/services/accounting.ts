@@ -36,7 +36,11 @@ export async function monthlyAccounting(orgId:string,activityId:string,year?:num
           sum(base_cost*case when coalesce(total_ttc,0)>0 then least(1,base_amount/nullif(total_ttc,0)) else 0 end)::numeric purchases,
           sum((coalesce(part_cost,0)+coalesce(shipping_cost,0))*case when coalesce(total_ttc,0)>0 then least(1,base_amount/nullif(total_ttc,0)) else 0 end*case when purchase_vat_mode='exempt' then 0 else coalesce(purchase_vat_rate,vat_rate,0)/100 end)::numeric purchase_vat,
           sum(((base_amount/nullif(1+vat_rate/100,0))+penalty_amount)*coalesce((select sum(coalesce((c->>'rate')::numeric,0)) from jsonb_array_elements(case when jsonb_typeof(contribution_snapshot)='array' then contribution_snapshot else '[]'::jsonb end) c where coalesce(c->>'basis','ca_ht')='ca_ht'),urssaf_rate,0)/100)::numeric social,
-          sum(coalesce(mileage_total,0)*case when coalesce(total_ttc,0)>0 then least(1,base_amount/nullif(total_ttc,0)) else 0 end)::numeric mileage,
+          -- Seul le kilométrage refacturé au client (mode « client_price ») figure sur la facture.
+          -- En mode « margin », mileage_total est le COÛT interne du déplacement : il ne doit jamais
+          -- être présenté comme un montant facturé (il est déjà compté dans les coûts directs).
+          sum((case when mileage_mode='client_price' then coalesce(mileage_total,0) else 0 end)
+              *case when coalesce(total_ttc,0)>0 then least(1,base_amount/nullif(total_ttc,0)) else 0 end)::numeric mileage,
           count(distinct quote_id)::int invoice_count
    from allocated where true ${filter}
    group by 1`,params),query(`select date_trunc('month',entry_date)::date as "month",coalesce(sum(case when entry_type='purchase' then amount else 0 end),0)::numeric purchases,coalesce(sum(case when entry_type='social' then amount else 0 end),0)::numeric social,coalesce(sum(case when entry_type='sav' then amount else 0 end),0)::numeric sav from accounting_entries where organization_id=$1 and activity_id=$2 ${year?"and date_trunc('year',entry_date)=make_date($3,1,1)":''} group by 1`,entParams),

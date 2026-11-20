@@ -17,7 +17,7 @@ const ensureMicroRef=()=>{if(microRefFetchStarted)return;microRefFetchStarted=tr
 let draftTimer=null,draftSequence=0;
 // Bloc 11 — champ simple pour la saisie d'un nouveau client sans fiche préexistante.
 const F=(id,label,val='',extra='')=>`<label class="field"><span>${e(label)}</span><input id="${id}" value="${e(val)}" ${extra}${/placeholder=/.test(extra)?'':` placeholder="Saisissez ${e(String(label).toLowerCase())}…"`}></label>`;
-const blank=()=>({label:'',quantity:'',unitCost:'',unitPrice:'',partId:null,saleCoefficientPercent:null,activityCategory:null});
+const blank=()=>({label:'',quantity:'',unitCost:'',unitPrice:'',partId:null,saleCoefficientPercent:null,activityCategory:null,categoryAuto:false});
 const cheapest=p=>{const c=(p?.suppliers||[]).map(s=>Number(s.purchasePrice)).filter(n=>n>0);return c.length?Math.min(...c):0};
 const finiteNumber=v=>{const n=Number(String(v??'').replace(',','.'));return Number.isFinite(n)?n:null};
 const savedBaseTtc=q=>{
@@ -57,8 +57,8 @@ export const view=()=>{
    <button type="button" class="btn secondary" id="add-line">+ Ajouter ${e((doc.itemsLabel||'une ligne').toLowerCase()==='pièces'?'une pièce':'une ligne')}</button>
 </div>
    ${c.shipping?`<label class="field"><span>${e(c.shippingLabel||'Frais annexes (HT)')} <em class="tag internal">interne</em></span><input id="shipping" type="number" min="0" step="0.01" value="${q&&q.shipping_cost!=null?e(q.shipping_cost):''}" placeholder="Coût livraison (€ HT)"></label>`:''}
-   <label class="field"><span>Frais kilométriques <em class="tag">visible client</em></span><select id="mileageMode"><option value="margin" ${mileageMode==='margin'?'selected':''}>Déduire de la marge</option><option value="client_price" ${mileageMode==='client_price'?'selected':''}>Ajouter au prix client TTC</option></select><input id="mileageKm" type="number" min="0" step="0.1" value="${q&&q.mileage_km!=null?e(q.mileage_km):''}" placeholder="Km"><div class="grid-2"><input id="mileageInternalRate" type="number" min="0" step="0.001" value="${e(mileageInternalRate)}" placeholder="Coût interne €/km"><input id="mileageClientRate" type="number" min="0" step="0.001" value="${e(mileageClientRate)}" placeholder="Tarif client €/km"></div><small class="help">Aurion distingue le coût interne et le tarif facturé. Montant appliqué : <strong id="mileageTotal">${money(Number(q?.mileage_total||0))}</strong>.</small></label>
-   <div class="field"><span>Coefficient Aurion · appliqué au coût des pièces</span><input id="coefficientBasis" type="hidden" value="purchase"><div class="grid-2"><label class="field"><span>Unité</span><select id="coefficientUnit"><option value="percent" ${coefficientUnit==='percent'?'selected':''}>%</option><option value="euro" ${coefficientUnit==='euro'?'selected':''}>€</option></select></label></div><label class="field"><span>Coefficient</span><input id="coefficientValue" type="number" min="0" step="0.01" value="${e(coefficientValue)}" placeholder="Coefficient"></label><small class="help">Le coefficient reste modifiable pour chaque devis. En €, le montant est ajouté à chaque unité de pièce ; en %, il majore le coût d’achat des pièces.</small></div>
+   <label class="field"><span>Frais kilométriques <em class="tag">visible client</em></span><select id="mileageMode"><option value="margin" ${mileageMode==='margin'?'selected':''}>Déduire de la marge</option><option value="client_price" ${mileageMode==='client_price'?'selected':''}>Ajouter au prix client TTC</option></select><input id="mileageKm" type="number" min="0" step="0.1" value="${q&&q.mileage_km!=null?e(q.mileage_km):''}" placeholder="Km"><div class="grid-2"><input id="mileageInternalRate" type="number" min="0" step="0.001" value="${mileageInternalRate?e(mileageInternalRate):''}" placeholder="Coût interne €/km"><input id="mileageClientRate" type="number" min="0" step="0.001" value="${mileageClientRate?e(mileageClientRate):''}" placeholder="Tarif client €/km"></div><small class="help">Aurion distingue le coût interne et le tarif facturé. Montant appliqué : <strong id="mileageTotal">${Number(q?.mileage_total||0)>0?money(Number(q.mileage_total)):'à renseigner'}</strong>.</small></label>
+   <div class="field"><span>Coefficient Aurion · appliqué au coût des pièces</span><input id="coefficientBasis" type="hidden" value="purchase"><div class="grid-2"><label class="field"><span>Unité</span><select id="coefficientUnit"><option value="percent" ${coefficientUnit==='percent'?'selected':''}>%</option><option value="euro" ${coefficientUnit==='euro'?'selected':''}>€</option></select></label></div><label class="field"><span>Coefficient</span><input id="coefficientValue" type="number" min="0" step="0.01" value="${coefficientValue?e(coefficientValue):''}" placeholder="Coefficient"></label><small class="help">Le coefficient reste modifiable pour chaque devis. En €, le montant est ajouté à chaque unité de pièce ; en %, il majore le coût d’achat des pièces.</small></div>
    <h2>${c.items===false?'2':'3'} · Prix client</h2>
    <label class="field"><span>Prix de vente main-d’œuvre HT</span><input id="laborSellingHt" type="number" min="0" step="0.01" value="${editing?'':(q?.labor_selling_ht!=null?e(q.labor_selling_ht):'')}" placeholder="Prix HT"><small class="help">Vous pouvez saisir directement le prix de vente de la main-d’œuvre. Le coût interne reste séparé.</small></label>
    <label class="field"><span>Coût interne main-d’œuvre HT <em class="tag internal">interne</em></span><input id="laborInternalCostHt" type="number" min="0" step="0.01" value="${q?.labor_internal_cost_ht!=null?e(q.labor_internal_cost_ht):''}" placeholder="Coût réel HT"><small class="help">Coût réel de la main-d’œuvre pour votre entreprise. Il réduit la marge et n’est jamais ajouté au prix client.</small></label>
@@ -141,7 +141,9 @@ export async function bind(){
   const recalc=()=>{
     let r;try{r=computePricing(inputs())}catch(x){$('#calc').innerHTML=`<p class="error">${e(x.message)}</p>`;return null}
     if(driver==='ttc')$('#minimumProfit').value=r.netMargin.toFixed(2);else $('#targetTtc').value=r.baseTtc.toFixed(2);
-    const mileageRateEl=$('#mileageMode')?.value==='client_price'?$('#mileageClientRate'):$('#mileageInternalRate');const mt=Number($('#mileageKm')?.value||0)*Number(mileageRateEl?.value||0);if($('#mileageTotal'))$('#mileageTotal').textContent=money(mt);
+    const mileageRateEl=$('#mileageMode')?.value==='client_price'?$('#mileageClientRate'):$('#mileageInternalRate');const mt=Number($('#mileageKm')?.value||0)*Number(mileageRateEl?.value||0);if($('#mileageTotal')){const kmKnown=String($('#mileageKm')?.value??'').trim()!=='',rateKnown=String(mileageRateEl?.value??'').trim()!=='';
+      // Aucune donnée saisie ⇒ placeholder explicite, jamais un faux « 0,00 € ».
+      $('#mileageTotal').textContent=kmKnown&&rateKnown?money(mt):'à renseigner';}
     $('#calc').classList.toggle('quote-loss',!!r.loss);$('#calc').classList.toggle('quote-profit',!r.loss);$('#calc').innerHTML=`<div class="calc-total"><span>Prix TTC de base + frais km</span><strong>${money(r.totalTtc)}</strong></div>
       ${r.loss?'<div class="alert-loss">⚠ Vente à perte : le prix ne couvre pas les coûts directs.</div>':(r.belowMinimumPrice?'<div class="alert-loss">⚠ Le prix est inférieur au minimum calculé avec le coefficient.</div>':'')}
       <div class="calc-net ${r.loss?'neg':''}"><span>Résultat net</span><strong>${money(r.netResult)}</strong><small>${r.netResultRate.toLocaleString('fr-FR')} % du HT</small></div>
@@ -191,12 +193,18 @@ export async function bind(){
     if(ev.target.classList.contains('ln-label')){
       l.label=ev.target.value;
       const part=S.parts.find(x=>x.name.toLowerCase()===l.label.trim().toLowerCase());
-      if(part){const changedPart=l.partId!==part.id;l.partId=part.id;l.saleCoefficientPercent=null;catalogPricing=true;if(changedPart||l.unitCost===''||l.unitCost==null){l.unitCost=cheapest(part);row.querySelector('.ln-cost').value=String(l.unitCost)}if(changedPart||l.unitPrice===''||l.unitPrice==null){const sale=Number(part.selling_price||0);l.unitPrice=sale>0?sale:'';row.querySelector('.ln-sale').value=l.unitPrice===''?'':sale.toFixed(2)}}else {l.partId=null;l.saleCoefficientPercent=null}
+      if(part){const changedPart=l.partId!==part.id;l.partId=part.id;l.saleCoefficientPercent=null;catalogPricing=true;if(changedPart||l.unitCost===''||l.unitCost==null){l.unitCost=cheapest(part);row.querySelector('.ln-cost').value=String(l.unitCost)}if(changedPart||l.unitPrice===''||l.unitPrice==null){const sale=Number(part.selling_price||0);l.unitPrice=sale>0?sale:'';row.querySelector('.ln-sale').value=l.unitPrice===''?'':sale.toFixed(2)}
+        // Une pièce du catalogue est un bien : sa nature (vente BIC) pilote la cotisation de la ligne.
+        if(!l.activityCategory||l.categoryAuto){l.activityCategory='vente_bic';l.categoryAuto=true;const sel=row.querySelector('.ln-cat');if(sel)sel.value='vente_bic'}
+      }else {l.partId=null;l.saleCoefficientPercent=null;
+        // Ligne de prestation : la catégorie de service redevient celle du document/activité.
+        if(l.categoryAuto){l.activityCategory=null;l.categoryAuto=false;const sel=row.querySelector('.ln-cat');if(sel)sel.value=''}
+      }
     }
     if(ev.target.classList.contains('ln-qty'))l.quantity=ev.target.value;
     if(ev.target.classList.contains('ln-cost'))l.unitCost=ev.target.value;
     if(ev.target.classList.contains('ln-sale'))l.unitPrice=ev.target.value;
-    if(ev.target.classList.contains('ln-cat'))l.activityCategory=ev.target.value||null;
+    if(ev.target.classList.contains('ln-cat')){l.activityCategory=ev.target.value||null;l.categoryAuto=false}
     syncCatalogTarget();recalc();persistDraft();
   };
   $('#lines').addEventListener('input',updateLine);$('#lines').addEventListener('change',updateLine);

@@ -34,10 +34,20 @@ test('les cotisations estimées des documents utilisent les assiettes figées du
   assert.match(report, /Cotisations estimées \(document\)/);
 });
 
+test('l’accueil ne présente pas des encaissements comme un chiffre d’affaires', () => {
+  assert.match(ui, /Encaissements HT du mois/);
+  assert.doesNotMatch(ui, /CA HT du mois/);
+  assert.match(ui, /<small>Encaissements HT<\/small>/);
+});
+
 test('les prévisions issues des factures sont libellées comme factures et comme projections', () => {
   assert.match(ui, /Factures moyennes \/ mois/);
   assert.match(ui, /Factures projetées/);
   assert.match(ui, /Année — réalisé HT \+ projection HT/);
+  // Bases explicites : entrées TTC, provision sur le HT, TVA non déduite du solde.
+  assert.match(ui, /Sorties estimées \(TTC \+ provision HT\)/);
+  assert.match(ui, /Solde estimé \(avant TVA à reverser\)/);
+  assert.match(ui, /La TVA collectée n’est pas déduite du solde/);
   assert.match(ui, /elles ne constituent pas un historique ni une promesse d’encaissement/);
   assert.match(ui, /data-edit-forecast-fixed-costs/);
   assert.match(ui, /api\.saveForecastAssumptions\(payload\)/);

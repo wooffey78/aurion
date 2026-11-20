@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { adminQuery } from '../db.js';
+import { adminQuery, adminTransaction } from '../db.js';
 import { logAdminAccess } from '../db.js';
 import { bumpSessions } from './account.js';
 import { deletePrivateObject } from './storage.js';
@@ -27,7 +27,9 @@ export async function listAccountDeletionRequests(page = 1, pageSize = 25) {
     select r.id, r.email, r.reason, r.source, r.status, r.requested_at as "requestedAt",
            r.cancelled_at as "cancelledAt", r.processed_at as "processedAt",
            r.processed_by as "processedBy", r.audit_reference as "auditReference",
-           r.rejection_reason as "rejectionReason",
+           r.rejection_reason as "rejectionReason", r.attempts as attempts,
+           r.last_error as "lastError", r.last_step as "lastStep",
+           r.processing_started_at as "processingStartedAt",
            u.id is not null as userExists, u.full_name as "fullName",
            (select o.name from organization_members om join organizations o on o.id=om.organization_id
              where om.user_id=r.user_id order by case when om.role='owner' then 0 else 1 end, o.name limit 1) as "organizationName",
@@ -47,74 +49,99 @@ export async function listAccountDeletionRequests(page = 1, pageSize = 25) {
   return { requests: rows, total, pending, page: safePage, pageSize: safeSize, history };
 }
 
-/** Traite réellement une demande : révocations, secrets, espaces, effacement, trace d'audit. */
+/** Traite réellement une demande : réservation atomique, révocations, secrets, espaces,
+ *  effacement transactionnel et trace d'audit. Idempotent et relançable. */
+const PROCESSING_LEASE_MS = 30 * 60 * 1000;
+
 export async function processAccountDeletion(requestId: string, operatorId: string): Promise<DeletionOutcome> {
-  const request = (await adminQuery(
-    'select id,user_id,email,reason,source,status,requested_at from account_deletion_requests where id=$1', [requestId])).rows[0];
-  const auditExisting = (await adminQuery(
-    'select audit_reference as "auditReference" from account_deletion_audit where request_id=$1 and final_status=\'processed\' limit 1', [requestId])).rows[0];
-  if (auditExisting) return { alreadyProcessed: true, auditReference: auditExisting.auditReference };
-  if (!request) throw new AurionError('NOT_FOUND', 'Demande de suppression introuvable.', 404);
-  if (request.status !== 'pending') throw new AurionError('INVALID_STATE', `Cette demande est déjà ${request.status}.`, 409);
-  const userId = String(request.user_id);
-  try {
-    await adminQuery("update account_deletion_requests set status='processing',scheduled_at=coalesce(scheduled_at,now()) where id=$1", [requestId]);
-
-    // 1) Révocation de toutes les sessions (refresh tokens natifs + version de session pour les JWT).
-    const revoked = (await adminQuery('update native_sessions set revoked_at=now() where user_id=$1 and revoked_at is null', [userId])).rowCount || 0;
-    await bumpSessions(userId).catch(() => {});
-
-    // 2) Espaces : si le demandeur est le seul membre, l'espace est fermé (aucun membre restant =>
-    //    aucun accès applicatif possible, RLS fermée ; archives comptables conservées à accès
-    //    restreint, séparées du service). Sinon, seule l'appartenance du demandeur est retirée et
-    //    les données partagées appartenant à d'autres membres sont préservées.
-    const memberships = (await adminQuery(
-      'select organization_id from organization_members where user_id=$1', [userId])).rows;
-    let organizationsClosed = 0, organizationsLeft = 0;
-    for (const membership of memberships) {
-      const orgId = String(membership.organization_id);
-      const others = Number((await adminQuery(
-        'select count(*)::int n from organization_members where organization_id=$1 and user_id<>$2', [orgId, userId])).rows[0]?.n || 0);
-      if (others === 0) {
-        // Espace mono-utilisateur : secrets d'intégration et connexions externes supprimés.
-        await adminQuery('delete from google_connections where organization_id=$1', [orgId]);
-        await adminQuery('delete from google_oauth_states where organization_id=$1', [orgId]);
-        await adminQuery('delete from mail_accounts where organization_id=$1', [orgId]);
-        await adminQuery("update billing_payment_requests set status='canceled',paid_at=null where organization_id=$1 and status='pending'", [orgId]);
-        organizationsClosed += 1;
-      } else {
-        organizationsLeft += 1;
+  // 1) Réservation ATOMIQUE de la demande : verrou de ligne + statut daté. Deux opérateurs
+  //    simultanés ne peuvent plus traiter la même demande ; une reprise n'est possible
+  //    qu'après expiration du bail (opérateur interrompu).
+  const reserved = await adminTransaction(async client => {
+    const request = (await client.query(
+      'select id,user_id,email,reason,source,status,requested_at,processing_started_at from account_deletion_requests where id=$1 for update', [requestId])).rows[0];
+    if (!request) throw new AurionError('NOT_FOUND', 'Demande de suppression introuvable.', 404);
+    const done = (await client.query(
+      "select audit_reference as \"auditReference\" from account_deletion_audit where request_id=$1 and final_status='processed' limit 1", [requestId])).rows[0];
+    if (done) return { alreadyProcessed: true as const, auditReference: String(done.auditReference) };
+    if (request.status === 'processing') {
+      const started = request.processing_started_at ? new Date(request.processing_started_at).getTime() : 0;
+      if (Date.now() - started < PROCESSING_LEASE_MS) {
+        throw new AurionError('INVALID_STATE', 'Cette demande est déjà en cours de traitement par un autre opérateur. Réessayez dans quelques minutes.', 409);
       }
-      await adminQuery('delete from organization_members where organization_id=$1 and user_id=$2', [orgId, userId]);
+    } else if (request.status !== 'pending') {
+      throw new AurionError('INVALID_STATE', `Cette demande est déjà ${request.status}.`, 409);
     }
-
-    // 2bis) Les accès gratuits VIP que le demandeur avait accordés restent en place : seule la
-    // référence « invited_by » (NOT NULL, ON DELETE RESTRICT) est réattribuée à l'opérateur.
-    await adminQuery('update vip_guest_accounts set invited_by=$2 where invited_by=$1', [userId, operatorId]);
-
-    // 3) Données et objets privés personnels (avatar privé, préférences de profil).
+    await client.query(
+      "update account_deletion_requests set status='processing',processing_by=$2,processing_started_at=now(),attempts=coalesce(attempts,0)+1,last_error=null,last_step='reserved',scheduled_at=coalesce(scheduled_at,now()) where id=$1",
+      [requestId, operatorId]);
+    return { alreadyProcessed: false as const, request };
+  });
+  if (reserved.alreadyProcessed) return { alreadyProcessed: true, auditReference: reserved.auditReference };
+  const request: any = (reserved as any).request;
+  const userId = String(request.user_id);
+  let step = 'started';
+  try {
+    // 2) Révocations et objets externes : une erreur n'est PLUS avalée — la demande repasse
+    //    en attente avec l'étape fautive enregistrée, pour un nouveau traitement complet.
+    step = 'sessions';
+    const revoked = (await adminQuery('update native_sessions set revoked_at=now() where user_id=$1 and revoked_at is null', [userId])).rowCount || 0;
+    step = 'session-version';
+    await bumpSessions(userId);
+    step = 'avatar';
     const avatarKey = (await adminQuery('select avatar_key from users where id=$1', [userId])).rows[0]?.avatar_key;
-    if (avatarKey) { await deletePrivateObject(String(avatarKey)).catch(() => {}); }
+    if (avatarKey) await deletePrivateObject(String(avatarKey));
 
-    // 4) Trace d'audit écrite AVANT l'effacement du compte : la suppression de l'utilisateur
-    //    cascadait la ligne de demande (085) ; l'audit conserve la preuve du traitement.
-    const auditReference = `SUP-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
-    await adminQuery(`insert into account_deletion_audit
-      (request_id,email_hash,source,requested_at,processed_at,processed_by,audit_reference,final_status,
-       organizations_closed,organizations_left,sessions_revoked)
-      values ($1,$2,$3,$4,now(),$5,$6,'processed',$7,$8,$9)`,
-      [requestId, emailHash(String(request.email)), String(request.source || 'app'), request.requested_at,
-        operatorId, auditReference, organizationsClosed, organizationsLeft, revoked]);
-    await logAdminAccess('account-deletion.process', { requestId, auditReference, organizationsClosed, organizationsLeft });
-
-    // 5) Effacement du compte : les données personnelles (sessions, brouillons synchronisés,
-    //    comptes VIP invités, tokens de vérification…) disparaissent par cascade ; les données
-    //    métier partagées restent aux organisations qui ont d'autres membres autorisés.
-    await adminQuery('delete from users where id=$1', [userId]);
-    return { auditReference, organizationsClosed, organizationsLeft, sessionsRevoked: revoked };
+    // 3) Effacement relationnel dans UNE SEULE transaction : espaces, secrets, réattribution
+    //    VIP, trace d'audit puis suppression du compte. Toute erreur annule l'ensemble.
+    step = 'erasure';
+    const result = await adminTransaction(async client => {
+      const locked = (await client.query("select status from account_deletion_requests where id=$1 for update", [requestId])).rows[0];
+      if (!locked || locked.status !== 'processing') throw new AurionError('INVALID_STATE', 'La demande n’est plus en cours de traitement.', 409);
+      await client.query("update account_deletion_requests set last_step='memberships' where id=$1", [requestId]);
+      const memberships = (await client.query('select organization_id from organization_members where user_id=$1', [userId])).rows;
+      let organizationsClosed = 0, organizationsLeft = 0;
+      for (const membership of memberships) {
+        const orgId = String(membership.organization_id);
+        const others = Number((await client.query(
+          'select count(*)::int n from organization_members where organization_id=$1 and user_id<>$2', [orgId, userId])).rows[0]?.n || 0);
+        if (others === 0) {
+          // Espace mono-utilisateur : secrets d'intégration et connexions externes supprimés.
+          await client.query('delete from google_connections where organization_id=$1', [orgId]);
+          await client.query('delete from google_oauth_states where organization_id=$1', [orgId]);
+          await client.query('delete from mail_accounts where organization_id=$1', [orgId]);
+          await client.query("update billing_payment_requests set status='canceled',paid_at=null where organization_id=$1 and status='pending'", [orgId]);
+          organizationsClosed += 1;
+        } else {
+          organizationsLeft += 1;
+        }
+        await client.query('delete from organization_members where organization_id=$1 and user_id=$2', [orgId, userId]);
+      }
+      await client.query("update account_deletion_requests set last_step='audit' where id=$1", [requestId]);
+      await client.query('update vip_guest_accounts set invited_by=$2 where invited_by=$1', [userId, operatorId]);
+      const auditReference = `SUP-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
+      await client.query(`insert into account_deletion_audit
+        (request_id,email_hash,source,requested_at,processed_at,processed_by,audit_reference,final_status,
+         organizations_closed,organizations_left,sessions_revoked)
+        values ($1,$2,$3,$4,now(),$5,$6,'processed',$7,$8,$9)`,
+        [requestId, emailHash(String(request.email)), String(request.source || 'app'), request.requested_at,
+          operatorId, auditReference, organizationsClosed, organizationsLeft, revoked]);
+      await client.query("update account_deletion_requests set last_step='delete-user' where id=$1", [requestId]);
+      await client.query('delete from users where id=$1', [userId]);
+      return { auditReference, organizationsClosed, organizationsLeft };
+    });
+    await logAdminAccess('account-deletion.process', {
+      requestId, auditReference: result.auditReference,
+      organizationsClosed: result.organizationsClosed, organizationsLeft: result.organizationsLeft,
+    });
+    return { ...result, sessionsRevoked: revoked };
   } catch (error) {
-    // Relançable : la demande repasse en attente, aucun état intermédiaire bloquant.
+    const message = error instanceof Error ? error.message : String(error);
+    // Relançable : retour en attente, étape et erreur conservées pour l'opérateur.
     await adminQuery("update account_deletion_requests set status='pending' where id=$1 and status='processing'", [requestId]).catch(() => {});
+    await adminQuery(
+      "update account_deletion_requests set last_error=$2,last_step=$3,processing_by=null,processing_started_at=null where id=$1 and status='pending'",
+      [requestId, message.slice(0, 500), step]).catch(() => {});
     throw error;
   }
 }

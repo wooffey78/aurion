@@ -20,7 +20,7 @@ import { buildStructuredInvoice } from '../services/electronic-invoice.js';
 import { detectFiscalSettings, detectLegalFormFromProfile, isOwnerLegalFormAllowed, OWNER_LEGAL_FORM_REFUSAL, OWNER_LEGAL_FORMS } from '../services/fiscal-detection.js';
 import { MICRO_CATEGORIES, MICRO_CATEGORY_CODES, loadReferentialVersions, referentialForDate, splitByCategory, categoryAccounting, normalizeCategoryInput, BUILTIN_REFERENTIAL_2026 } from '../services/micro-referential.js';
 import { proposeCategoryFromNaf, proposeProfileFromNaf } from '../services/micro-detection.js';
-import { urssafDeadlines, thresholdStatuses, recordThresholdAlerts, THRESHOLDS_2026, type MicroCategoryForThreshold } from '../services/fiscal-calendar.js';
+import { urssafDeadlines, thresholdStatuses, recordThresholdAlerts, recordUpcomingFiscalDeadlines, THRESHOLDS_2026, type MicroCategoryForThreshold } from '../services/fiscal-calendar.js';
 import { buildFec, revenueBookCsv, simplifiedLedgerCsv, contributionsTableCsv, revenueJournal, purchasesJournal } from '../services/accounting-export.js';
 import { allocateInstallmentPayments, buildInstallmentPlan, calculateInvoicePayment, calculateReminderPenalty, isValidDateOnly, normalizePaymentDate, reminderTotal } from '../services/invoice-workflow.js';
 import { paymentsConfigured } from '../services/payments/index.js';
@@ -697,7 +697,7 @@ export async function businessRoutes(app:FastifyInstance){
     await platformAdminQuery('update accountant_invitations set accepted_at=now() where id=$1',[inv.id]);
     return {ok:true,note:'Accès comptable accordé (lecture seule). Reconnectez-vous pour que le rôle soit actif dans votre session.'};
   });
-  app.post('/activities/detect-fiscal',async(r,reply)=>{const b:any=r.body||{};if(!b.legalForm)return reply.code(400).send({error:'INVALID_INPUT'});const p=profileFor(String(b.name||''),String(b.description||''),b.profileCode);const detected=detectFiscalSettings(String(b.legalForm),p.code,String(b.name||''),String(b.description||''));return {...detected,cgvText:defaultCgvFor(p.code,p.title,String(b.legalForm||''))};});
+  app.post('/activities/detect-fiscal',async(r,reply)=>{const b:any=r.body||{};if(!b.legalForm)return reply.code(400).send({error:'INVALID_INPUT'});const p=profileFor(String(b.name||''),String(b.description||''),b.profileCode);const detected=detectFiscalSettings(String(b.legalForm),p.code,String(b.name||''),String(b.description||''),{annualRevenueHt:b.annualRevenueHt??null,vatRegime:b.vatRegime??null,nafCode:b.nafCode??null});return {...detected,cgvText:defaultCgvFor(p.code,p.title,String(b.legalForm||''))};});
   app.post('/activities/detect-legal-form',async(r,reply)=>{const b:any=r.body||{};return detectLegalFormFromProfile(String(b.name||''),String(b.description||''));});
   app.post('/activities/detect-profile',async(r,reply)=>{const b:any=r.body||{};const p=profileFor(String(b.name||''),String(b.description||''),b.profileCode);const nafHint=proposeProfileFromNaf(b.nafCode||'');
     // L'indice NAF affine la suggestion : le métier précis du code APE détecté est proposé
@@ -727,7 +727,7 @@ export async function businessRoutes(app:FastifyInstance){
       await query('insert into activities(id,organization_id,code,name,description,legal_form,cgv_text,urssaf_rate,vat_rate,margin_min_percent,default_part_coefficient_percent,default_labor_coefficient_percent) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[id,r.auth!.organizationId,code,b.name.trim(),b.description||null,b.legalForm||null,b.cgvText||null,b.urssafRate===''?null:urssafRate,vatRate,marginMinPercent,partCoefficient,laborCoefficient]);
       if(b.profileCode&&PROFILE_CODES.includes(b.profileCode))await saveActivityProfileOverride(r.auth!.organizationId,id,b.profileCode);
       const profile=profileFor(b.name.trim(),b.description||'',b.profileCode);
-      const detected=detectFiscalSettings(String(b.legalForm||''),profile.code,b.name.trim(),b.description||'');
+      const detected=detectFiscalSettings(String(b.legalForm||''),profile.code,b.name.trim(),b.description||'',{annualRevenueHt:b.annualRevenueHt??null,vatRegime:b.vatRegime??null,nafCode:b.nafCode??null});
       if(b.legalForm&&b.autoFiscalDetect!==false){
         await query('update activities set urssaf_rate=$1,vat_rate=coalesce($2,vat_rate),social_regime=$3,vat_regime=$4,social_auto_detected=true,vat_auto_detected=true where id=$5 and organization_id=$6',[detected.socialRate,detected.vatRate,detected.socialRegime,detected.vatRegime,id,r.auth!.organizationId]);
         await saveContributionPresets(r.auth!.organizationId,id,detected.contributions);
@@ -776,7 +776,7 @@ export async function businessRoutes(app:FastifyInstance){
     if(b.autoFiscalDetect===false)await query('update activities set social_auto_detected=false,vat_auto_detected=false where id=$1 and organization_id=$2',[id,r.auth!.organizationId]);
     if(b.legalForm&&b.autoFiscalDetect!==false){
       const a=x.rows[0],p=profileFor(a.name,a.description||'',b.profileCode);
-      const detected=detectFiscalSettings(String(b.legalForm),p.code,a.name,a.description||'');
+      const detected=detectFiscalSettings(String(b.legalForm),p.code,a.name,a.description||'',{annualRevenueHt:b.annualRevenueHt??null,vatRegime:b.vatRegime??null,nafCode:b.nafCode??null});
       const keepManualSocial=a.social_auto_detected===false&&b.urssafRate!==undefined;
       const keepManualVat=a.vat_auto_detected===false&&b.vatRate!==undefined;
       const socialRate=keepManualSocial?Number(urssafRate):detected.socialRate;
@@ -1423,7 +1423,9 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
           ?(await client.query(`select ${invoiceAddressSource==='intervention'?'intervention_address':'address'} from clients where id=$1 and organization_id=$2`,[current.client_id,org])).rows[0]?.[invoiceAddressSource==='intervention'?'intervention_address':'address']||null
           :null);
       const number=await nextNumber(org,'FAC',client);
-      const updated=await client.query("update quotes set document_type='invoice',status='issued',number=$1,payment_status='unpaid',amount_paid=0,paid_at=null,invoice_address_source=$2,billing_address_snapshot=$3,due_at=$4::date,reminder_interval_days=$5::int,next_reminder_at=case when $5::int > 0 then ($4::date + interval '1 day')::timestamptz else null end,updated_at=now() where id=$6::uuid and organization_id=$7::uuid and document_type<>'invoice' returning id",[number,invoiceAddressSource,billingAddress,dueAt,reminderInterval,id,org]);
+      // La facture ne doit pas hériter du sent_at du devis : elle n'a pas encore été envoyée.
+      // emailDocument() (ou l'action d'envoi explicite) renseignera sent_at après un envoi réel.
+      const updated=await client.query("update quotes set document_type='invoice',status='issued',number=$1,payment_status='unpaid',amount_paid=0,paid_at=null,sent_at=null,invoice_address_source=$2,billing_address_snapshot=$3,due_at=$4::date,reminder_interval_days=$5::int,next_reminder_at=case when $5::int > 0 then ($4::date + interval '1 day')::timestamptz else null end,updated_at=now() where id=$6::uuid and organization_id=$7::uuid and document_type<>'invoice' returning id",[number,invoiceAddressSource,billingAddress,dueAt,reminderInterval,id,org]);
       if(!updated.rowCount)return {ok:false as const,status:409,error:'ALREADY_INVOICE',message:'Ce document a déjà été converti en facture.'};
       return {ok:true as const,number,clientId:current.client_id,activityId:current.activity_id};
     });
@@ -1564,8 +1566,15 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     await query('update quotes set reminder_count=$1,last_reminder_at=now(),next_reminder_at=$2,updated_at=now() where id=$3 and organization_id=$4',[next,nextAt,id,org]);
     return {ok:true,reminderNumber:next,penaltyAmount:penalty};
   });
-  app.post('/time-metrics/reset',async r=>{
+  app.post('/time-metrics/reset',async(r,reply)=>{
     const org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));
+    // Une remise à zéro sans activité supprimait l'historique de TOUTES les activités de
+    // l'organisation. Elle est désormais refusée dès qu'il existe plusieurs activités :
+    // l'interface transmet l'activité affichée et la suppression reste strictement bornée.
+    if(!aid){
+      const count=Number((await query('select count(*)::int n from activities where organization_id=$1',[org])).rows[0]?.n||0);
+      if(count>1)return reply.code(400).send({error:'ACTIVITY_REQUIRED',message:'La remise à zéro doit viser une activité précise. Sélectionnez l’activité affichée et réessayez.'});
+    }
     if(aid)await query('delete from client_time_sessions where organization_id=$1 and activity_id=$2',[org,aid]);
     else await query('delete from client_time_sessions where organization_id=$1',[org]);
     return {ok:true,activityId:aid};
@@ -1683,6 +1692,8 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
   app.delete('/sav/:id',async(r,reply)=>{const id=String((r.params as any).id),org=r.auth!.organizationId;const x=await query('delete from sav_cases where id=$1 and organization_id=$2 returning id',[id,org]);if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});await query('delete from accounting_entries where source_id=$1 and organization_id=$2',[id,org]);return {ok:true};});
   app.get('/dashboard/summary',async r=>{
     const org=r.auth!.organizationId;
+    // Échéance URSSAF à moins de 7 jours : alimente le journal de bord sans exposer le calendrier.
+    try{await recordUpcomingFiscalDeadlines(org)}catch(e:any){r.log.warn({err:String(e?.message||e)},'fiscal deadline journal skipped')}
     const [aid,t]=await Promise.all([
       ensureActivity(r,activityId(r)),
       query(`select count(*)::int n from support_tickets where organization_id=$1 and status not in ('resolved','duplicate','closed')`,[org])

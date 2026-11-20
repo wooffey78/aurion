@@ -32,7 +32,7 @@ function connected(root,st,ctx){
 }
 
 function google(st){
-  if(!st.google.configured)return`<details class="advanced"><summary>Google Agenda non configuré</summary><p class="help">Un administrateur doit renseigner les variables OAuth du backend : ${(st.google.missingConfiguration||[]).map(e).join(', ')||'vérifier la configuration Google'}.</p></details>`;
+  if(!st.google.configured)return`<details class="advanced"><summary>Google Agenda non configuré sur ce serveur</summary><p class="help">La messagerie fonctionne sans Google : la synchronisation de l’agenda nécessite une application OAuth Google propre à votre installation. Renseignez ${(st.google.missingConfiguration||[]).map(e=>`<code>${e}</code>`).join(', ')||'les variables Google'} dans le fichier d’environnement du backend (<code>backend/.env</code> en local), puis redémarrez Aurion. Sur une instance hébergée, ces variables se configurent côté serveur (Render → Environment).</p><p class="help">La configuration de la boîte mail (SMTP/IMAP) est indépendante : elle ne fournit pas les identifiants OAuth de Google Agenda.</p></details>`;
   return`<details class="advanced"><summary>Connexion Google avancée (Google Agenda en direct)</summary><div class="button-row"><button class="btn secondary" id="g-connect">${st.google.connected?'Reconnecter Google':'Connecter Google'}</button>${st.google.connected?'<button class="btn danger" id="g-off">Déconnecter Google</button>':''}</div></details>`;
 }
 function bindGoogle(root,ctx){

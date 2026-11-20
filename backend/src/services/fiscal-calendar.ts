@@ -174,6 +174,31 @@ export function thresholdStatuses(
   return rows;
 }
 
+/** Alerte d'échéance URSSAF à moins de 7 jours, inscrite au journal de bord.
+ * Le calendrier fiscal n'est plus exposé dans l'interface : l'échéance reste calculée en interne et
+ * n'apparaît que comme événement du journal. L'événement n'est jamais résolu automatiquement :
+ * seul un clic explicite de l'utilisateur (« Supprimer l'alerte ») le fait disparaître. */
+export async function recordUpcomingFiscalDeadlines(orgId: string, today = new Date()) {
+  const periodicity = (await query('select urssaf_periodicity from organizations where id=$1', [orgId])).rows[0]?.urssaf_periodicity as Periodicity | null;
+  if (periodicity !== 'mensuelle' && periodicity !== 'trimestrielle') return;
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const nowIso = iso(today);
+  const limitIso = iso(new Date(today.getTime() + 7 * 86400000));
+  const year = today.getUTCFullYear();
+  const deadlines = [...urssafDeadlines(year, periodicity), ...urssafDeadlines(year + 1, periodicity)];
+  for (const d of deadlines) {
+    if (d.dueDate < nowIso || d.dueDate > limitIso) continue;
+    const days = Math.round((Date.parse(`${d.dueDate}T00:00:00Z`) - Date.parse(`${nowIso}T00:00:00Z`)) / 86400000);
+    const key = `fiscal-deadline-${d.dueDate}`;
+    await query(
+      `insert into dashboard_journal_events(organization_id,event_type,title,description,severity,source,dedupe_key,internal_path)
+       values($1,'fiscal_deadline',$2,$3,'warning','fiscal_calendar',$4,'/dashboard')
+       on conflict (organization_id,dedupe_key) do nothing`,
+      [orgId, `Échéance URSSAF · ${d.periodLabel}`, `La déclaration et le paiement de la période ${d.periodStart} → ${d.periodEnd} sont attendus le ${d.dueDate} (dans ${days} jour${days > 1 ? 's' : ''}). Supprimez cette alerte une fois l'échéance traitée.`, key],
+    );
+  }
+}
+
 /** Alertes de seuil persistées au journal de bord (une seule par seuil : déduplication `dedupe_key`). */
 export async function recordThresholdAlerts(orgId: string, year: number, statuses: ThresholdStatus[]) {
   for (const s of statuses) {

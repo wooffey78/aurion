@@ -17,6 +17,8 @@ const schema=z.object({
  COOKIE_SECURE:z.enum(['true','false']).default('false').transform(v=>v==='true'),
  GOOGLE_CLIENT_ID:z.string().default(''), GOOGLE_CLIENT_SECRET:z.string().default(''), GOOGLE_REDIRECT_URI:z.string().default(''),
  GOOGLE_TOKEN_ENCRYPTION_KEY:z.string().default(''), GOOGLE_CALENDAR_ID:z.string().default('primary'),
+ // Auth0 — connexion SSO OIDC serveur (le compte Aurion existant est résolu par e-mail vérifié).
+ AUTH0_DOMAIN:z.string().trim().default(''), AUTH0_CLIENT_ID:z.string().trim().default(''), AUTH0_CLIENT_SECRET:z.string().default(''), AUTH0_REDIRECT_URI:z.string().trim().default(''),
  // Stockage documentaire cloud (15.4.0) : retour OAuth distinct de la messagerie et seuils d'alerte de quota centralisés.
  GOOGLE_DRIVE_REDIRECT_URI:z.string().default(''), AURION_CLOUD_QUOTA_THRESHOLDS:z.string().regex(/^\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*$/).default('80,90,95,100'),
  MAIL_FROM_NAME:z.string().default('Aurion'), AURION_ENCRYPTION_KEY:z.string().default(''), AURION_ENCRYPTION_KEY_VERSION:z.string().trim().min(1).default('k1'), AURION_ENCRYPTION_KEY_PREVIOUS:z.string().default(''), AURION_ENCRYPTION_KEY_PREVIOUS_VERSION:z.string().default(''), AURION_ENCRYPTION_LEGACY_JWT_KEY:z.enum(['true','false']).default('false').transform(v=>v==='true'), APP_BASE_URL:z.string().default(''), PLATFORM_SMTP_HOST:z.string().default(''), PLATFORM_SMTP_PORT:z.coerce.number().int().default(465), PLATFORM_SMTP_SECURITY:z.enum(['ssl','starttls','none']).default('ssl'), PLATFORM_SMTP_USER:z.string().default(''), PLATFORM_SMTP_PASS:z.string().default(''), PLATFORM_SMTP_FROM:z.string().default(''), RATE_LIMIT_MAX:z.coerce.number().int().min(60).default(1500), LOG_LEVEL:z.enum(['fatal','error','warn','info','debug','trace']).default('info'), BILLING_VAT_RATE_BPS:z.coerce.number().int().min(0).max(100000).default(0), STRIPE_SECRET_KEY:z.string().default(''), STRIPE_WEBHOOK_SECRET:z.string().default(''), BANK_TRANSFER_IBAN:z.string().default(''), BANK_TRANSFER_BIC:z.string().default(''), BANK_TRANSFER_HOLDER:z.string().default('Aurion'),
@@ -74,6 +76,23 @@ if(parsed.NODE_ENV==='production'){
  if(parsed.AURION_ENCRYPTION_LEGACY_JWT_KEY)console.warn('[AURION] Déchiffrement transitoire des secrets v1 avec la clé JWT explicitement activé ; ré-encryptez les secrets avant de désactiver ce mode.')
 }
 if(parsed.GOOGLE_CLIENT_ID && !parsed.GOOGLE_CLIENT_SECRET)throw new Error('GOOGLE_CLIENT_SECRET manquant.');
+// Auth0 est facultatif. Une configuration partielle est refusée plutôt que d'afficher
+// un bouton SSO qui ne peut pas aboutir.
+const auth0Parts=[parsed.AUTH0_DOMAIN,parsed.AUTH0_CLIENT_ID,parsed.AUTH0_CLIENT_SECRET];
+const auth0Any=auth0Parts.some(Boolean), auth0All=auth0Parts.every(Boolean);
+if(auth0Any&&!auth0All)throw new Error('AUTH0_DOMAIN, AUTH0_CLIENT_ID et AUTH0_CLIENT_SECRET doivent être définis ensemble.');
+if(auth0All){
+ if(parsed.AUTH0_DOMAIN.includes('://')||parsed.AUTH0_DOMAIN.includes('/')||parsed.AUTH0_DOMAIN.includes('?')||parsed.AUTH0_DOMAIN.includes('#'))throw new Error('AUTH0_DOMAIN doit contenir uniquement le nom d’hôte Auth0, sans protocole ni chemin.');
+ let auth0Domain:URL;
+ try{auth0Domain=new URL(`https://${parsed.AUTH0_DOMAIN}`)}catch{throw new Error('AUTH0_DOMAIN invalide.');}
+ if(auth0Domain.hostname!==parsed.AUTH0_DOMAIN||auth0Domain.protocol!=='https:'||auth0Domain.port||auth0Domain.pathname!=='/')throw new Error('AUTH0_DOMAIN doit être un nom d’hôte HTTPS Auth0 valide.');
+ const redirectValue=parsed.AUTH0_REDIRECT_URI|| (parsed.APP_BASE_URL?new URL('/auth/auth0/callback',parsed.APP_BASE_URL).toString():'');
+ let auth0Redirect:URL;
+ try{auth0Redirect=new URL(redirectValue)}catch{throw new Error('AUTH0_REDIRECT_URI doit être une URL absolue /auth/auth0/callback.');}
+ const expectedOrigin=parsed.APP_BASE_URL?new URL(parsed.APP_BASE_URL).origin:null;
+ if(auth0Redirect.pathname!=='/auth/auth0/callback'||auth0Redirect.search||auth0Redirect.hash||auth0Redirect.username||auth0Redirect.password||!expectedOrigin||auth0Redirect.origin!==expectedOrigin||(parsed.NODE_ENV==='production'&&auth0Redirect.protocol!=='https:'))throw new Error('AUTH0_REDIRECT_URI doit correspondre exactement à APP_BASE_URL/auth/auth0/callback.');
+}
+
 // Hors production : un provider déclaré sans secret serait une réception muette non signée ; refus explicite.
 if(parsed.AURION_PA_PROVIDER && !parsed.AURION_PA_WEBHOOK_SECRET)throw new Error('AURION_PA_WEBHOOK_SECRET doit être défini lorsque AURION_PA_PROVIDER est configuré.');
 // Bloc 13 — secret de webhook de paiement obligatoire dès que le prestataire est configuré

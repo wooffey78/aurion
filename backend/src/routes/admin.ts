@@ -36,6 +36,7 @@ export async function adminRoutes(app:FastifyInstance){
           case
             when oa.has_admin or oa.has_vip then 'free'
             when s.organization_id is null then 'other'
+            when s.status='no_billing' then 'no_billing'
             when s.status='trialing' and s.trial_ends_at>now() then 'trial'
             when s.status='active' and (s.current_period_end is null or s.current_period_end>=now()) then 'subscribed'
             when s.status in ('canceled','expired','past_due')
@@ -54,6 +55,7 @@ export async function adminRoutes(app:FastifyInstance){
         count(*) filter(where category='trial')::int as trial,
         count(*) filter(where category='subscribed')::int as subscribed,
         count(*) filter(where category='expired')::int as expired,
+        count(*) filter(where category='no_billing')::int as no_billing,
         count(*) filter(where category='other')::int as other,
         count(*) filter(where category='subscribed' and plan_code='monthly')::int as monthly,
         count(*) filter(where category='subscribed' and plan_code='yearly')::int as yearly,
@@ -125,7 +127,7 @@ export async function adminRoutes(app:FastifyInstance){
       users:Number(totals.users||0),organizations:Number(totals.organizations||0),
       free:Number(totals.free||0),freeBreakdown:{adminOnly:Number(totals.admin_only||0),vipOnly:Number(totals.vip_only||0),adminAndVip:Number(totals.admin_and_vip||0)},
       trial:Number(totals.trial||0),monthly:Number(totals.monthly||0),yearly:Number(totals.yearly||0),
-      totalPaid:Number(totals.subscribed||0),expired:Number(totals.expired||0),other:Number(totals.other||0),
+      totalPaid:Number(totals.subscribed||0),expired:Number(totals.expired||0),noBilling:Number(totals.no_billing||0),other:Number(totals.other||0),
       cancelScheduled:Number(totals.cancel_scheduled||0),
       conversionRate:completed?Number((converted/completed*100).toFixed(1)):0,
       conversionCohort:{completed,converted},

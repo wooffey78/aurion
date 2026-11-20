@@ -8,6 +8,7 @@ backend/.env.*
 
 # Dependencies and generated output
 node_modules/
+**/.gradle/
 backend/node_modules/
 backend/dist/
 dist/
@@ -28,3 +29,9 @@ logs/
 Thumbs.db
 .vscode/
 .idea/
+
+# Secrets de signature Android (jamais versionnés ni archivés)
+android/keystore.properties
+android/keystore/
+*.jks
+*.keystore

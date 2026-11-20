@@ -9,7 +9,8 @@ test('Accueil distingue devis actifs, encaissements et rendez-vous à venir', ()
   assert.match(ui, /!\['canceled','cancelled','rejected','void','deleted'\]\.includes/);
   assert.match(ui, /Rendez-vous à venir/);
   assert.match(ui, /new Date\(a\.starts_at\)>now/);
-  assert.match(ui, /encaissements HT, majorations comprises/);
+  assert.match(ui, /Encaissements HT du mois/);
+  assert.match(ui, /paiements reçus, majorations comprises/);
   assert.match(ui, /TTC, SAV déduits/);
 });
 
@@ -46,6 +47,9 @@ test('La fiche client sépare factures émises, payé et restant dû', () => {
   assert.match(ui, /Factures émises TTC/);
   assert.match(ui, /payé \$\{money\(st\.paidTtc\|\|0\)\}/);
   assert.match(ui, /restant \$\{money\(st\.remainingTtc\|\|0\)\}/);
+  // Les documents annulés/refusés restent visibles dans l'historique, mais marqués comme tels.
+  assert.match(ui, /' · Annulé'/);
+  assert.match(ui, /' · Refusé'/);
 });
 
 test('Les indicateurs de temps sont libellés sur les sessions terminées', () => {

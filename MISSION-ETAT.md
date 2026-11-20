@@ -1,10 +1,54 @@
-# État de la mission — 14 novembre 2026 (session 6 : Blocs 6-bis, 7, 19-partiel + recherches 15/17/18)
+# État de la mission — 20 novembre 2026 (candidate 15.4.39)
 
-Prompt maître « finalisation vers 100 % » (21 blocs). Base : chaîne de livraisons 15.4.30 → 15.4.31 → 15.4.32 → **15.4.33**.
+**Avancement pondéré estimé : 64,1 %** (grille constante de 95 points). La 15.4.39 conserve la correction d'inscription sans Stripe et ajoute une connexion SSO Auth0 facultative. Cette dernière n'est pas encore activée sur un tenant réel.
 
-## Livraison courante
+**Statut : candidate à recette, non publiée.** La vérification frontend et les 10 tests ciblés passent. Le smoke a donné 166/168 dans cet environnement : les deux échecs nécessitent des dépendances compilées/installées absentes ici. Le build TypeScript complet, Playwright et l'authentification Auth0 réelle restent à valider.
+
+| Domaine | Poids | Avancement |
+|---|---:|---:|
+| A. Fonctions métier et calculs | 12 | 95 % |
+| B. Synchronisation et mode hors ligne | 16 | 78 % |
+| C. Documents, stockage et appareils | 7 | 74 % |
+| D. Web/PWA/Windows/Android/iOS | 8 | 42 % |
+| E. Infrastructure, migrations, sauvegardes | 12 | 29 % |
+| F. Sécurité, RLS, secrets, RGPD | 10 | 78 % |
+| G. Intégrations externes | 9 | 45 % |
+| H. Juridique et commercial | 8 | 50 % |
+| I. Tests, accessibilité, bêta, support | 13 | 70 % |
+| **Total pondéré** | **95** | **64,1 %** |
+
+Détail, limites, tests et risques : `RAPPORT-AUDIT-15.4.39.md`. Guide Auth0 : `docs/AUTH0-CONFIGURATION.md`.
+
+Priorités : build/typecheck + tests PostgreSQL/Playwright ; tenant Auth0 réel ; CI entièrement verte ; sauvegarde/restauration ; PA/e-reporting et documents juridiques ; builds natifs.
+
+**GitHub et Render :** aucun push ni déploiement 15.4.39 n'est déclaré effectué. L'état distant précédent est 15.4.35.
+
+---
+
+## Historique — état de la mission 15.4.36 (20 novembre 2026)
+
+**Version de référence : 15.4.36** (branche `main` de `wooffey78/aurion`, dérivée de la 15.4.35 poussée).
+
+Cette livraison corrige les anomalies P0/P1 de l'audit 15.4.35 :
+
+- **TVA** : la franchise en base n'est plus déduite du seul régime micro ; seuils 2026 par activité
+  (37 500 / 41 250 € services, 85 000 / 93 500 € vente) et état « à confirmer » explicite.
+- **Cotisations** : CFP commerçant 0,10 % vs artisan 0,30 %, branche CIPAV à 23,20 % distincte du BNC 25,60 %.
+- **Suppression de compte** : réservation atomique verrouillée, effacement transactionnel, erreurs
+  externes remontées, reprise traçable (migration 090).
+- **Métiers** : 30 profils (10 nouveaux), catalogues et vocabulaire de détection enrichis.
+- **Placeholders** : plus de faux zéro sur les frais kilométriques et le coefficient des devis/factures.
+- **Remise à zéro du temps** : strictement bornée à l'activité affichée.
+- **Documentation** : chemins et versions alignés (applications natives, rotation des secrets, README).
+
+Les sections datées ci-dessous (15.4.30 → 15.4.33) sont conservées **comme historique** et ne
+représentent plus l'état courant du produit.
+
+## Historique — livraison 15.4.33
 
 **`aurion-15.4.33-blocs-6-7-offline.zip`** — SHA-256 consigné en fin de session — `unzip -t` sans erreur — VERSION 15.4.33 cohérente partout.
+
+Prompt maître « finalisation vers 100 % » (21 blocs). Base : chaîne de livraisons 15.4.30 → 15.4.31 → 15.4.32 → **15.4.33**.
 
 ## Validation exécutée cette session (PostgreSQL 16 réel)
 

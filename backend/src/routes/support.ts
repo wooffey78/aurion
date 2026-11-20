@@ -9,7 +9,61 @@ const STATUS_LABELS={open:'Ouvert',in_progress:'En cours',waiting_user:'En atten
 const SLA:{[k:string]:number}={ 'SAV':2,'Facturation':2,'Remboursement':3,'Problème sur le site':1,'Compte et connexion':2,'Devis et factures':1,'Documents et modèles':2,'Messagerie et agenda':2,'Installation / application':3,'Sécurité et confidentialité':1,'Bug ou erreur':1,'Suggestion d’amélioration':5,'Autre':3 };
 function supportAddress(){ return config.AURION_SUPPORT_EMAIL; }
 async function nextNumber(_org:string){const r=await query(`select nextval('aurion_support_ticket_seq') n`);return `AURION-SUP-${String(r.rows[0].n).padStart(6,'0')}`}
-async function isAdmin(userId:string){return !!(await query("select 1 from users u left join platform_admins pa on pa.user_id=u.id where u.id=$1 and (pa.user_id is not null )",[userId])).rowCount}
+/**
+ * Autorisation de l'amorçage administrateur. Réservé au mode local / non-production :
+ * sur une instance déployée exposée (`NODE_ENV=production`), un propriétaire n'est JAMAIS
+ * promu automatiquement, quelle que soit la variable d'environnement. Le premier
+ * administrateur d'une instance de production se crée explicitement avec
+ * `npm run admin:create` (backend/src/create-admin.ts).
+ *
+ * En local/développement/test, l'amorçage reste actif par défaut ; `AURION_ADMIN_BOOTSTRAP=false`
+ * le désactive, sans toucher au code.
+ */
+export function adminBootstrapAllowed(nodeEnv:string=config.NODE_ENV,flag:string|undefined=process.env.AURION_ADMIN_BOOTSTRAP){
+ return nodeEnv!=='production'&&String(flag??'').trim().toLowerCase()!=='false';
+}
+
+/**
+ * Promotion effective, isolée pour être vérifiable : renvoie true seulement si la ligne
+ * `platform_admins` existe après l'écriture. Toute erreur d'insertion (RLS, privilège,
+ * contrainte, base indisponible) est absorbée et donne un refus propre (false) — jamais une
+ * exception qui casserait `/admin/me` par un 500, et jamais une promotion supposée.
+ */
+export async function insertPlatformAdmin(
+  runner:{query:(q:string,v?:any[])=>Promise<any>},
+  userId:string,
+  warn:(message:string)=>void=()=>{},
+):Promise<boolean>{
+ try{
+   const inserted=await runner.query('insert into platform_admins(user_id) values($1) on conflict do nothing returning user_id',[userId]);
+   if((inserted.rowCount??0)>0)return true;
+   // Conflit : la ligne existait déjà (promotion concurrente ou administrateur déjà actif).
+   return ((await runner.query('select 1 from platform_admins where user_id=$1',[userId])).rowCount??0)>0;
+ }catch(error:any){
+   warn(`amorçage administrateur impossible (${String(error?.code||error?.message||error).slice(0,80)}) : accès administrateur refusé.`);
+   return false;
+ }
+}
+
+type QueryRunner={query:(q:string,v?:any[])=>Promise<any>};
+export async function isAdmin(
+ userId:string,
+ runner:QueryRunner={query},
+ allowed:()=>boolean=adminBootstrapAllowed,
+){
+ const direct=await runner.query("select 1 from users u left join platform_admins pa on pa.user_id=u.id where u.id=$1 and (pa.user_id is not null )",[userId]);
+ if(direct.rowCount)return true;
+ // Amorçage local uniquement (voir adminBootstrapAllowed) : tant qu'AUCUN administrateur
+ // plateforme n'existe et que l'instance ne contient qu'une seule entreprise, son propriétaire
+ // devient administrateur. Une instance déployée n'est jamais concernée.
+ if(!allowed())return false;
+ const bootstrap=await runner.query(`select 1 from organization_members om
+   where om.user_id=$1 and om.role='owner'
+     and not exists(select 1 from platform_admins)
+     and (select count(*) from organizations)=1`,[userId]);
+ if(!bootstrap.rowCount)return false;
+ return insertPlatformAdmin(runner,userId,message=>console.warn(`[AURION] ${message}`));
+}
 async function addMessage(ticketId:string,userId:string,type:'user'|'admin'|'system',message:string){await query('insert into support_messages(ticket_id,author_user_id,author_type,message) values($1,$2,$3,$4)',[ticketId,userId,type,message])}
 async function status(ticketId:string,next:string,userId:string,note?:string){
  const cur=(await query('select status from support_tickets where id=$1',[ticketId])).rows[0]?.status;
@@ -91,4 +145,4 @@ ${message}${dup?`\n\nDoublon du ticket ${dup.number}.`:''}`;
    return {ok:true};
  });
 }
-export {isAdmin,status,STATUS_LABELS};
+export {status,STATUS_LABELS};
