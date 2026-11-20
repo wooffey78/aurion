@@ -190,18 +190,22 @@ test('documents juridiques : révision technique 4.0 du 20 novembre 2026 sur les
   assert.match(read('docs/POLITIQUE-CONFIDENTIALITE.md'), /legal\/suppression-compte/);
 });
 
-test('versions harmonisées 15.4.38 partout (manifestes, lockfiles, service worker)', () => {
+test('versions harmonisées partout (manifestes, lockfiles, service worker)', () => {
+  // La version de référence est VERSION.txt : tous les manifestes, lockfiles, la coquille
+  // index.html et le service worker suivent la MÊME version à chaque livraison (le test est
+  // générique : plus aucune version codée en dur, la prochaine livraison ne le cassera pas).
+  const version = read('VERSION.txt').trim();
+  const escaped = version.replace(/\./g, '\\.');
   const pkg = JSON.parse(read('package.json'));
   const bpkg = JSON.parse(read('backend/package.json'));
   const lock = JSON.parse(read('package-lock.json'));
   const block = JSON.parse(read('backend/package-lock.json'));
   for (const [name, v] of [['package.json', pkg.version], ['backend/package.json', bpkg.version], ['package-lock.json', lock.version], ['backend/package-lock.json', block.version]]) {
-    assert.equal(v, '15.4.38', `${name} : version ${v}`);
+    assert.equal(v, version, `${name} : version ${v}`);
   }
-  assert.equal(lock.packages[''].version, '15.4.38', 'package-lock.json : packages[""].version');
-  assert.equal(block.packages[''].version, '15.4.38', 'backend/package-lock.json : packages[""].version');
-  assert.equal(read('VERSION.txt').trim(), '15.4.38');
-  assert.equal(read('backend/VERSION.txt').trim(), '15.4.38', 'backend/VERSION.txt');
-  assert.match(read('sw.js'), /aurion-shell-v15\.4\.38-r1/);
-  assert.match(read('index.html'), /v=15\.4\.38-r1/);
+  assert.equal(lock.packages[''].version, version, 'package-lock.json : packages[""].version');
+  assert.equal(block.packages[''].version, version, 'backend/package-lock.json : packages[""].version');
+  assert.equal(read('backend/VERSION.txt').trim(), version, 'backend/VERSION.txt');
+  assert.match(read('sw.js'), new RegExp(`aurion-shell-v${escaped}-r1`));
+  assert.match(read('index.html'), new RegExp(`v=${escaped}-r1`));
 });

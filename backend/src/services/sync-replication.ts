@@ -21,7 +21,7 @@ export const SYNC_SCHEMA_VERSION = 3; // v3 : complétude Bloc 2 (086) // v2 : q
 // numérotation réglementaire serveur (document_number_sequences — JAMAIS répliquée), tables sans
 // organization_id (activity_contributions, supplier_parts, support_messages), fonctions retirées du
 // produit (administrative_*), tables techniques (sync_*, schema_migrations, users, organizations).
-export const SYNC_ENTITIES: Record<string, { table: string; orderColumn?: string; joinTable?: string; joinKey?: string; keyColumn?: string; label: string }> = {
+export const SYNC_ENTITIES: Record<string, { table: string; orderColumn?: string; joinTable?: string; joinKey?: string; keyColumn?: string; keyColumns?: string[]; keySeparator?: string; label: string }> = {
   activities: { table: 'activities', label: 'Activités' },
   accounting_entries: { table: 'accounting_entries', label: 'Écritures comptables' },
   appointments: { table: 'appointments', label: 'Rendez-vous' },
@@ -45,14 +45,16 @@ export const SYNC_ENTITIES: Record<string, { table: string; orderColumn?: string
   ereporting_lines: { table: 'ereporting_lines', label: 'Lignes d\'e-reporting' },
   quote_items: { table: 'quote_items', joinTable: 'quotes', joinKey: 'quote_id', label: 'Lignes de documents (devis/factures)' }, // tenant via quotes (pas de organization_id propre)
   dashboard_journal_events: { table: 'dashboard_journal_events', label: 'Journal du tableau de bord' },
-  organization_members: { table: 'organization_members', orderColumn: 'user_id', label: 'Membres de l\'organisation' },
+  // Clé naturelle (084, déclencheur membre) : entity_id = user_id, pas de colonne id.
+  organization_members: { table: 'organization_members', keyColumn: 'user_id', orderColumn: 'user_id', label: 'Membres de l\'organisation' },
   parts: { table: 'parts', label: 'Pièces' },
   quotes: { table: 'quotes', label: 'Devis et factures' },
   sav_cases: { table: 'sav_cases', label: 'Dossiers SAV' },
   suppliers: { table: 'suppliers', label: 'Fournisseurs' },
   supplies: { table: 'supplies', label: 'Consommables' },
   support_tickets: { table: 'support_tickets', label: 'Tickets de support' },
-  user_drafts: { table: 'user_drafts', orderColumn: 'draft_key', label: 'Brouillons synchronisés' },
+  // Clé composite (084, déclencheur brouillon) : entity_id = "user_id:draft_key", pas de colonne id.
+  user_drafts: { table: 'user_drafts', keyColumns: ['user_id', 'draft_key'], keySeparator: ':', orderColumn: 'draft_key', label: 'Brouillons synchronisés' },
   warranties: { table: 'warranties', label: 'Garanties' },
   warranty_policies: { table: 'warranty_policies', label: 'Polices de garantie' },
   // Bloc 2 — complétude : données métier et configuration utile hors connexion (086).

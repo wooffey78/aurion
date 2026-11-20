@@ -77,7 +77,7 @@ export const view=()=>{
 
 export function bind(){
   const all=s=>document.querySelectorAll(s),get=id=>S.quotes.find(x=>x.id===id); const search=document.querySelector('#doc-search'); search?.addEventListener('input',ev=>{const q=String(ev.target.value||'').trim().toLowerCase();all('.doc-row').forEach(r=>r.hidden=!!q&&!r.dataset.docSearch.includes(q))});
-  all('[data-new-type]').forEach(b=>b.onclick=()=>{S.editing=null;S.quoteDraft=null;S.startBlankQuote=true;S.documentType=b.dataset.newType;hooks.refresh('quote').catch(x=>toast(x.message,'error'))});
+  all('[data-new-type]').forEach(b=>b.onclick=()=>{S.editing=null;S.quoteDraft=null;S.startBlankQuote=true;S.documentType=b.dataset.newType;hooks.refresh('quote',{navigation:true}).catch(x=>toast(x.message,'error'))});
   all('[data-filter]').forEach(b=>b.onclick=()=>{S.docFilter=b.dataset.filter;hooks.show('invoices')});
   // Bloc 12 — bordereau professionnel → brouillon de facture (chaîne déterministe, sans IA).
   document.querySelector('#parse-bordereau')?.addEventListener('click',()=>{
@@ -111,7 +111,7 @@ export function bind(){
   }
   all('.pdf-view').forEach(b=>b.onclick=()=>{const q=get(b.dataset.id);openDoc(kindOf(q),q.id,'pdf','view')});
   all('.dl').forEach(b=>b.onclick=()=>{const q=get(b.dataset.id);openDoc(kindOf(q),q.id,b.dataset.ext,'download')});
-  all('.edit-doc').forEach(b=>b.onclick=()=>{S.editing=get(b.dataset.id);if(!S.editing)return;S.documentType=S.editing.document_type==='invoice'?'invoice':'quote';hooks.refresh('quote').catch(x=>toast(x.message,'error'))});
+  all('.edit-doc').forEach(b=>b.onclick=()=>{S.editing=get(b.dataset.id);if(!S.editing)return;S.documentType=S.editing.document_type==='invoice'?'invoice':'quote';hooks.refresh('quote',{navigation:true}).catch(x=>toast(x.message,'error'))});
   all('.delete-doc').forEach(b=>b.onclick=()=>{const q=get(b.dataset.id);confirmDelete(`Supprimer définitivement ${q.document_type==='invoice'?'la facture':'le devis'} ${q.number} ?\nSes fichiers PDF, Word et ODT seront aussi supprimés. Cette action est irréversible.`,()=>api.deleteQuote(q.id),'Document supprimé',{title:`Supprimer ${q.number} ?`})});
   // Bloc 13 — lien de paiement (décision D3 non tranchée : le message reste honnête si non configuré).
   all('.paylink-doc').forEach(b=>b.onclick=async()=>{const q=get(b.dataset.id);if(!q)return;

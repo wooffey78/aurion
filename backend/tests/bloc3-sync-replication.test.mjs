@@ -135,8 +135,20 @@ test('bloc3: instantané paginé, isolation A/B, curseur, delta et tombstone, mi
   assert.ok([401, 403].includes(noAuth.statusCode), 'sans authentification : refus');
 
   // Idempotence de la migration 084 : réexécution complète sans erreur (phase-H la rejoue aussi ×2).
-  const sql = readFileSync(new URL('../migrations/084_sync_replication.sql', import.meta.url), 'utf8');
-  await mod.db.adminDb.query(sql);
+  // Le DDL est rejoué via la connexion de MIGRATION (compte propriétaire), comme en production :
+  // le rôle d'administration applicatif n'est pas propriétaire des tables et ne peut pas
+  // porter du DDL (« must be owner » si on l'utilisait par erreur).
+  const migrationUrl = process.env.AURION_MIGRATION_DATABASE_URL;
+  assert.ok(migrationUrl, 'AURION_MIGRATION_DATABASE_URL requis pour rejouer la migration comme le compte propriétaire');
+  const { default: pg } = await import('pg');
+  const migrationClient = new pg.Client({ connectionString: migrationUrl });
+  await migrationClient.connect();
+  try {
+    const sql = readFileSync(new URL('../migrations/084_sync_replication.sql', import.meta.url), 'utf8');
+    await migrationClient.query(sql);
+  } finally {
+    await migrationClient.end();
+  }
   const recheck = await mod.app.inject({ method: 'GET', url: '/sync/cursor', headers: authA });
   assert.equal(recheck.statusCode, 200);
 

@@ -286,7 +286,7 @@ ${body.documentType==='invoice'?'La facture sera enregistrée comme émise et en
       else {await api.createQuote({...body,sendEmail:false});S.quoteDraft=null}
       if(!editing){try{await api.deleteDraft()}catch{} }
       try{await api.recordQuotePattern({service:body.intervention,servicePrice:r.totalTtc,parts:items.map(x=>{const p=S.parts.find(z=>z.id===x.partId);return {name:x.label,model:p?.model,variant:p?.variant,color:p?.color,quality:p?.quality,reference:p?.reference,price:Number(x.unitCost||0)}})});}catch{}
-      let refreshed=true;try{await hooks.refresh('invoices')}catch{refreshed=false;hooks.show('invoices')}
+      let refreshed=true;try{await hooks.refresh('invoices',{navigation:true})}catch{refreshed=false;hooks.show('invoices')}
       const noun=editing?'Modifications enregistrées.':(body.documentType==='invoice'?'Facture enregistrée.':'Devis enregistré. Vous pouvez maintenant choisir de l’envoyer ou de le modifier.');
       toast(refreshed?noun:`${noun} Actualisation de la liste impossible, mais l’enregistrement a été effectué.`,'success');
     }catch(x){toast(x.message,'error')}

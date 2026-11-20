@@ -7,8 +7,13 @@ const dash=fs.readFileSync(new URL('../../assets/js/pages/dashboard.js',import.m
 const docs=fs.readFileSync(new URL('../../assets/js/pages/dash/docs.js',import.meta.url),'utf8');
 
 test('étape 5 : la navigation ne propose plus une section Nouveau devis séparée',()=>{
+  // 15.4.39+ : les entrées de menu sont des objets {id,label,icon} dans core/navigation.js ;
+  // le contrat est conservé : pas d'entrée « Nouveau devis » isolée, une seule entrée
+  // « Devis & factures » (les boutons de création vivent dans les écrans).
   assert.doesNotMatch(dash,/\['quote','Nouveau devis'/);
-  assert.match(dash,/\['invoices','Devis & factures'/);
+  const nav=fs.readFileSync(new URL('../../assets/js/core/navigation.js',import.meta.url),'utf8');
+  assert.match(nav,/id:'invoices',label:'Devis & factures'/);
+  assert.doesNotMatch(nav,/id:'quote',label:'Nouveau devis'/);
 });
 
 test('étape 6 : devis et factures utilisent le même endpoint de sauvegarde avec le bon type',()=>{

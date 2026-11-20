@@ -15,7 +15,10 @@ test('brouillon partagé côté serveur, isolé par organisation et utilisateur'
   assert.match(api, /getDraft:.*settings\/draft/);
   assert.match(quote, /Synchronisation du brouillon/);
   assert.match(quote, /targetNet:num\('#minimumProfit'\)/);
-  assert.match(dashboard, /hooks\.refresh\(b\.dataset\.view,\{navigation:true\}\)/);
+  // 15.4.40 : la sidebar passe par navigate() → hooks.refresh(id,{navigation:true}) —
+  // le contrat est conservé (un clic de menu charge les données puis rend la vue demandée).
+  assert.match(dashboard, /hooks\.refresh\(id,\{navigation:true\}\)/);
+  assert.match(dashboard, /navigate\(b\.dataset\.view\)/);
   assert.match(dashboard, /backgroundRefreshRunning/);
 });
 

@@ -10,5 +10,7 @@ test('étape 28 - le tableau de bord ne contient plus l’encart Accès rapide',
 });
 
 test('étape 28 - la navigation vers Agenda reste disponible dans la sidebar', () => {
-  assert.equal(nav.includes("['agenda','Agenda','◷']"), true);
+  // 15.4.39+ : la sidebar est construite depuis core/navigation.js ({id,label,icon}).
+  const navModule=fs.readFileSync(new URL('../../assets/js/core/navigation.js',import.meta.url),'utf8');
+  assert.equal(navModule.includes("{id:'agenda',label:'Agenda',icon:'◷'}"), true);
 });

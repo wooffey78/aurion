@@ -1,6 +1,6 @@
 {
   "name": "aurion-backend",
-  "version": "15.4.39",
+  "version": "15.4.41",
   "private": true,
   "type": "module",
   "engines": {
@@ -32,12 +32,12 @@
     "@fastify/multipart": "9.2.1",
     "@fastify/rate-limit": "10.2.0",
     "@fastify/sensible": "6.0.3",
-    "@fastify/static": "10.1.7",
+    "@fastify/static": "10.1.12",
     "adm-zip": "0.6.1",
     "argon2": "0.43.0",
     "docx": "9.5.1",
     "dotenv": "16.6.1",
-    "fast-xml-parser": "5.5.1",
+    "fast-xml-parser": "5.12.1",
     "fastify": "5.12.7",
     "fastify-plugin": "5.0.1",
     "google-auth-library": "10.9.1",
@@ -66,5 +66,8 @@
   "allowScripts": {
     "argon2@0.43.0": true,
     "esbuild@0.25.12": true
+  },
+  "overrides": {
+    "gaxios": "^7.1.4"
   }
 }

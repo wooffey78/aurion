@@ -33,7 +33,7 @@ if ($Out.StartsWith($Root + [IO.Path]::DirectorySeparatorChar, [StringComparison
 if (Test-Path -LiteralPath $Out) { throw "Le fichier de sortie existe déjà : $Out" }
 
 $excludedDirectories = @(
-    '.git', '.idea', '.next', '.pytest_cache', '.turbo', '.vscode', '.vite', '__pycache__',
+    '.git', '.gradle', '.idea', '.next', '.pytest_cache', '.turbo', '.vscode', '.vite', '__pycache__',
     'coverage', 'data', 'dist', 'dist-setup', 'dist-source', 'logs', 'node_modules', 'runtime', 'storage'
 )
 
@@ -57,7 +57,8 @@ function Test-ExcludedPath {
     $leaf = $segments[-1]
     if ($leaf -match '^\.env(?:\..*)?$' -and $leaf -ne '.env.example') { return $true }
     if ($leaf -match '(?i)(\.zip|\.log|\.dump|\.sql\.gz|\.tmp|\.bak|\.swp|\.msi)$') { return $true }
-    if ($leaf -in @('.DS_Store', 'Thumbs.db')) { return $true }
+    if ($leaf -in @('.DS_Store', 'Thumbs.db', 'keystore.properties')) { return $true }
+    if ($leaf -match '(?i)\.(jks|keystore|p12|pfx|key|pem)$') { return $true }
     return $false
 }
 
@@ -115,7 +116,8 @@ try {
         $parts = $name -split '/'
         (($parts | Where-Object { $excludedDirectories -contains $_ }).Count -gt 0) -or
         (($parts[-1] -match '^\.env(?:\..*)?$' -and $parts[-1] -ne '.env.example')) -or
-        ($parts[-1] -match '(?i)(\.zip|\.log|\.dump|\.sql\.gz|\.tmp|\.bak|\.swp|\.msi)$')
+        ($parts[-1] -match '(?i)(\.zip|\.log|\.dump|\.sql\.gz|\.tmp|\.bak|\.swp|\.msi|\.jks|\.keystore|\.p12|\.pfx|\.key|\.pem)$') -or
+        ($parts[-1] -ieq 'keystore.properties')
     })
     if ($unsafe.Count -gt 0) { throw 'Le ZIP contient un chemin non sûr.' }
     if ($excluded.Count -gt 0) { throw 'Le ZIP contient encore un artefact exclu.' }

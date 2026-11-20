@@ -98,22 +98,22 @@ export const adminDb = config.AURION_ADMIN_DATABASE_URL ? new Pool({
 
 /** Journalise un accès inter-entreprises explicite (une entrée par opération, pas par requête). */
 export async function logAdminAccess(operation: string, detail?: unknown): Promise<void> {
-  if (!adminDb) return;
-  await adminDb.query('insert into platform_admin_access_log(operation,detail) values($1,$2::jsonb)', [operation, JSON.stringify(detail ?? null)]).catch(()=>{});
+  const pool = adminDb ?? db;
+  await pool.query('insert into platform_admin_access_log(operation,detail) values($1,$2::jsonb)', [operation, JSON.stringify(detail ?? null)]).catch(()=>{});
 }
 
 /**
  * Requête inter-entreprises explicite (console d'administration, travaux planifiés, webhook Stripe).
- * Nécessite AURION_ADMIN_DATABASE_URL pointant vers un rôle membre de « aurion_admin » ;
- * sinon l'appel échoue avec ADMIN_DB_NOT_CONFIGURED (503) plutôt que de renvoyer des données vides.
+ * En installation provisionnée : AURION_ADMIN_DATABASE_URL pointe vers un rôle membre de
+ * « aurion_admin » (seul chemin franchissant la RLS 074). En installation mono-instance
+ * (Render, démonstration, auto-hébergement simple) où cette variable n'est pas renseignée :
+ * repli sur le pool principal — le rôle de DATABASE_URL a exécuté les migrations et est
+ * PROPRIÉTAIRE des tables, et la RLS 074 est ENABLE sans FORCE : il n'est donc pas soumis à
+ * l'isolation tenant et la console d'administration reste fonctionnelle au lieu de renvoyer
+ * un 503 systématique. Les installations qui définissent le pool dédié ne passent jamais ici.
  */
 export async function adminQuery<T extends pg.QueryResultRow = pg.QueryResultRow>(text:string, values:unknown[]=[]){
-  if (!adminDb) {
-    const error = new Error('Pool d’administration non configuré (AURION_ADMIN_DATABASE_URL).') as Error & { statusCode?: number; code?: string };
-    error.code = 'ADMIN_DB_NOT_CONFIGURED'; error.statusCode = 503;
-    throw error;
-  }
-  return adminDb.query<T>(text, values);
+  return (adminDb ?? db).query<T>(text, values);
 }
 
 /**
@@ -122,12 +122,8 @@ export async function adminQuery<T extends pg.QueryResultRow = pg.QueryResultRow
  * Les verrous de ligne (`select … for update`) pris dans `work` couvrent toute la transaction.
  */
 export async function adminTransaction<T>(work:(client:pg.PoolClient)=>Promise<T>):Promise<T>{
-  if (!adminDb) {
-    const error = new Error('Pool d’administration non configuré (AURION_ADMIN_DATABASE_URL).') as Error & { statusCode?: number; code?: string };
-    error.code = 'ADMIN_DB_NOT_CONFIGURED'; error.statusCode = 503;
-    throw error;
-  }
-  const client = await adminDb.connect();
+  // Repli mono-instance : voir adminQuery (rôle propriétaire de DATABASE_URL, hors RLS 074).
+  const client = await (adminDb ?? db).connect();
   try {
     await client.query('begin');
     const result = await work(client);

@@ -3,7 +3,7 @@ import{go}from'../core/router.js';
 import{toast,appLogo}from'../core/ui.js';
 import{api}from'../core/api.js';
 import{invalidateSession}from'../core/session.js';
-import{isMobileDevice,supportsPlatformPasskeys,supportsConditionalPasskeys}from'../core/device.js';
+import{isMobileDevice,supportsPlatformPasskeys,supportsConditionalPasskeys,supportsWebAuthn,platformPasskeyLabel}from'../core/device.js';
 
 const b64u=x=>{const b=new Uint8Array(x);let s='';for(const c of b)s+=String.fromCharCode(c);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')};
 const dec=x=>{const s=String(x).replace(/-/g,'+').replace(/_/g,'/');return Uint8Array.from(atob(s),c=>c.charCodeAt(0))};
@@ -89,7 +89,7 @@ function showPasskeySetupOffer(email){
 }
 
 export function renderAuth(initialMode='register'){
-  document.querySelector('#app').innerHTML='<main id="main" class="auth-shell"><section class="auth-card glass"><div class="auth-brand">'+appLogo('72')+'<div><strong>AURION</strong><span>L’intelligence qui travaille pour vous</span></div></div><h1>Votre activité, sous contrôle.</h1><p class="lede">Clients, devis, factures, agenda et automatisations dans un espace professionnel.</p><div class="auth-tabs"><button class="tab active" id="reg" type="button">Créer mon espace</button><button class="tab" id="login" type="button">Se connecter</button></div><form id="auth" class="stack"><label class="field" id="full-name-field"><span>Nom et prénom</span><input id="full-name" type="text" autocomplete="name" maxlength="160" required placeholder="Nom et prénom"></label><label class="field"><span>E-mail</span><div class="password-actions"><input id="email" type="email" autocomplete="email" required placeholder="vous@entreprise.fr"><button type="button" id="suggest-email" class="link-btn">Utiliser l’e-mail enregistré</button></div><small id="mobile-auth-hint" class="help" hidden>Sur mobile, le gestionnaire de mots de passe peut remplir vos identifiants ; une clé d’accès peut aussi vous connecter avec la biométrie du téléphone.</small></label><label class="field"><span>Mot de passe</span><div class="password-input"><input id="password" type="password" autocomplete="new-password" required><button type="button" id="showpass" class="icon-btn" aria-label="Afficher le mot de passe">◉</button></div><div id="register-password-tools"><div class="password-meter"><i id="meter"></i></div><div class="password-actions"><button type="button" id="suggest" class="link-btn">Suggérer un mot de passe</button><span id="score" class="help">12 caractères minimum</span></div></div></label><label id="terms" class="check"><input type="checkbox" required> J’ai lu et j’accepte les <a href="#/legal/cgv" target="_blank" rel="noopener">CGV</a> et la <a href="#/legal/privacy" target="_blank" rel="noopener">politique de confidentialité</a>.</label><button id="submit" class="btn primary" type="submit">Créer mon espace <span>→</span></button><button id="google-signin" class="btn secondary auth-google-button" type="button" hidden>Continuer avec Google</button><button id="auth0-signin" class="btn secondary auth-google-button" type="button" hidden>Continuer avec Auth0</button><p class="help auth-method-note">La clé d’accès est proposée dans le champ e-mail sur mobile lorsqu’elle est disponible. Les identifiants restent également accessibles par autofill.</p><p class="forgot-line"><a id="forgot" class="link-btn" href="#/forgot" hidden>Mot de passe oublié ?</a></p><p id="error" class="error" hidden aria-live="polite"></p><p id="status" class="help" aria-live="polite"></p></form><p class="legal-links"><a href="#/legal/cgv" target="_blank" rel="noopener">CGV</a> · <a href="#/legal/privacy" target="_blank" rel="noopener">Confidentialité</a> · <a href="#/legal/cookies" target="_blank" rel="noopener">Cookies</a> · <a href="#/legal/legal-notice" target="_blank" rel="noopener">Mentions légales</a> · <a href="#/withdrawal">Renoncer au contrat ici</a></p><div class="security-note">Mot de passe haché côté serveur · session sécurisée · biométrie protégée par WebAuthn</div></section><aside class="auth-visual"><img src="./assets/aurion-overview.svg?v=15.3.19" alt="Aperçu du tableau de bord Aurion : journal de bord, clients, devis, agenda et trésorerie" data-hide-on-error></aside></main>';
+  document.querySelector('#app').innerHTML='<main id="main" class="auth-shell"><section class="auth-card glass"><div class="auth-brand">'+appLogo('72')+'<div><strong>AURION</strong><span>L’intelligence qui travaille pour vous</span></div></div><h1>Votre activité, sous contrôle.</h1><p class="lede">Clients, devis, factures, agenda et automatisations dans un espace professionnel.</p><div class="auth-tabs"><button class="tab active" id="reg" type="button">Créer mon espace</button><button class="tab" id="login" type="button">Se connecter</button></div><form id="auth" class="stack"><label class="field" id="full-name-field"><span>Nom et prénom</span><input id="full-name" type="text" autocomplete="name" maxlength="160" required placeholder="Nom et prénom"></label><label class="field"><span>E-mail</span><div class="password-actions"><input id="email" type="email" autocomplete="email" required placeholder="vous@entreprise.fr"><button type="button" id="suggest-email" class="link-btn">Utiliser l’e-mail enregistré</button></div><small id="mobile-auth-hint" class="help" hidden>Sur mobile, le gestionnaire de mots de passe peut remplir vos identifiants ; une clé d’accès peut aussi vous connecter avec la biométrie du téléphone.</small></label><label class="field"><span>Mot de passe</span><div class="password-input"><input id="password" type="password" autocomplete="new-password" required><button type="button" id="showpass" class="icon-btn" aria-label="Afficher le mot de passe">◉</button></div><div id="register-password-tools"><div class="password-meter"><i id="meter"></i></div><div class="password-actions"><button type="button" id="suggest" class="link-btn">Suggérer un mot de passe</button><span id="score" class="help">12 caractères minimum</span></div></div></label><label id="terms" class="check"><input type="checkbox" required> J’ai lu et j’accepte les <a href="#/legal/cgv" target="_blank" rel="noopener">CGV</a> et la <a href="#/legal/privacy" target="_blank" rel="noopener">politique de confidentialité</a>.</label><button id="submit" class="btn primary" type="submit">Créer mon espace <span>→</span></button><button id="google-signin" class="btn secondary auth-google-button" type="button" hidden>Continuer avec Google</button><button id="auth0-signin" class="btn secondary auth-google-button" type="button" hidden>Continuer avec Auth0</button><button id="passkey-signin" class="btn secondary auth-google-button" type="button" hidden>Continuer avec votre clé d’accès</button><p class="help auth-method-note">La clé d’accès est proposée dans le champ e-mail sur mobile lorsqu’elle est disponible. Les identifiants restent également accessibles par autofill.</p><p class="forgot-line"><a id="forgot" class="link-btn" href="#/forgot" hidden>Mot de passe oublié ?</a></p><p id="error" class="error" hidden aria-live="polite"></p><p id="status" class="help" aria-live="polite"></p></form><p class="legal-links"><a href="#/legal/cgv" target="_blank" rel="noopener">CGV</a> · <a href="#/legal/privacy" target="_blank" rel="noopener">Confidentialité</a> · <a href="#/legal/cookies" target="_blank" rel="noopener">Cookies</a> · <a href="#/legal/legal-notice" target="_blank" rel="noopener">Mentions légales</a> · <a href="#/withdrawal">Renoncer au contrat ici</a></p><div class="security-note">Mot de passe haché côté serveur · session sécurisée · biométrie protégée par WebAuthn</div></section><aside class="auth-visual"><img src="./assets/aurion-overview.svg?v=15.3.19" alt="Aperçu du tableau de bord Aurion : journal de bord, clients, devis, agenda et trésorerie" data-hide-on-error></aside></main>';
   let mode=initialMode==='login'?'login':'register';
   const form=document.querySelector('#auth');
   const status=document.querySelector('#status');
@@ -103,22 +103,20 @@ export function renderAuth(initialMode='register'){
   const mobileHint=document.querySelector('#mobile-auth-hint');
   const passwordTools=document.querySelector('#register-password-tools');
   const suggestEmail=document.querySelector('#suggest-email');
-  let registrationBlocked=false;
+  // Décision éditeur 15.4.40 : les documents contractuels non publiés ne sont JAMAIS bloquants.
+  // Le statut ne sert qu'à adapter le libellé d'évaluation locale ; le bouton reste actif et
+  // l'acceptation des CGV/confidentialité (case obligatoire) reste exigée côté serveur.
   fetch(api.baseUrl+'/auth/registration-status',{credentials:'include',headers:{Accept:'application/json'}})
     .then(response=>response.ok?response.json():Promise.reject(new Error('status unavailable')))
     .then(result=>{
-      registrationBlocked=result?.available!==true;
       if(result?.localEvaluation===true){
         terms.innerHTML='<input type="checkbox" required> Je comprends que cette installation locale est réservée à l’évaluation et que les documents juridiques affichés sont des projets non publiés.';
-      }else if(registrationBlocked){
-        status.textContent='La création de compte sera réactivée lorsque les documents contractuels auront été finalisés et publiés.';
       }
       // Le remplacement du contenu de #terms recrée une case obligatoire.
       // Réappliquer l'état requis selon le mode courant évite qu'un contrôle
       // obligatoire reste masqué si le statut arrive après l'ouverture de /login.
       const termsInput=terms.querySelector('input');
       if(termsInput)termsInput.required=mode==='register';
-      submit.disabled=mode==='register'&&registrationBlocked;
     })
     .catch(()=>{});
   let googleConfigured=false,auth0Configured=false;
@@ -131,6 +129,40 @@ export function renderAuth(initialMode='register'){
   api.auth0AuthStatus().then(result=>{auth0Configured=result?.configured===true;showAuth0()}).catch(()=>{auth0Configured=false;showAuth0()});
   google.onclick=()=>{if(!google.hidden)window.location.assign(api.baseUrl+'/auth/google/start')};
   auth0.onclick=()=>{if(!auth0.hidden)window.location.assign(api.baseUrl+'/auth/auth0/start')};
+  // Connexion par clé d'accès : bouton explicite sur TOUS les appareils compatibles (ordinateur
+  // inclus), libellé adapté à la biométrie de la plateforme. Aucun bouton n'est affiché si le
+  // navigateur ne sait pas faire : rien n'est jamais inerte.
+  const passkeyBtn=document.querySelector('#passkey-signin');
+  const passkeyUsable=supportsWebAuthn();
+  const showPasskey=()=>{passkeyBtn.hidden=mode!=='login'||!passkeyUsable;if(passkeyUsable)passkeyBtn.textContent=`Continuer avec ${platformPasskeyLabel()}`};
+  passkeyBtn.onclick=async()=>{
+    if(passkeyBtn.hidden)return;
+    stopConditionalPasskey();
+    error.hidden=true;
+    status.textContent='Validation de votre clé d’accès…';
+    try{
+      const o=await api.webauthnAuthOptions();
+      const credential=await navigator.credentials.get({publicKey:{challenge:dec(o.challenge),rpId:o.rpId,timeout:o.timeout,userVerification:o.userVerification||'required'}});
+      if(!credential)throw new Error('Aucune clé d’accès n’a été utilisée.');
+      await finishPasskeyLogin(credential,o.challenge);
+    }catch(x){
+      status.textContent='';
+      error.textContent=x?.name==='NotAllowedError'
+        ?'Connexion par clé d’accès annulée ou aucune clé enregistrée sur cet appareil. Utilisez votre mot de passe, puis activez une clé d’accès depuis « Mon compte ».'
+        :(x?.message||'La clé d’accès n’a pas pu être utilisée. Utilisez votre mot de passe.');
+      error.hidden=false;
+    }
+  };
+  // Google / Auth0 : proposés uniquement lorsqu'ils sont configurés côté serveur (aucun bouton
+  // inerte) ; une note discrète l'explique à la place d'un bouton mort.
+  const authNote=document.createElement('p');
+  authNote.className='help auth-method-note';
+  Promise.all([api.googleAuthStatus().catch(()=>null),api.auth0AuthStatus().catch(()=>null)]).then(([g,a])=>{
+    if(g?.configured!==true||a?.configured!==true){
+      authNote.textContent='Connexion Google / Auth0 : activation prévue par l’éditeur (configuration serveur). Votre clé d’accès biométrique fonctionne dès maintenant sur cet appareil.';
+      auth0.after(authNote);
+    }
+  });
   const setMode=m=>{
     stopConditionalPasskey();
     mode=m;
@@ -147,11 +179,11 @@ export function renderAuth(initialMode='register'){
     suggestEmail.hidden=!registration;
     mobileHint.hidden=registration||!isMobileDevice();
     submit.innerHTML=registration?'Créer mon espace <span>→</span>':'Se connecter <span>→</span>';
-    submit.disabled=registration&&registrationBlocked;
     error.hidden=true;
     status.textContent='';
     showGoogle();
     showAuth0();
+    showPasskey();
     if(!registration&&isMobileDevice())void startConditionalPasskeyLogin(email,status,error);
   };
   setMode(mode);

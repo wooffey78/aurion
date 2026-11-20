@@ -151,6 +151,13 @@ function installDataGoDelegation(){
 }
 
 export async function refresh(id=S.view,opts={navigation:false}){
+  // Appel multi-jeux de données (hooks.refresh(['invoices','accounting',…])) : recharge ces
+  // jeux pour la vue COURANTE puis re-rend — ce cas ne navigue jamais vers une autre vue.
+  if(Array.isArray(id)){
+    await load(id,S.view);
+    if(S.pendingView===S.view)show(S.view);
+    return;
+  }
   // Bloc 8 règle 10 — une course entre deux navigations/rafraîchissements ne doit jamais
   // ramener l'utilisateur en arrière : seul le DERNIER affichage demandé rend la vue.
   if(opts.navigation)S.pendingView=id;
@@ -165,7 +172,13 @@ export async function refresh(id=S.view,opts={navigation:false}){
       else{S.quoteDraft=null;if(savedDraft){try{await api.deleteDraft()}catch{}}}
     }else if(savedDraft){S.quoteDraft=savedDraft;if(savedDraft.documentType==='invoice')S.documentType='invoice';else if(savedDraft.documentType==='quote')S.documentType='quote';}
   }
-  await load([...(EXTRAS[id]||[])],id);if(id==='accounting'||id==='treasury')lastFinancialRefreshAt=Date.now();paintShell();/* Bloc 8 règle 10 — si l'utilisateur a navigué pendant le chargement, il n'est jamais ramené en arrière : la vue demandée ne re-rend que si elle est toujours courante. */if(S.pendingView===id)show(id)
+  await load([...(EXTRAS[id]||[])],id);if(id==='accounting'||id==='treasury')lastFinancialRefreshAt=Date.now();paintShell();
+  /* Bloc 8 règle 10 — si l'utilisateur a navigué pendant le chargement, il n'est jamais ramené
+  en arrière : la vue demandée ne re-rend que si elle est toujours courante. Correctif 15.4.40 :
+  un appel qui nomme une AUTRE vue (bouton « + Nouveau devis » des documents, retour à la liste
+  après enregistrement) demande explicitement un changement d'écran — il est toujours rendu,
+  sinon les boutons semblaient inertes (pendingView restait sur la vue courante). */
+  if(opts.navigation||S.pendingView===id)show(id)
 }
 hooks.refresh=refresh;hooks.show=show;
 

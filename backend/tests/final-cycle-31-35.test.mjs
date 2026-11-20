@@ -7,14 +7,16 @@ const root=fileURLToPath(new URL('../../', import.meta.url));
 const read=p=>readFileSync(join(root,p),'utf8');
 
 const dashboard=read('assets/js/pages/dashboard.js');
+const navigation=read('assets/js/core/navigation.js');
 const catalog=read('assets/js/pages/dash/catalog.js');
 const other=read('assets/js/pages/dash/other.js');
 const settings=read('assets/js/pages/dash/settings.js');
 const docs=read('assets/js/pages/dash/docs.js');
 const core=read('assets/js/pages/dash/core.js');
 
-assert.match(dashboard,/\['suppliers','Fournisseurs'/,'Étape 31: fournisseurs dans la sidebar');
-assert.match(dashboard,/S\.isPlatformAdmin\?`<button[^`]*data-view="admin"/s,'Étape 31: administration conditionnée au rôle');
+assert.match(navigation,/\{id:'suppliers',label:'Fournisseurs',icon:'▱'\}/,'Étape 31: fournisseurs dans la sidebar');
+assert.match(navigation,/\{id:'admin',label:'Administration',icon:'⚙',admin:true\}/,'Étape 31: administration conditionnée au rôle');
+assert.match(dashboard,/S\.isPlatformAdmin/,'Étape 31: le rôle plateforme est résolu avant la navigation');
 assert.match(catalog,/api\.createSupply\(/,'Étape 32: création fourniture');
 assert.match(catalog,/api\.updateSupply\(/,'Étape 32: modification fourniture');
 assert.match(catalog,/supplies:api\.deleteSupply/,'Étape 32: suppression fourniture via le dispatcher de catégorie');

@@ -20,7 +20,11 @@ const all=sources.map(x=>x[1]).join('\n');
 
 test('Step 15: all dashboard navigation buttons have delegated click contracts',()=>{
   assert.match(all,/navRoot\.onclick=.*button\[data-view\]/s);
-  assert.match(all,/view\.querySelectorAll\('\[data-go\]'\)/);
+  // 15.4.39+ : les boutons [data-go] sont couverts par la délégation globale
+  // (installDataGoDelegation : un seul écouteur document, ev.target.closest('[data-go]')) —
+  // les boutons injectés après rendu sont couverts sans re-attachement.
+  assert.match(all,/installDataGoDelegation\(\)/);
+  assert.match(all,/closest\('\[data-go\]'\)/);
 });
 
 test('Step 15: no catalog or SAV row button opens a modal/confirmation during bind',()=>{

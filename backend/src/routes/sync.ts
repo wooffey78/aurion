@@ -74,9 +74,19 @@ export async function syncReplicationRoutes(app: FastifyInstance) {
       }
       const def = SYNC_ENTITIES[c.entity];
       if (!def) continue; // entité non répliquée : ignorée pour le client (le curseur avance)
+      // Correctif 15.4.41 : certaines entités n'ont pas de colonne id (organization_members,
+      // user_drafts — migration 084). La relecture utilise la clé naturelle ou composite
+      // réellement écrite dans entity_id, jamais une colonne id supposée.
+      const keyValues = def.keyColumns
+        ? String(c.entity_id).split(def.keySeparator ?? ':')
+        : [c.entity_id];
+      const keyPredicate = def.keyColumns
+        ? def.keyColumns.map((col, i) => `t.${col}=$${i + 1}`).join(' and ')
+        : `t.${def.keyColumn || 'id'}=$1`;
+      const orgPredicate = def.joinTable ? 'j.organization_id' : 't.organization_id';
       const data = (await query<{ data: Record<string, unknown> }>(
-        `select to_jsonb(t.*) as data from ${def.table} t${def.joinTable ? ` join ${def.joinTable} j on j.id=t.${def.joinKey}` : ''} where t.${def.keyColumn || 'id'}=$1 and ${def.joinTable ? 'j.organization_id' : 't.organization_id'}=$2 limit 1`,
-        [c.entity_id, org]
+        `select to_jsonb(t.*) as data from ${def.table} t${def.joinTable ? ` join ${def.joinTable} j on j.id=t.${def.joinKey}` : ''} where ${keyPredicate} and ${orgPredicate}=$${keyValues.length + 1} limit 1`,
+        [...keyValues, org]
       )).rows[0]?.data ?? null;
       if (!data) continue; // déjà supprimée ensuite : le tombstone suivant la couvrira
       out.push({ id: Number(c.id), entity: c.entity, entityId: c.entity_id, op: 'upsert', changedAt: c.changed_at, data });

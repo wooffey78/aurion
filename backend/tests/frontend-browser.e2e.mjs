@@ -157,6 +157,18 @@ try{
   }
   const viewIds=await page.locator('.nav [data-view]').evaluateAll(nodes=>[...new Set(nodes.map(node=>node.getAttribute('data-view')).filter(Boolean))]);
   if(!viewIds.length)throw new Error('Aucune vue de tableau de bord n’a été rendue dans la navigation.');
+  // Correctif 15.4.40/41 — boutons des documents commerciaux : depuis l'écran « Devis & factures »,
+  // « + Nouveau devis » et « + Nouvelle facture » doivent CHANGER D'ÉCRAN. Avant le correctif du
+  // garde pendingView dans refresh(), les boutons semblaient inertes depuis cette page (le
+  // tableau de bord, qui passait le flag de navigation, était le seul point d'entrée fonctionnel).
+  await page.locator('.nav [data-view]').evaluateAll(nodes=>{nodes.find(n=>n.getAttribute('data-view')==='invoices')?.click()});
+  await page.waitForFunction(()=>/Devis & factures/.test(document.querySelector('#view h1')?.textContent||''),null,{timeout:15000});
+  await page.locator('#view [data-new-type="quote"]').click();
+  await page.waitForFunction(()=>/Nouveau devis/.test(document.querySelector('#view h1')?.textContent||''),null,{timeout:15000});
+  await page.locator('.nav [data-view]').evaluateAll(nodes=>{nodes.find(n=>n.getAttribute('data-view')==='invoices')?.click()});
+  await page.waitForFunction(()=>/Devis & factures/.test(document.querySelector('#view h1')?.textContent||''),null,{timeout:15000});
+  await page.locator('#view [data-new-type="invoice"]').click();
+  await page.waitForFunction(()=>/Nouvelle facture/.test(document.querySelector('#view h1')?.textContent||''),null,{timeout:15000});
   for(const viewId of viewIds){
     await page.locator('.nav [data-view]').evaluateAll((nodes,id)=>nodes.find(node=>node.getAttribute('data-view')===id)?.click(),viewId);
     await page.waitForTimeout(250);

@@ -50,9 +50,11 @@ test('bloc22: fenêtre maximisée au-dessus de la barre des tâches, horloge loc
   assert.match(ui, /getHours\(\)/);
   assert.match(ui, /,1000\)/);
   assert.match(ui, /visibilitychange/);
-  const other = read('../../assets/js/pages/dash/other.js');
-  assert.match(other, /id="local-clock"/);
-  assert.match(other, /startLocalClock\(document\.getElementById\('local-clock'\)\)/);
+  // 15.4.39+ : l'horloge locale vit dans la coquille du tableau de bord (dashboard.js),
+  // visible depuis toutes les vues — le contrat (composant partagé ui.js) est inchangé.
+  const shell = read('../../assets/js/pages/dashboard.js');
+  assert.match(shell, /id="local-clock"/);
+  assert.match(shell, /startLocalClock\(document\.getElementById\('local-clock'\)\)/);
   // Aucune modification globale/permanente des paramètres Windows (aucun registre écrit par les scripts).
   for (const f of ['../../scripts/Aurion-Launcher.ps1', '../../scripts/Install-Aurion.ps1', '../../scripts/Stop-Aurion.ps1']) {
     const src = read(f);
