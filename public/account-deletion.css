@@ -1,0 +1,24 @@
+:root{--bg:#0b1220;--card:#111a2e;--ink:#e5edff;--muted:#9db0d0;--line:#24344f;--accent:#3b82f6}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);line-height:1.6}
+main{max-width:760px;margin:0 auto;padding:clamp(16px,4vw,48px)}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.brand{font-weight:800;letter-spacing:.12em;color:var(--ink);text-decoration:none;font-size:18px}
+.btn{display:inline-block;padding:10px 18px;border-radius:10px;border:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:14px}
+h1{font-size:clamp(1.4rem,5vw,2rem);margin:0 0 8px}
+h2{font-size:1.05rem;margin:18px 0 6px}
+p,li{color:var(--ink)}
+p.small,.muted{color:var(--muted);font-size:.92em}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:clamp(14px,3vw,24px);margin:18px 0}
+ul{padding-left:20px;margin:6px 0}li{margin:4px 0}
+label{display:block;margin:12px 0 4px;font-size:.9em;color:var(--muted)}
+input,textarea{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0d1526;color:var(--ink);font-size:15px}
+button{margin-top:14px;padding:11px 20px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-weight:700;font-size:15px;cursor:pointer;width:100%}
+button[disabled]{opacity:.6;cursor:wait}
+#msg{margin-top:12px;font-size:.92em}.ok{color:#86efac}.err{color:#fca5a5}
+
+/* Curseur de souris sombre à contour clair : le cœur du curseur est plus sombre que
+   l'ensemble du site (plus sombre que les champs de saisie clairs), et le contour clair
+   le rend lisible aussi sur le fond sombre. Le pointeur main des boutons/liens est
+   conservé (règles existantes), les champs de texte reçoivent un I-beam sombre. */
+html{cursor:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath d='M4 1 L4 17 L8 13.5 L10.6 19 L13.2 17.6 L10.6 12.4 L15 12 Z' fill='%230d223d' stroke='%23e8f1fb' stroke-width='1.3' stroke-linejoin='round'/%3E%3C/svg%3E") 3 2, auto}
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="submit"]):not([type="button"]),textarea,[contenteditable="true"]{cursor:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='18' viewBox='0 0 16 18'%3E%3Cpath d='M8 2.5 v13 M4 1.5 h8 M4 16.5 h8' fill='none' stroke='%23e8f1fb' stroke-width='3.6' stroke-linecap='round'/%3E%3Cpath d='M8 2.5 v13 M4 1.5 h8 M4 16.5 h8' fill='none' stroke='%230d223d' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E") 8 9, text}

@@ -1,0 +1,41 @@
+import type { FastifyInstance } from 'fastify';
+import crypto from 'node:crypto';
+import { query, withTenant } from '../db.js';
+import { authorizationUrl, saveTokens, validateGoogleConnection, googleOAuthSetupStatus } from '../services/google.js';
+import { sendOrgMail, mailConfigured } from '../services/mail.js';
+import { AurionError } from '../services/errors.js';
+import { loadAppointment, syncAppointment } from '../services/calendar.js';
+import { signatureForEmail, emailBodyHtml } from '../services/signature.js';
+import { renderDocument } from '../services/document-renderer.js';
+import { readPrivateObject } from '../services/storage.js';
+import { createInvoiceWarranty } from '../services/warranty.js';
+
+export async function integrationRoutes(app:FastifyInstance){
+  app.get('/integrations/google/status',{preHandler:app.requireAuth},async r=>{return {...await validateGoogleConnection(r.auth!.organizationId),...googleOAuthSetupStatus(),calendarId:process.env.GOOGLE_CALENDAR_ID||'primary'}});
+  app.get('/integrations/google/start',{preHandler:app.requireAuth},async(r,reply)=>{const setup=googleOAuthSetupStatus();if(!setup.configured)return reply.code(503).send({error:'GOOGLE_OAUTH_NOT_CONFIGURED',message:'La connexion Google nécessite les identifiants OAuth, l’URL de retour et une clé de chiffrement des jetons.',missingConfiguration:setup.missingConfiguration});const state=crypto.randomBytes(32).toString('base64url');await query('insert into google_oauth_states(state,organization_id,expires_at) values($1,$2,now()+interval \'10 minutes\')',[state,r.auth!.organizationId]);return {configured:true,url:await authorizationUrl(state)}});
+  app.get('/integrations/google/callback',async(r,reply)=>{const q:any=r.query;const s=await query('select organization_id from google_oauth_states where state=$1 and expires_at>now()',[q.state]);if(!s.rowCount)return reply.code(400).send('Lien Google expiré.');const client=await (await import('../services/google.js')).oauthClient();const {tokens}=await client.getToken(String(q.code));
+    // RLS 074 : l'organisation provient du state à usage unique ; l'écriture des jetons s'exécute dans son contexte tenant.
+    await withTenant(String(s.rows[0].organization_id),()=>saveTokens(s.rows[0].organization_id,tokens));await query('delete from google_oauth_states where state=$1',[q.state]);return reply.type('text/html; charset=utf-8').send('<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Aurion</title><body><main><h1>Aurion</h1><h2>Google connecté à Aurion.</h2><p>Vous pouvez fermer cette fenêtre.</p></main></body></html>')});
+  app.delete('/integrations/google',{preHandler:app.requireAuth},async r=>{await query('delete from google_connections where organization_id=$1',[r.auth!.organizationId]);return {ok:true}});
+  app.post('/communications/email/document',{preHandler:app.requireAuth},async(r,reply)=>{
+    const b:any=r.body;
+    if(!b?.documentId||!['quote','invoice'].includes(b.type))return reply.code(400).send({error:'INVALID_INPUT'});
+    const type=b.type as 'quote'|'invoice', org=r.auth!.organizationId;
+    if(!(await mailConfigured(org)))throw new AurionError('MAIL_NOT_CONFIGURED','La messagerie n’est pas configurée. Ouvrez Paramètres → Messagerie & agenda pour renseigner votre adresse e-mail (une seule fois).');
+    const d=await renderDocument(org,b.documentId,type);
+    if(!d.row.client_email)return reply.code(400).send({error:'CLIENT_EMAIL_MISSING'});
+    const pdf=await readPrivateObject(d.keys.pdf);
+    const label=type==='invoice'?'facture':'devis';const body=b.message||`Bonjour ${d.row.client_name||''},\n\nVeuillez trouver votre ${label} ${d.row.number} en pièce jointe.`;const sig=await signatureForEmail(org,d.row.activity_id,type);
+    await sendOrgMail(org,{to:d.row.client_email,subject:`${type==='invoice'?'Facture':'Devis'} ${d.row.number}`,text:body+sig.text,html:emailBodyHtml(body,sig.html),attachments:[...(sig.inlineAttachments||[]),{filename:`${d.row.number}.pdf`,content:pdf}]});
+    await query('update quotes set sent_at=now(),updated_at=now() where id=$1 and organization_id=$2',[b.documentId,org]);
+    if(type==='invoice') await createInvoiceWarranty(org,b.documentId,d.row as any);
+    if(type==='invoice' && d.row.client_id){
+      await query(`update client_time_sessions set duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),ended_at=now(),paused_at=null,status='completed' where organization_id=$1 and user_id=$2 and client_id=$3 and ended_at is null and status='running'`,[org,r.auth!.userId,d.row.client_id]);
+      await query(`update client_time_sessions set ended_at=now(),paused_at=null,status='completed' where organization_id=$1 and user_id=$2 and client_id=$3 and ended_at is null and status='paused'`,[org,r.auth!.userId,d.row.client_id]);
+    }
+    return {ok:true};
+  });
+  app.post('/communications/calendar',{preHandler:app.requireAuth},async(r,reply)=>{const b:any=r.body;if(!b?.appointmentId)return reply.code(400).send({error:'INVALID_INPUT'});const a=await loadAppointment(r.auth!.organizationId,b.appointmentId);if(!a)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true,calendar:await syncAppointment(r.auth!.organizationId,a,'create')}});
+  app.patch('/communications/calendar/:appointmentId',{preHandler:app.requireAuth},async(r,reply)=>{const a=await loadAppointment(r.auth!.organizationId,(r.params as any).appointmentId);if(!a)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true,calendar:await syncAppointment(r.auth!.organizationId,a,'update')}});
+  app.delete('/communications/calendar/:appointmentId',{preHandler:app.requireAuth},async(r,reply)=>{const a=await loadAppointment(r.auth!.organizationId,(r.params as any).appointmentId);if(!a)return reply.code(404).send({error:'NOT_FOUND'});return {ok:true,calendar:await syncAppointment(r.auth!.organizationId,a,'cancel')}});
+}

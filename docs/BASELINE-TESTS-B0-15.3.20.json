@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "reference": {
+    "version": "15.3.20",
+    "commit": "eba2a831d9a37a194bef266cf6c57985d7c29787",
+    "workflowRunId": 41824863953,
+    "workflowRunUrl": "https://github.com/wooffey78/aurion/actions/runs/41824863953",
+    "runner": "ubuntu-24.04",
+    "postgres": "17"
+  },
+  "smoke": {
+    "total": 65,
+    "passed": 58,
+    "failed": 7,
+    "failures": [
+      "le fond est légèrement bleuté et le texte utilise un bleu sombre lisible",
+      "la recherche par nom ne remplace jamais automatiquement les données déjà renseignées",
+      "la configuration initiale reste dédiée aux entreprises existantes",
+      "biometric sign-in is offered only on supported devices and is user-initiated",
+      "passkeys are offered on secure desktop and mobile browsers supporting WebAuthn",
+      "biometric flow keeps password fallback and only registers after a deliberate choice",
+      "les anciennes routes administratives et de marque ne sont plus exposées"
+    ]
+  },
+  "full": {
+    "total": 295,
+    "passed": 277,
+    "failed": 18,
+    "failures": [
+      "le fond est légèrement bleuté et le texte utilise un bleu sombre lisible",
+      "connexion Google exige état CSRF, PKCE, jeton vérifié et compte Aurion existant",
+      "la recherche par nom ne remplace jamais automatiquement les données déjà renseignées",
+      "Google production setup requires the exact HTTPS callback",
+      "production migration command refuses to fall back to the runtime database role",
+      "les boutons d’accueil ouvrent les pages d’authentification par navigation native",
+      "la configuration initiale reste dédiée aux entreprises existantes",
+      "biométrie : bouton accessible sans connexion automatique silencieuse",
+      "une détection ne vide jamais une donnée déjà détectée ou saisie",
+      "le service Render sans configuration backend redirige vers la production sans secret inventé",
+      "biometric sign-in is offered only on supported devices and is user-initiated",
+      "passkeys are offered on secure desktop and mobile browsers supporting WebAuthn",
+      "biometric flow keeps password fallback and only registers after a deliberate choice",
+      "les anciennes routes administratives et de marque ne sont plus exposées",
+      "Step 15: static button ids either have a click contract or submit a form",
+      "délai de relance 0 ou vide : aucune relance automatique programmée",
+      "tests/stripe-billing.integration.test.mjs",
+      "les notifications restent visibles sur petits écrans avec zone de sécurité mobile"
+    ]
+  },
+  "browser": {
+    "status": "failure",
+    "message": "locator.waitFor: Timeout 20000ms exceeded.",
+    "waitingFor": "locator('#sidebar') to be visible",
+    "location": "backend/tests/frontend-browser.e2e.mjs:56:34"
+  }
+}

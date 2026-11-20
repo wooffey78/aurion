@@ -1,0 +1,28 @@
+<!doctype html><html lang="fr"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aurion — Suppression de compte</title>
+<link rel="stylesheet" href="/public/account-deletion.css">
+<script src="/public/account-deletion.js" defer></script>
+</head><body><main>
+<header><a class="brand" href="/">AURION</a><a class="btn" href="/#/auth">Créer mon espace / Se connecter</a></header>
+<h1>Demander la suppression de votre compte Aurion</h1>
+<p class="small">Cette page publique permet de demander la suppression de votre compte sans installer l’application. Vous pouvez aussi faire la demande depuis l’application, dans <b>Mon compte → Suppression du compte</b>, où vous confirmez avec votre mot de passe.</p>
+<section>
+<h2>Ce qui est supprimé</h2>
+<ul><li>Votre compte utilisateur : adresse e-mail, nom, mot de passe, sessions et appareils connectés.</li><li>Vos brouillons synchronisés et vos données de profil (avatar, préférences).</li><li>Vos accès aux espaces Aurion ; si vous êtes le seul membre d’un espace, ses connexions externes (messagerie, Google) sont révoquées et l’espace devient inaccessible.</li></ul>
+<h2>Ce qui est conservé (obligation légale)</h2>
+<ul><li>Les pièces comptables et preuves contractuelles que la loi impose de conserver, archivées à accès restreint, détachées de votre identité et jamais réutilisées pour fournir le service.</li><li>Une trace minimale du traitement (référence d’audit, date, statut), sans donnée personnelle en clair.</li></ul>
+<h2>Délai et contact</h2>
+<p class="small">La demande est enregistrée immédiatement ; le traitement intervient sous 30 jours au plus. Vous pouvez annuler depuis l’application tant qu’elle n’est pas traitée. Contact : l’adresse de support indiquée dans les mentions légales.</p>
+</section>
+<section>
+<form id="f">
+<label for="email">Adresse e-mail du compte</label><input id="email" name="email" type="email" autocomplete="email" maxlength="254" required>
+<label for="confirm">Confirmer l’adresse e-mail</label><input id="confirm" name="confirm" type="email" autocomplete="email" maxlength="254" required>
+<label for="reason">Motif (facultatif)</label><textarea id="reason" name="reason" rows="3" maxlength="1000"></textarea>
+<button id="send" type="submit">Envoyer ma demande</button>
+<p id="msg" role="status" aria-live="polite"></p>
+</form>
+</section>
+<p class="small muted">Vérification d’identité : le traitement effectif vérifie votre identité avant toute suppression. La demande est d’abord enregistrée, puis traitée par l’éditeur après contrôle de l’adresse de contact. Aucune donnée de cette page n’est utilisée à d’autres fins.</p>
+</main></body></html>

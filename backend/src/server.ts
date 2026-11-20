@@ -1,0 +1,47 @@
+import {buildApp} from './app.js';
+import { redactValue } from './services/observability.js';
+import {config} from './config.js';
+import {query,db} from './db.js';
+import {startReminderWorker} from './services/scheduler.js';
+import {ensureLegalDocuments} from './services/account.js';
+import {migrateLocalPrivateStorageToS3} from './services/storage.js';
+
+async function waitForDatabase(){
+  const max=20;
+  for(let i=1;i<=max;i++){
+    try{await query('select 1');console.log('[AURION] PostgreSQL joignable.');return}
+    catch(e:any){
+      const code = typeof e?.code === 'string' ? e.code : 'UNKNOWN';
+      console.error(`[AURION] PostgreSQL injoignable (tentative ${i}/${max}, code=${code}).`);
+      if(i===max)throw new Error('PostgreSQL injoignable. Vérifiez DATABASE_URL et la disponibilité de la base, sans afficher la chaîne de connexion.');
+      await new Promise(r=>setTimeout(r,1500));
+    }
+  }
+}
+
+// Bloc 24 — erreurs fatales : journalisation structurée puis ARRÊT PROPRE du processus
+// (Render redémarre). Un processus ne poursuit jamais dans un état incertain ; les réponses
+// restent génériques (aucune pile d'appels envoyée aux clients).
+process.on('unhandledRejection', (reason) => {
+  console.error(JSON.stringify({ level:'fatal', service:'aurion-api', msg:'unhandledRejection', detail: redactValue(String((reason as any)?.stack || reason)) }));
+  process.exit(1);
+});
+process.on('uncaughtException', (error) => {
+  console.error(JSON.stringify({ level:'fatal', service:'aurion-api', msg:'uncaughtException', detail: redactValue(String(error?.stack || error)) }));
+  process.exit(1);
+});
+try{
+  await waitForDatabase();
+  const storageMigration=await migrateLocalPrivateStorageToS3();
+  if(storageMigration.copied)console.log(`[AURION STORAGE] ${storageMigration.copied} fichier(s), ${storageMigration.bytes} octet(s) copiés vers S3.`);
+  await ensureLegalDocuments().catch(e=>console.error('[AURION] documents légaux non initialisés :',e?.message||e));
+  const app=await buildApp();
+  await app.listen({host:config.HOST,port:config.PORT});
+  startReminderWorker(app.log);
+  const stop=async()=>{try{await app.close();await db.end()}finally{process.exit(0)}};
+  process.on('SIGINT',stop);process.on('SIGTERM',stop);
+}catch(e:any){
+  const code = typeof e?.code === 'string' ? e.code : 'STARTUP_FAILED';
+  console.error(`[AURION] Demarrage impossible (code=${code}). Vérifiez la configuration et les journaux du serveur.`);
+  process.exit(1);
+}

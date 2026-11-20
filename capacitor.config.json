@@ -1,0 +1,16 @@
+{
+  "appId": "fr.aurion.app",
+  "appName": "Aurion",
+  "webDir": "dist-web",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "never"
+  },
+  "server": {
+    "androidScheme": "https",
+    "cleartext": false
+  }
+}

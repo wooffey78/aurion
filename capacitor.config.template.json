@@ -1,0 +1,14 @@
+{
+  "$comment": "Gabarit Capacitor pour les enveloppes Android/iOS d'Aurion (Bloc 8). À copier en capacitor.config.json à la racine d'un projet Capacitor initialisé (npx cap init). appName/appId à confirmer par l'éditeur avant tout enregistrement en boutique. Le serveur reste la source de vérité ; les enveloppes natives posent window.AURION_API_URL avant config.js (déjà prévu) et fournissent window.AURION_SQLITE_DRIVER pour le stockage SQLite chiffré (Bloc 2, adaptateur prêt).",
+  "appId": "fr.aurion.app",
+  "appName": "Aurion",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "android": { "allowMixedContent": false },
+  "ios": { "contentInset": "never" },
+  "server": {
+    "url": "https://A_REMPLACER_DOMAINE_OVH",
+    "cleartext": false,
+    "androidScheme": "https"
+  }
+}

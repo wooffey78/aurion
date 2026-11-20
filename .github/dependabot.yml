@@ -1,0 +1,36 @@
+version: 2
+updates:
+  # Dépendances npm du backend (fastify, pg, zod, jose, argon2, googleapis…).
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+    # Regroupement maîtrisé : les correctifs de sécurité et mineurs sont groupés,
+    # les montées de version majeures restent des PR individuelles à examiner.
+    groups:
+      patch-and-minor:
+        update-types:
+          - patch
+          - minor
+    commit-message:
+      prefix: "deps(backend)"
+    labels:
+      - dependencies
+      - backend
+    reviewers:
+      - wooffey78
+  # GitHub Actions (checkout, setup-node…) : mises à jour mensuelles.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "deps(ci)"
+    labels:
+      - dependencies
+      - ci
+    reviewers:
+      - wooffey78

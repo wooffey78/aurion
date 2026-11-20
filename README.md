@@ -1,0 +1,35 @@
+# Aurion 15.4.35
+
+Nouveautés 15.4.35 (fusion 15.4.34-consolidée + 15.4.25) : suppression de compte complète en ligne (application + page publique, confirmation forte, traitement effectif idempotent avec trace d'audit et console administrateur) ; 20 profils métiers avec suggestions élargies et détection des cotisations par catégorie micro pour chaque métier ; validation des devis/factures par un dialogue Aurion ; curseur sombre à contour clair ; compteur serveur des rendez-vous à venir ; contrôle de collision des migrations ; `autoDeploy: true` sur Render (push main → déploiement) ; documents juridiques 4.0 révisés le 20 novembre 2026 ; version harmonisée 15.4.35 (manifestes et lockfiles). Nouveautés 15.4.34 : adressage S3 path-style optionnel pour Neon Object Storage (`AURION_S3_FORCE_PATH_STYLE=true`) tout en conservant l’adressage virtual-host OVH par défaut ; relance globale et ciblée des sections d’administration en échec ; messages d’e-mail fondés sur le statut réellement retourné ; diagnostic Render des variables manquantes (noms uniquement, aucune valeur secrète) ; contrats de non-régression renforcés pour les indicateurs, le stockage, les dialogues, la CI et le déploiement.
+
+Application de gestion pour entreprises déjà immatriculées, avec interface web/PWA et API Node.js/Fastify/PostgreSQL.
+
+Aurion ne propose ni parcours de création d’entreprise, ni studio d’identité visuelle, ni intelligence artificielle, ni recherche d’entreprise par nom. À la première connexion, un parcours en 8 étapes (Vous, Entreprise avec détection SIRET/SIREN au clic, Activité, Logo facultatif, Messagerie, Signature e-mail, Documents dans le cloud, Récapitulatif) écrit directement dans les fiches lues par Paramètres et « Mon compte ».
+
+Nouveautés 15.4.24 (Bloc 1) : configuration canonique injectée par le serveur (`APP_BASE_URL` → `<meta name="aurion-api-base">`), plus aucune URL de production codée en dur dans les sources du frontend (`assets/js/config.js`), mode local Windows et enveloppes natives inchangés ; Render réconcilié avec la décision éditeur « environnement temporaire gratuit » (`render.yaml` plan `free`), production cible OVHcloud Francfort documentée (`docs/MIGRATION-RENDER-OVH.md`, `docs/INFRA-OVH-COUTS.md`) — aucune bascule ni achat réalisés. Historique 15.4.23 : outils exécutables de sauvegarde/restauration (`npm run db:backup`, `npm run db:restore:drill`), pré-vol intégrations et juridique (`npm run check:integrations`, `npm run check:legal`), cahier de recette de la bêta privée (`docs/RECETTE-BETA-PRIVEE.md`).
+
+Nouveautés 15.4.4 : e-reporting (bloc 5) — déclarations de données de transaction et de paiement via la plateforme agréée, matrice de périmètre documentée sans inférence automatique (B2C domestique et B2B international déclarés par l'utilisateur, B2B domestique orienté vers l'émission), rapport d'écarts bloquant, flux scellés, accusés signés obligatoires, corrections sans réécriture de l'originale (voir `docs/PLATEFORME-AGREEE.md` § 10). Nouveautés 15.4.3 : émission de factures électroniques (bloc 4) — génération UBL 2.1 et CII D16B (profil Factur-X BASIC), quatre mentions obligatoires du 1er septembre 2026 saisissables sur chaque facture (SIREN du client, catégorie de l’opération, option TVA sur les débits le cas échéant, adresse de livraison si différente), transmission signée via la plateforme agréée avec accusés signés obligatoires, idempotence sans doublon, reprises après délai dépassé et journal complet (voir `docs/PLATEFORME-AGREEE.md` § 8). Nouveautés 15.4.2 : socle de réception des factures fournisseurs électroniques via une plateforme agréée (webhook signé HMAC, idempotence, détection de doublons, archivage de l’original sans altération, rapprochement fournisseur, journal d’événements, reprise après erreur). Aucune plateforme agréée réelle n’est connectée : réception et transmission ne sont pas déclarées opérationnelles en production.
+
+Nouveautés 15.4.1 : isolation multi-tenant par Row Level Security PostgreSQL (61 tables, contexte transactionnel, pool d'administration journalisé — voir `docs/SECURITE-RLS.md`), CI strictement verte (333 tests, baseline 15.3.20 résolue), audit de dépendances, Dependabot, documentation alignée sur le code.
+
+Nouveautés 15.4.0 : stockage documentaire dans le Google Drive de l’utilisateur (file d’attente hors ligne, reprise automatique, quota et alertes dans le journal de bord), notes de frais intégrées à la comptabilité et à la trésorerie, rétractation déplacée dans « Mon compte ». Voir `CHANGELOG-15.4.0.md`, `docs/CLOUD-STOCKAGE-15.4.0.md` et `docs/PARCOURS-15.4.0.md`.
+
+## Développement local
+
+1. Installer Node.js 22.16.0 ou supérieur et PostgreSQL.
+2. Copier `backend/.env.example` en `backend/.env` et configurer une base **réservée à Aurion**.
+3. Depuis la racine : `npm ci --prefix backend`, puis `npm run build`.
+4. Appliquer les migrations selon la procédure décrite dans `backend/package.json`, puis lancer `npm start`.
+5. Contrôler `http://127.0.0.1:4000/health/db` (base joignable) et exécuter `npm run check`. Pour l'isolation RLS et le pool d'administration, configurer `AURION_ADMIN_DATABASE_URL` (voir `docs/SECURITE-RLS.md`).
+
+Pour l’installation Windows autonome, suivre `README-INSTALLATION.md`. Pour Render, lire `docs/DEPLOIEMENT-RENDER.md`. `render.yaml` décrit le service de production unique (`aurion`, région Francfort, aligné sur le stockage OVH région `de`) ; l’instance historique `aurion-web` (Oregon) est volontairement hors blueprint comme voie de retour arrière, à supprimer après la bascule (procédure et sauvegardes : `docs/RUNBOOK-PRODUCTION.md`). Le blueprint ne crée ni la base PostgreSQL gérée ni le stockage S3. La recette de la bêta privée est encadrée par `docs/RECETTE-BETA-PRIVEE.md` et l’exploitation quotidienne par `docs/EXPLOITATION-SUPPORT.md`.
+
+L’archive de sources ne contient ni dépendances installées, ni secrets locaux, ni journaux ou données d’exécution. Installez les dépendances à partir du fichier de verrouillage avant le build. LibreOffice est téléchargé en ligne par l’installateur Windows si nécessaire ; le MSI n’est pas inclus dans l’archive source.
+
+Après avoir exécuté les contrôles, créez une archive de sources propre avec `pwsh tools/Build-Source-Archive.ps1 -Out <chemin-de-sortie.zip>`. Le script conserve la racine du projet et ses fichiers de verrouillage, vérifie les trois versions déclarées et exclut les dépendances, builds et données locales.
+
+## Publication
+
+Ne jamais commiter les fichiers `.env`, `backend/storage/`, exports de base ou secrets. Toute mise en production doit conserver une base dédiée à Aurion, les clés de chiffrement persistantes et une stratégie de sauvegarde/restauration vérifiée.
+
+Pour une première publication, utiliser `tools/Publish-Aurion.ps1` depuis une extraction propre. Pour un service Render existant dont l’auto-déploiement est désactivé, utiliser `tools/Deploy-Aurion-Render.ps1` après avoir configuré `RENDER_API_KEY` dans la session PowerShell. Ces scripts refusent de remplacer une branche distante existante ou de modifier les ressources/variables Render.

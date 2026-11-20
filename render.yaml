@@ -1,0 +1,127 @@
+# Blueprint Render Aurion 15.4.24 — UN service web : Frankfurt (`aurion`), ENVIRONNEMENT TEMPORAIRE GRATUIT.
+# - Bloc 1 (décision éditeur) : Render reste gratuit pour développement/démonstration uniquement.
+#   Le plan est passé de `starter` (payant) à `free` — aucune formule Render payante ne sera souscrite.
+#   La production cible est OVHcloud Francfort (application/API, PostgreSQL, S3 privé région `de`,
+#   sauvegardes) : voir docs/MIGRATION-RENDER-OVH.md et docs/INFRA-OVH-COUTS.md.
+# - Limites de l'offre gratuite Render à connaître : instance suspendue après inactivité,
+#   ressources partagées, pas de SLA — aucune donnée client de production ne doit y résider
+#   après la bascule OVH (gel des écritures inclus dans la procédure de migration).
+# - Région unique Francfort, alignée sur le stockage OVH `de` (résidence des données UE, RGPD).
+# - L'instance historique `aurion-web` (Oregon) est VOLONTAIREMENT hors blueprint : elle reste
+#   la voie de retour arrière pendant la bascule (docs/PLAN-BASCULE-FRANKFURT-15.3.20.md) et
+#   doit être supprimée dans le tableau de bord Render après bascule DNS + fenêtre de retour.
+#   Un service retiré du blueprint n'est jamais détruit par une synchronisation.
+# - Les secrets ne sont JAMAIS écrits ici : `sync: false` = à saisir dans le tableau de bord Render.
+# - autoDeploy activé (décision éditeur 15.4.35) : chaque push validé sur `main` déclenche
+#   le déploiement Render automatiquement. La CI GitHub (.github/workflows/aurion-ci.yml)
+#   garde son rôle de garde-fou : build + typecheck + tests avant le merge sur main.
+#   Déploiement manuel toujours possible : tableau de bord Render « Manual Deploy ».
+# - Chaque démarrage applique les migrations additives (node dist/migrate.js) : sauvegarder la base avant tout déploiement
+#   (procédure et test de restauration : docs/RUNBOOK-PRODUCTION.md).
+# - PostgreSQL (base gérée) et OVH Object Storage (S3) sont des services externes non créés par ce blueprint.
+# - Synchroniser ce blueprint applique cette configuration au service `aurion` existant portant ce nom.
+envVarGroups:
+  - name: aurion-commun
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: AURION_STORAGE_BACKEND
+        value: s3
+      - key: AURION_S3_ENDPOINT
+        value: https://s3.de.io.cloud.ovh.net
+      - key: AURION_S3_REGION
+        value: de
+      - key: AURION_ENCRYPTION_KEY_VERSION
+        value: k1
+      - key: AURION_CLOUD_QUOTA_THRESHOLDS
+        value: "80,90,95,100"
+      - key: BILLING_VAT_RATE_BPS
+        value: "0"
+      - key: PLATFORM_SMTP_SECURITY
+        value: starttls
+
+services:
+  - type: web
+    name: aurion
+    runtime: node
+    region: frankfurt
+    plan: free
+    branch: main
+    buildCommand: npm ci --prefix backend --include=dev --no-audit --no-fund && npm run build
+    startCommand: npm --prefix backend start
+    healthCheckPath: /health/db
+    autoDeploy: true
+    envVars:
+      - fromGroup: aurion-commun
+      - key: AURION_PUBLIC_ORIGIN
+        # URL de démonstration Render actuelle (temporaire) : utilisée pour CORS/cookies tant que
+        # la démonstration tourne ici. À remplacer par le domaine OVH canonique à la bascule
+        # (docs/MIGRATION-RENDER-OVH.md) ; jamais utilisée comme configuration finale de production.
+        value: https://aurion-2hye.onrender.com
+      - key: DATABASE_URL
+        sync: false
+      - key: AURION_MIGRATION_DATABASE_URL
+        sync: false
+      - key: AURION_ADMIN_DATABASE_URL
+        sync: false
+      - key: AURION_RUNTIME_DB_ROLE
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: AURION_ENCRYPTION_KEY
+        generateValue: true
+      - key: AURION_ENCRYPTION_KEY_PREVIOUS
+        sync: false
+      - key: AURION_ENCRYPTION_KEY_PREVIOUS_VERSION
+        sync: false
+      - key: AURION_ENCRYPTION_LEGACY_JWT_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: AURION_S3_BUCKET
+        sync: false
+      - key: AURION_S3_ACCESS_KEY
+        sync: false
+      - key: AURION_S3_SECRET_KEY
+        sync: false
+      - key: PLATFORM_SMTP_HOST
+        sync: false
+      - key: PLATFORM_SMTP_PORT
+        sync: false
+      - key: PLATFORM_SMTP_USER
+        sync: false
+      - key: PLATFORM_SMTP_PASS
+        sync: false
+      - key: PLATFORM_SMTP_FROM
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: GOOGLE_DRIVE_REDIRECT_URI
+        sync: false
+      - key: GOOGLE_TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: AURION_SUPPORT_EMAIL
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: AURION_PA_PROVIDER
+        sync: false
+      - key: AURION_PA_WEBHOOK_SECRET
+        sync: false
+
+  # `aurion-web` (Oregon) : volontairement absent du blueprint — instance historique de
+  # retour arrière pendant la bascule ; à supprimer dans le tableau de bord Render une fois
+  # la bascule DNS effectuée et la fenêtre de retour arrière expirée (docs/RUNBOOK-PRODUCTION.md).
+
