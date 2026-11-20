@@ -45,7 +45,7 @@ export const view=()=>{
   ${editing?'':'<p id="draft-sync-status" class="help" role="status" aria-live="polite">Le brouillon sera synchronisé à votre compte automatiquement.</p>'}
   <form id="quote-form" class="quote-layout"><section class="panel stack">
    <h2>1 · Client et ${e((doc.interventionLabel||'prestation').toLowerCase())}</h2>
-   <label class="field"><span>Client</span><select id="qclient"><option value="">Votre choix</option>${S.clients.map(x=>`<option value="${x.id}" ${q&&q.client_id===x.id?'selected':''}>${e(x.name)}</option>`).join('')}<option value="__new__">Nouveau client (saisie directe)</option></select></label><section id="new-client-fields" hidden class="stack"><p class="help">Création directe sans fiche préexistante : la fiche client sera créée avec le document dans la même opération (annulation = rien n'est créé). Avant validation, Aurion recherche les doublons et vous propose de réutiliser un client existant — jamais de fusion automatique.</p><div class="grid-2">${F('nc-name','Nom / raison sociale','','required')}${F('nc-email','E-mail','','type="email"')}</div><div class="grid-2">${F('nc-phone','Téléphone','')}${F('nc-siret','SIRET (facultatif)','','inputmode="numeric" maxlength="14"')}</div>${F('nc-address','Adresse','')}<div class="grid-2">${F('nc-postal','Code postal','')}${F('nc-city','Ville','')}</div></section><div id="qclient-summary" class="client-summary" hidden></div>
+   <label class="field"><span>Client</span><select id="qclient"><option value="">Votre choix</option>${S.clients.map(x=>`<option value="${x.id}" ${q&&q.client_id===x.id?'selected':''}>${e(x.name)}</option>`).join('')}<option value="__new__">Nouveau client (saisie directe)</option></select></label><section id="new-client-fields" hidden class="stack"><p class="help" id="nc-help">Création directe sans fiche préexistante : la fiche client sera créée avec le document dans la même opération (annulation = rien n'est créé). Avant validation, Aurion recherche les doublons et vous propose de réutiliser un client existant — jamais de fusion automatique.</p><div class="grid-2">${F('nc-name','Nom / raison sociale','','required')}${F('nc-email','E-mail','','type="email"')}</div><div class="grid-2">${F('nc-phone','Téléphone','')}${F('nc-siret','SIRET (facultatif)','','inputmode="numeric" maxlength="14"')}</div>${F('nc-address','Adresse','')}<div class="grid-2">${F('nc-postal','Code postal','')}${F('nc-city','Ville','')}</div></section><div id="qclient-summary" class="client-summary" hidden></div>
    <label class="field"><span>Adresse d’intervention enregistrée sur le document</span><select id="interventionAddressId"><option value="">Adresse par défaut / aucune adresse</option></select><small class="help">L’adresse choisie est figée dans le devis ou la facture émis ; les modifications ultérieures du carnet d’adresses ne changent pas les documents historiques.</small></label>
    <label class="field"><span>Adresse de facturation</span><select id="invoiceAddressSource"><option value="client" ${invoiceAddressSource==='client'?'selected':''}>Adresse postale</option><option value="intervention" ${invoiceAddressSource==='intervention'?'selected':''}>Adresse d’intervention</option><option value="free" ${invoiceAddressSource==='free'?'selected':''}>Adresse libre</option></select></label>
    <label class="field"><span>Adresse utilisée pour la facturation</span><textarea id="billingAddress" rows="4" placeholder="Saisissez ou modifiez l’adresse de facturation…">${e(billingAddress)}</textarea><small class="help">Cette adresse est préremplie selon votre choix et reste toujours modifiable manuellement.</small></label>
@@ -221,7 +221,21 @@ export async function bind(){
   document.querySelectorAll('.contrib-rate').forEach(x=>x.addEventListener('input',()=>{recalc();persistDraft()}));
   $('#activityCategory')?.addEventListener('change',()=>{recalc();persistDraft()});
   // Bloc 11 — saisie directe d'un client sans fiche préexistante.
-  $('#qclient')?.addEventListener('change',()=>{const sec=$('#new-client-fields');if(sec)sec.hidden=$('#qclient').value!=='__new__';persistDraft()});
+  // Client existant : les coordonnées de la fiche remplissent automatiquement les champs du
+  // document — aucune saisie à refaire ; la saisie directe reste réservée à un client sans fiche.
+  const NC_FIELDS=['nc-name','nc-email','nc-phone','nc-siret','nc-address','nc-postal','nc-city'];
+  const applyClientFields=()=>{const sec=$('#new-client-fields'),help=$('#nc-help');if(!sec)return;
+    const isNew=$('#qclient').value==='__new__',c=selectedClient();
+    if(isNew){sec.hidden=false;if(help)help.textContent='Création directe sans fiche préexistante : la fiche client sera créée avec le document dans la même opération (annulation = rien n’est créé). Avant validation, Aurion recherche les doublons et vous propose de réutiliser un client existant — jamais de fusion automatique.';
+      NC_FIELDS.forEach(id=>{const el=document.getElementById(id);if(!el)return;el.disabled=false;if(el.dataset.autofilled==='1'){el.value='';delete el.dataset.autofilled}});
+      return}
+    if(!c){sec.hidden=true;return}
+    sec.hidden=false;
+    const map={'nc-name':c.name||'','nc-email':c.email||'','nc-phone':c.phone||'','nc-siret':c.siret||'','nc-address':c.address||'','nc-postal':'','nc-city':''};
+    NC_FIELDS.forEach(id=>{const el=document.getElementById(id);if(!el)return;el.disabled=true;el.value=map[id]||'';el.dataset.autofilled='1'});
+    if(help)help.textContent='Coordonnées remplies automatiquement depuis la fiche client — aucune saisie nécessaire. Ces champs ne servent qu’à créer un document pour un client qui n’existe pas encore.'};
+  applyClientFields();
+  $('#qclient')?.addEventListener('change',()=>{applyClientFields();persistDraft()});
   const readNewClient=()=>({name:$('#nc-name').value.trim(),email:$('#nc-email')?.value?.trim()||'',phone:$('#nc-phone')?.value?.trim()||'',address:$('#nc-address')?.value?.trim()||'',postalCode:$('#nc-postal')?.value?.trim()||'',city:$('#nc-city')?.value?.trim()||'',siret:$('#nc-siret')?.value?.replace(/\s/g,'')||''});
   $('#invoiceAddressSource').addEventListener('change',async()=>{await refreshBillingAddress();persistDraft()});
   $('#interventionAddressId')?.addEventListener('change',persistDraft);

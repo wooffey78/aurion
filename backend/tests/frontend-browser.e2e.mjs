@@ -174,6 +174,46 @@ try{
     await page.waitForTimeout(250);
     if(!(await page.locator('#view').count()))throw new Error('Racine #view absente après la navigation vers '+viewId);
   }
+  // Correctif 15.4.41 — client existant : les coordonnées de la fiche remplissent AUTOMATIQUEMENT
+  // les champs du document (devis ET facture) ; la saisie directe reste réservée à un client
+  // sans fiche préexistante. Aucune valeur auto-remplie ne doit fuiter vers « __new__ ».
+  {
+    const autoName='Client Fiche Auto '+Date.now();
+    const created=await page.evaluate(async n=>{
+      const r=await fetch('/clients',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n,email:'fiche.auto@example.test',phone:'06 12 34 56 78',address:'12 rue des Lilas, 33000 Bordeaux',siret:'12345678900011'})});
+      return {status:r.status,body:await r.text().catch(()=> '')};
+    },autoName);
+    if(created.status>=300)throw new Error('Création du client de fiche impossible (HTTP '+created.status+') : '+created.body+'\n'+serverLog);
+    for(const kind of ['quote','invoice']){
+      await page.locator('.nav [data-view]').evaluateAll(nodes=>{nodes.find(n=>n.getAttribute('data-view')==='invoices')?.click()});
+      await page.waitForFunction(()=>/Devis & factures/.test(document.querySelector('#view h1')?.textContent||''),null,{timeout:15000});
+      await page.locator('#view [data-new-type="'+kind+'"]').click();
+      // Un brouillon synchronisé (créé par les tests précédents) ouvre le dialogue Aurion
+      // « Reprendre le brouillon existant ? » ; « Remplacer par un nouveau document » est le
+      // chemin du test — l'application supprime alors elle-même le brouillon serveur.
+      const dialogShown=await page.waitForFunction(()=>!!document.querySelector('.confirm-backdrop'),null,{timeout:4000}).then(()=>true).catch(()=>false);
+      if(dialogShown)await page.locator('.confirm-backdrop [data-a="yes"]').click();
+      try{
+        await page.waitForFunction(()=>/Nouveau devis|Nouvelle facture/.test(document.querySelector('#view h1')?.textContent||''),null,{timeout:15000});
+      }catch(e){
+        const diag=await page.evaluate(()=>({h1:document.querySelector('#view h1')?.textContent||'',backdrop:!!document.querySelector('.confirm-backdrop'),buttons:[...document.querySelectorAll('#view [data-new-type]')].map(b=>({type:b.getAttribute('data-new-type'),visible:!!b.offsetParent}))})).catch(x=>({evalError:String(x)}));
+        throw new Error('Le bouton + Nouveau '+(kind==='invoice'?'facture':'devis')+' n’a pas changé d’écran : '+JSON.stringify(diag)+'\n'+e.message);
+      }
+      await page.locator('#qclient').selectOption({label:autoName});
+      await page.waitForFunction(()=>document.querySelector('#nc-name')?.disabled===true,null,{timeout:8000});
+      const filled=await page.evaluate(()=>({name:document.querySelector('#nc-name')?.value,email:document.querySelector('#nc-email')?.value,phone:document.querySelector('#nc-phone')?.value,siret:document.querySelector('#nc-siret')?.value,address:document.querySelector('#nc-address')?.value,anyEnabled:['nc-name','nc-email','nc-phone','nc-siret','nc-address'].some(id=>!document.getElementById(id)?.disabled),help:document.querySelector('#nc-help')?.textContent||''}));
+      if(filled.name!==autoName||filled.email!=='fiche.auto@example.test'||filled.phone!=='06 12 34 56 78'||filled.siret!=='12345678900011'||filled.address!=='12 rue des Lilas, 33000 Bordeaux'||filled.anyEnabled)throw new Error('Coordonnées du client existant non remplies automatiquement depuis la fiche : '+JSON.stringify(filled));
+      if(!/remplies automatiquement depuis la fiche client/.test(filled.help))throw new Error('L’aide des champs n’est pas adaptée au mode client existant : '+filled.help);
+      await page.locator('#qclient').selectOption('__new__');
+      await page.waitForFunction(()=>document.querySelector('#nc-name')?.disabled===false&&document.querySelector('#nc-name')?.value==='',null,{timeout:8000});
+      const leaked=await page.evaluate(()=>({email:document.querySelector('#nc-email')?.value,phone:document.querySelector('#nc-phone')?.value,siret:document.querySelector('#nc-siret')?.value,address:document.querySelector('#nc-address')?.value}));
+      if(Object.values(leaked).some(v=>v!==''))throw new Error('Des valeurs auto-remplies ont fuité vers la saisie directe d’un nouveau client : '+JSON.stringify(leaked));
+      // Laisser passer le débounce de synchronisation du brouillon (650 ms) puis purger le
+      // brouillon serveur pour que l'itération suivante parte d'un état connu.
+      await page.waitForTimeout(1200);
+      await page.evaluate(()=>fetch('/settings/draft',{method:'DELETE',credentials:'include'}));
+    }
+  }
   await page.evaluate(()=>fetch('/auth/logout',{method:'POST',credentials:'include'}));
   await page.goto(baseUrl,{waitUntil:'domcontentloaded'});
   await page.getByRole('link',{name:'Se connecter'}).click();
