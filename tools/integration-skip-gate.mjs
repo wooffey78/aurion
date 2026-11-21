@@ -209,6 +209,7 @@ function runTests(files) {
     const chunks = [];
     const child = spawn(process.execPath, [
       '--test',
+      '--test-concurrency=1',
       `--test-reporter=${reporterPath}`,
       '--test-reporter-destination=stdout',
       '--test-reporter=spec',
