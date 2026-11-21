@@ -78,9 +78,11 @@ jobs:
       - name: Install LibreOffice for PDF document integration tests
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends libreoffice
+          sudo apt-get install --yes --no-install-recommends libreoffice poppler-utils
           command -v soffice
           soffice --headless --version
+          command -v pdftotext
+          pdftotext -v
 
       # Porte dédiée : un test d'intégration PostgreSQL, Stripe ou Google ignoré (ou todo)
       # doit faire échouer la CI. Le rapport tests / réussis / ignorés / échecs est publié
