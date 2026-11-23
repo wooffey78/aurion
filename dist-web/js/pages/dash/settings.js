@@ -3,7 +3,7 @@ import{api,getActiveActivity,setActiveActivity}from'../../core/api.js';
 import{S,e,toast,modalForm,confirmDelete,hooks,askConfirm}from'./core.js';
 import{renderMailbox}from'../mailbox.js';
 import{renderDataImport}from'../data-import.js';
-import{detectCompany,isOutOfScopeCompany,OWNER_SCOPE_REFUSAL,buildProposals,renderProposals,renderCompanyChoices}from'../../core/company-detect.js';
+import{detectCompany,isOutOfScopeCompany,OWNER_SCOPE_REFUSAL,buildProposals,renderProposals,renderCompanyChoices,renderEstablishmentsNote}from'../../core/company-detect.js';
 import{storageSection,bindStorage}from'./storage.js';
 
 const F=(id,label,val='',extra='')=>`<label class="field"><span>${label}</span><input id="${id}" value="${e(val)}" ${extra}${/placeholder=/.test(extra)?'':` placeholder="Saisissez ${e(label.toLowerCase())}…"`}></label>`;
@@ -45,10 +45,28 @@ const renderContributions=(rows=[])=>!rows.length
 
 const manualInput=(id,label,placeholder,extra='')=>`<label class="field"><span>${label}</span><input id="${id}" placeholder="${placeholder}" ${extra}></label>`;
 
+// V2 — rendu des propositions de métiers classées : niveau de confiance lisible, raisons
+// sourcées, bouton « Utiliser » par proposition. Le classement est indicatif : aucune
+// proposition n'est appliquée sans action explicite de l'utilisateur.
+// (Nom distinct de renderProposals (importé, propositions champ par champ du registre) :
+// une collision de nom cassait le chargement du module — corrigé 15.4.45, détecté par la
+// recette navigateur.)
+const renderProfileProposals=(r={})=>{
+  // 15.4.46 — liste sémantique (ul/li) et nom accessible par bouton (même invariant que
+  // le parcours guidé : chaque « Utiliser » se nomme).
+  const list=(r.proposals||[]).map(p=>`<li class="profile-proposal-row"><div><b>${e(p.title)}</b> <span class="pill">${e(p.confidenceLabel)}</span>${(p.reasons||[]).map(x=>`<small>${e(x)}</small>`).join('')}</div><button class="btn secondary" type="button" data-profile-use="${e(p.profile)}" aria-label="Utiliser la proposition ${e(p.title)}">Utiliser</button></li>`).join('');
+  if(!list)return '';
+  return `<div class="section-title"><h3>Propositions de métier</h3><span class="pill">Classement automatique</span></div><ul class="profile-proposal-list">${list}</ul>${r.requiresConfirmation?'<small class="help">Correspondance incertaine : précisez la description de votre activité ou choisissez directement le métier qui correspond le mieux.</small>':''}`;
+};
+
+const originLabel=origin=>origin==='confirmed'?'proposition confirmée':origin==='auto'?'proposition acceptée':'choix manuel';
+
 const activityForm=(a={},profiles=[])=>{
   const contributionBox=`<section class="fiscal-contributions" id="fiscal-contributions">${renderContributions(a.contributions||[])}</section>`;
   return `<div class="settings-subsection" data-settings-text="métier activité profil catalogue">
     <label class="field"><span>Métier</span><select id="profileCode"><option value="">Votre choix</option>${profiles.map(p=>`<option value="${p.code}" ${a.profile_code===p.code?'selected':''}>${e(p.title)}</option>`).join('')}</select><small class="help">Le métier adapte le catalogue, le calculateur et le vocabulaire des documents.</small></label>
+    <div class="profile-proposals" id="profile-proposals" aria-live="polite"></div>
+    ${a.profile_code?`<small class="help">Métier retenu : ${e(originLabel(a.profile_origin))}${a.profile_chosen_at?` · décision du ${e(new Date(a.profile_chosen_at).toLocaleDateString('fr-FR'))}`:''}. Une détection automatique ne modifiera jamais ce choix ; vous pouvez le changer ici à tout moment.</small>`:''}
     ${manualInput('name','Nom de l’activité','Nom donné à cette activité',a.id?'':'required')}
     ${manualInput('description','Description / métier','Décrivez l’activité avec des mots (ex. réparation de smartphones, plomberie, création de sites web)…')}
     <div class="notice"><b>Identité juridique : ${e(S.company?.legal_form||a.legal_form||'À détecter')}</b><small>Renseignée une seule fois dans « Entreprise » et réutilisée automatiquement ici.</small></div>
@@ -116,9 +134,10 @@ export const view=()=>{
         <div class="grid-2">${F('ssiren','SIREN',S.company.siren||'')}<label class="field"><span>Forme juridique</span><select id="slegal"><option value="">Votre choix</option>${S.company.legal_form?`<option value="${e(S.company.legal_form)}" selected>${e(S.company.legal_form)}</option>`:''}</select></label></div>
         <div class="button-row"><button type="button" class="btn secondary" id="lookup-company-siret">Détecter mon entreprise (SIRET, SIREN ou nom)</button></div><p id="company-registry-status" class="help" role="status" aria-live="polite"></p>
         <div id="company-registry-preview" class="notice" hidden></div>
+        <div id="company-registry-establishments" class="notice" hidden></div>
         <div class="grid-2">${F('saddress','Adresse du siège',S.company.address||'')}<div>${F('swebsite','Site web',S.company.website||'')}</div></div>
         <div class="grid-2">${F('spostal','Code postal',S.company.postal_code||'')}${F('scity','Ville',S.company.city||'')}</div>
-        <div class="grid-2">${F('sactivity','Activité / métier',S.company.activity||'')} ${F('snaf','Code NAF',S.company.configuration_data?.naf_code||'')}</div><div class="grid-2">${F('svat','N° de TVA intracommunautaire',S.company.configuration_data?.vat_number||'')}<div></div></div><div>${F('scustom','Activité précise',S.company.custom_activity||'')}</div>
+        <div class="grid-2">${F('sactivity','Activité / métier',S.company.activity||'')} ${F('snaf','Code NAF',S.company.configuration_data?.naf_code||'')}</div><div class="grid-2">${F('svat','N° de TVA intracommunautaire',S.company.configuration_data?.vat_number||'')}<div></div></div><div>${F('scustom','Activité précise',S.company.custom_activity||'')}</div><div><label class="field"><span>Activités secondaires ou complémentaires</span><textarea id="ssecondary" rows="2" maxlength="600" placeholder="Une par ligne (ex. vente d’accessoires)">${e(S.company.configuration_data?.secondary_activities||'')}</textarea><small class="help">Facultatif — une par ligne ; elles affinent les propositions de métier du parcours guidé.</small></label></div>
         <fieldset class="stack fieldset-box"><legend class="eyebrow">OPTIONS FISCALES DÉCLARÉES · BLOC 9</legend>
           <div class="grid-2"><label class="field"><span>Versement libératoire de l’impôt</span><select id="fiscal-vl"><option value="inconnu" ${((S.company.vl_option||'inconnu')==='inconnu')?'selected':''}>Inconnu (aucune déclaration)</option><option value="oui" ${S.company.vl_option==='oui'?'selected':''}>Oui — option exercée</option><option value="non" ${S.company.vl_option==='non'?'selected':''}>Non — option non exercée</option></select><small class="help">Aurion ne déduit JAMAIS cette option du SIRET : elle est déclarée par vous, avec votre confirmation.</small></label><label class="field"><span>Date d’effet de l’option (si « oui »)</span><input id="fiscal-vl-from" type="date" value="${S.company.vl_effective_from?e(String(S.company.vl_effective_from).slice(0,10)):''}"></label></div>
           <label class="check"><input id="fiscal-vl-verified" type="checkbox" ${S.company.vl_verified?'checked':''}><span> J’ai confirmé cette option auprès d’une source officielle (avis d’imposition / impots.gouv)</span></label>
@@ -184,7 +203,7 @@ export function bind(){
 
   // Détection SIRET/SIREN (D4) : implémentation partagée avec le parcours, au clic uniquement, propositions champ par champ.
   let registryCandidate=null;
-  const markCompanyDirty=(dirty=true)=>{const el=$('#company-state');if(el)el.textContent=dirty?'Modifications non enregistrées':'Aucune modification'};
+  const markCompanyDirty=(dirty=true)=>{const el=$('#company-state');if(el)el.textContent=dirty?'Modifications non enregistrées':(identityNote?.()||'Aucune modification')};
   const registryFieldMap={name:'#sname',siret:'#ssiret',siren:'#ssiren',legal_form:'#slegal',address:'#saddress',postal_code:'#spostal',city:'#scity',activity:'#sactivity',naf_code:'#snaf',website:'#swebsite',vat_number:'#svat'};
   const currentCompanyValues=()=>Object.fromEntries(Object.entries(registryFieldMap).map(([k,sel])=>[k,$(sel)?.value.trim()||'']));
   const applyFiscalFromLegalForm=async legalForm=>{
@@ -199,9 +218,19 @@ export function bind(){
   const applyRegistryField=(key,value)=>{
     const el=$(registryFieldMap[key]);if(!el)return;
     if(el.tagName==='SELECT'&&![...el.options].some(o=>o.value===value))el.add(new Option(value,value));
-    el.value=value;markCompanyDirty(true);
+    el.value=value;registryApplied=true;markCompanyDirty(true);
     if(key==='legal_form')applyFiscalFromLegalForm(value);
   };
+  // Prompt 01 — provenance des informations d'identité : affichée dans l'état de la fiche
+  // (registre public + date de consultation, ou saisie manuelle). Jamais d'écrasement
+  // silencieux : le texte de provenance complète l'état « Aucune modification ».
+  let registryApplied=false;
+  const identityNote=()=>{
+    const src=S.company?.identity_source,at=S.company?.identity_checked_at;
+    if(!src&&!at)return null;
+    return `Provenance des informations d'identité : ${src==='registre-public'?'registre public':src||'saisie manuelle'}${at?` · consultées le ${new Date(at).toLocaleDateString('fr-FR')}`:''}`;
+  };
+  const registryMeta=()=>({source:'Registre public (recherche-entreprises.api.gouv.fr)',consultedOn:new Date().toLocaleDateString('fr-FR')});
   $('#lookup-company-siret')?.addEventListener('click',async()=>{
     // Détection par SIRET, SIREN ou nom (le nom de l'entreprise sert de dernière recherche possible).
     // Bloc 7 : détection du compte de l'entrepreneur — une société détectée est refusée sans conversion.
@@ -211,9 +240,10 @@ export function bind(){
     const box=$('#company-registry-preview');
     if(result.status==='out_of_scope'){if(box){box.hidden=true;box.innerHTML=''}return}
     if(Array.isArray(result.results)&&result.results.length){
-      renderCompanyChoices(box,result.results,chosen=>{if(isOutOfScopeCompany(chosen)){if(box){box.hidden=true;box.innerHTML=''}const s=$('#company-registry-status');if(s)s.textContent=OWNER_SCOPE_REFUSAL;return}registryCandidate=chosen;renderProposals(box,buildProposals(currentCompanyValues(),chosen),applyRegistryField);$('#company-registry-status').textContent=`${chosen.legalName||'Entreprise'} : choisissez les informations à reprendre.`});
+      renderCompanyChoices(box,result.results,chosen=>{if(isOutOfScopeCompany(chosen)){if(box){box.hidden=true;box.innerHTML=''}const s=$('#company-registry-status');if(s)s.textContent=OWNER_SCOPE_REFUSAL;return}registryCandidate=chosen;renderProposals(box,buildProposals(currentCompanyValues(),chosen),applyRegistryField,registryMeta());renderEstablishmentsNote($('#company-registry-establishments'),chosen);$('#company-registry-status').textContent=`${chosen.legalName||'Entreprise'} : choisissez les informations à reprendre.`});
     }
-    else if(registryCandidate)renderProposals(box,buildProposals(currentCompanyValues(),registryCandidate),applyRegistryField);else if(box){box.hidden=true;box.innerHTML=''}
+    else if(registryCandidate){renderProposals(box,buildProposals(currentCompanyValues(),registryCandidate),applyRegistryField,registryMeta());renderEstablishmentsNote($('#company-registry-establishments'),registryCandidate)}
+    else if(box){box.hidden=true;box.innerHTML=''}
   });
   ['#ssiret','#ssiren'].forEach(sel=>$(sel)?.addEventListener('input',()=>markCompanyDirty()));
   $('#settings')?.addEventListener('input',()=>markCompanyDirty());
@@ -221,11 +251,11 @@ export function bind(){
   $('#settings')?.addEventListener('submit',async ev=>{
     ev.preventDefault();
     try{
-      await api.updateOrganization({name:$('#sname').value.trim(),activity:$('#sactivity').value.trim(),customActivity:$('#scustom').value.trim(),siret:$('#ssiret').value.replace(/\D/g,''),siren:$('#ssiren').value.replace(/\D/g,''),legalForm:$('#slegal').value.trim(),address:$('#saddress').value.trim(),postalCode:$('#spostal').value.trim(),city:$('#scity').value.trim(),website:$('#swebsite').value.trim(),vlOption:$('#fiscal-vl')?$('#fiscal-vl').value:undefined,vlVerified:$('#fiscal-vl-verified')?$('#fiscal-vl-verified').checked:undefined,vlEffectiveFrom:$('#fiscal-vl')?($('#fiscal-vl-from')?.value||null):undefined,urssafPeriodicity:$('#fiscal-periodicity')?($('#fiscal-periodicity').value||null):undefined,urssafPeriodicityEffectiveFrom:$('#fiscal-periodicity')?($('#fiscal-periodicity-from')?.value||null):undefined,configurationData:{...(S.company?.configuration_data||{}),naf_code:$('#snaf').value.trim(),vat_number:$('#svat')?.value.trim()||''}});
+      await api.updateOrganization({name:$('#sname').value.trim(),activity:$('#sactivity').value.trim(),customActivity:$('#scustom').value.trim(),siret:$('#ssiret').value.replace(/\D/g,''),siren:$('#ssiren').value.replace(/\D/g,''),legalForm:$('#slegal').value.trim(),address:$('#saddress').value.trim(),postalCode:$('#spostal').value.trim(),city:$('#scity').value.trim(),website:$('#swebsite').value.trim(),identitySource:registryApplied?'registre-public':undefined,vlOption:$('#fiscal-vl')?$('#fiscal-vl').value:undefined,vlVerified:$('#fiscal-vl-verified')?$('#fiscal-vl-verified').checked:undefined,vlEffectiveFrom:$('#fiscal-vl')?($('#fiscal-vl-from')?.value||null):undefined,urssafPeriodicity:$('#fiscal-periodicity')?($('#fiscal-periodicity').value||null):undefined,urssafPeriodicityEffectiveFrom:$('#fiscal-periodicity')?($('#fiscal-periodicity-from')?.value||null):undefined,configurationData:{...(S.company?.configuration_data||{}),naf_code:$('#snaf').value.trim(),vat_number:$('#svat')?.value.trim()||'',secondary_activities:$('#ssecondary')?.value.trim()??(S.company?.configuration_data?.secondary_activities||'')}});
       toast('Entreprise enregistrée.','success');registryCandidate=null;markCompanyDirty(false);await hooks.refresh('settings');
     }catch(x){toast(x.message,'error')}
   });
-  $('#company-reset')?.addEventListener('click',()=>{Object.entries(initialCompany).forEach(([k,val])=>{const map={name:'#sname',siret:'#ssiret',siren:'#ssiren',legal_form:'#slegal',address:'#saddress',postal_code:'#spostal',city:'#scity',website:'#swebsite',activity:'#sactivity',custom_activity:'#scustom'};const el=map[k]?$(map[k]):null;if(el)el.value=val??''});$('#snaf').value=initialCompany.configuration_data?.naf_code||'';registryCandidate=null;const preview=$('#company-registry-preview');if(preview){preview.hidden=true;preview.innerHTML=''}markCompanyDirty(false)});
+  $('#company-reset')?.addEventListener('click',()=>{Object.entries(initialCompany).forEach(([k,val])=>{const map={name:'#sname',siret:'#ssiret',siren:'#ssiren',legal_form:'#slegal',address:'#saddress',postal_code:'#spostal',city:'#scity',website:'#swebsite',activity:'#sactivity',custom_activity:'#scustom'};const el=map[k]?$(map[k]):null;if(el)el.value=val??''});$('#snaf').value=initialCompany.configuration_data?.naf_code||'';const ssecondary=$('#ssecondary');if(ssecondary)ssecondary.value=initialCompany.configuration_data?.secondary_activities||'';registryCandidate=null;const preview=$('#company-registry-preview');if(preview){preview.hidden=true;preview.innerHTML=''}markCompanyDirty(false)});
 
   const configurationForm=$('#configuration-form');
   if(configurationForm){
@@ -272,10 +302,29 @@ export function bind(){
       const description=v(form,'description')||a.description||S.company?.custom_activity||S.company?.activity||'';
       if(!name&&!description)return;
       try{
-        const r=await api.detectProfile({name,description,nafCode:$('#snaf')?.value?.trim()||S.company?.configuration_data?.naf_code||''});
+        // V2 — activityId : la proposition calculée et affichée est datée dans le journal
+        // (traçabilité) ; la sélection retenue n'est jamais modifiée par la détection.
+        // 15.4.45 — les activités secondaires déclarées (une par ligne, configuration
+        // entreprise) alimentent le classement : la raison « Activités secondaires » est citée.
+        const secondary=String(S.company?.configuration_data?.secondary_activities||'').split('\n').map(x=>x.trim()).filter(Boolean).slice(0,10);
+        const r=await api.detectProfile({name,description,nafCode:$('#snaf')?.value?.trim()||S.company?.configuration_data?.naf_code||'',secondaryActivities:secondary,activityId:a.id||undefined});
         if(profileSelect&&!profileSelect.value&&r?.code)profileSelect.value=r.code;
         const status=form.querySelector('#fiscal-detection');
-        if(status&&r?.title)status.textContent=`Profil détecté : ${r.title}.`;
+        if(status&&r?.title)status.textContent=r.requiresConfirmation?`Profil détecté : ${r.title}. Correspondance incertaine : vérifiez la description ou choisissez le métier qui convient le mieux.`:`Profil détecté : ${r.title}.`;
+        const box=form.querySelector('#profile-proposals');
+        if(box)box.innerHTML=renderProfileProposals(r);
+        box?.querySelectorAll('[data-profile-use]').forEach(btn=>btn.addEventListener('click',async()=>{
+          const code=btn.dataset.profileUse||'';
+          if(profileSelect)profileSelect.value=code;
+          try{
+            // Choix explicite : confirmation d'une proposition (origine 'confirmed',
+            // journalisée). Le ré-enregistrement ultérieur du même métier ne rétrograde
+            // jamais l'origine (non-régression SQL côté serveur).
+            if(a.id)await api.profileChoice(a.id,{profileCode:code,confirmProposalId:code});
+            if(box)box.innerHTML=`<div class="notice"><b>Métier retenu : proposition confirmée.</b><small>Une détection automatique ne modifiera jamais ce choix ; vous pouvez le changer ici à tout moment.</small></div>`;
+            profileSelect?.dispatchEvent(new Event('change'));
+          }catch(x){toast(x.message,'error')}
+        }));
       }catch{}
     };
     const detectLegal=async()=>{
@@ -288,6 +337,9 @@ export function bind(){
     };
     setTimeout(detectProfile,0);
     setTimeout(detectLegal,0);
+    // 15.4.45 — la correction du nom ou de la description relance la détection (propositions
+    // rafraîchies ; la sélection retenue n'est jamais écrasée automatiquement).
+    let profTimer;['name','description'].forEach(id=>{form.querySelector('#'+id)?.addEventListener('input',()=>{clearTimeout(profTimer);profTimer=window.setTimeout(detectProfile,600)})});
   };
 
   $('#add-activity')?.addEventListener('click',async()=>{

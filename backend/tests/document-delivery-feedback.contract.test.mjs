@@ -8,7 +8,9 @@ test('la conversion devis-facture restitue le statut réel de livraison e-mail',
   assert.match(docs, /emailToast\(r\.emailStatus/);
   assert.doesNotMatch(docs, /Facture \$\{r\.number\} créée et envoyée/);
   const business = read('../src/routes/business.ts');
-  assert.match(business, /return \{number:converted\.number,emailStatus\}/);
+  // 15.4.51 (PROMPT B3) : la réponse peut porter `integrityRecorded` en supplément (maillon de
+  // chaîne d'intégrité écrit après émission, échec signalé sans invalider la conversion).
+  assert.match(business, /return \{number:converted\.number,emailStatus(,integrityRecorded)?\}/);
 });
 
 test('les confirmations de la modale distinguent le message de succès fourni et la file hors ligne', () => {

@@ -82,6 +82,10 @@ const LEGAL_SEEDS: { kind: string; title: string; file: string; requiredEnv: str
   { kind: 'cgv', title: 'Conditions générales d’utilisation et de vente', file: 'CGU-CGV.md', requiredEnv: ['AURION_LEGAL_PUBLISHER_NAME','AURION_LEGAL_PUBLISHER_FORM','AURION_LEGAL_PUBLISHER_SIREN','AURION_LEGAL_PUBLISHER_SIRET','AURION_LEGAL_PUBLISHER_ADDRESS','AURION_LEGAL_PUBLISHER_EMAIL'] },
   { kind: 'privacy', title: 'Politique de confidentialité et annexe de traitement des données', file: 'POLITIQUE-CONFIDENTIALITE.md', requiredEnv: ['AURION_LEGAL_PUBLISHER_NAME','AURION_LEGAL_PUBLISHER_FORM','AURION_LEGAL_PUBLISHER_SIREN','AURION_LEGAL_PUBLISHER_ADDRESS','AURION_LEGAL_PUBLISHER_EMAIL','AURION_PRIVACY_CONTACT_EMAIL','AURION_SUBPROCESSORS'] },
   { kind: 'cookies', title: 'Politique cookies et stockages du navigateur', file: 'COOKIES.md', requiredEnv: ['AURION_LEGAL_PUBLISHER_NAME','AURION_PRIVACY_CONTACT_EMAIL'] },
+  // 15.4.54 (PROMPT D1/D2) — DPA RGPD : contrat de sous-traitance (art. 28) ajouté aux
+  // documents contractuels ; version contractuelle portée de 4.0 à 5.0 (portail invités,
+  // webhooks sortants, contrats d'entretien, e-facture préparatoire).
+  { kind: 'dpa', title: 'DPA — Contrat de sous-traitance de traitement (art. 28 RGPD)', file: 'DPA-RGPD.md', requiredEnv: ['AURION_LEGAL_PUBLISHER_NAME','AURION_LEGAL_PUBLISHER_FORM','AURION_LEGAL_PUBLISHER_SIREN','AURION_LEGAL_PUBLISHER_ADDRESS','AURION_LEGAL_PUBLISHER_EMAIL','AURION_PRIVACY_CONTACT_EMAIL','AURION_SUBPROCESSORS'] },
   { kind: 'legal-notice', title: 'Mentions légales', file: 'LEGAL-NOTICE.md', requiredEnv: ['AURION_LEGAL_PUBLISHER_NAME','AURION_LEGAL_PUBLISHER_FORM','AURION_LEGAL_PUBLISHER_SIREN','AURION_LEGAL_PUBLISHER_SIRET','AURION_LEGAL_PUBLISHER_ADDRESS','AURION_LEGAL_PUBLISHER_VAT','AURION_LEGAL_DIRECTOR','AURION_LEGAL_PUBLISHER_EMAIL','AURION_HOST_NAME','AURION_HOST_ADDRESS','AURION_HOST_CONTACT','AURION_PRIVACY_CONTACT_EMAIL'] },
   { kind: 'accessibility', title: 'Déclaration d’accessibilité', file: 'DECLARATION-ACCESSIBILITE.md', requiredEnv: ['AURION_LEGAL_PUBLISHER_NAME','AURION_ACCESSIBILITY_CONTACT_EMAIL','AURION_ACCESSIBILITY_AUDIT_DATE','AURION_ACCESSIBILITY_AUDIT_RESULT'] },
 ];
@@ -90,7 +94,7 @@ const legalTokenLabel: Record<string,string> = {
 };
 /** Initialise les documents juridiques versionnés; une approbation explicite de version est requise pour publication. */
 export async function ensureLegalDocuments() {
-  const publicationApproved = process.env.AURION_LEGAL_PUBLICATION_APPROVAL === '4.0';
+  const publicationApproved = process.env.AURION_LEGAL_PUBLICATION_APPROVAL === '5.0';
   for (const s of LEGAL_SEEDS) {
     const f = path.join(BACKEND_ROOT, '..', 'docs', s.file);
     let body = existsSync(f) ? readFileSync(f, 'utf8') : `# ${s.title}\n\nTexte juridique indisponible.`;
@@ -98,15 +102,19 @@ export async function ensureLegalDocuments() {
     const hasUnresolvedContent = /\{\{[A-Z0-9_]+\}\}|\[(?:À compléter|À confirmer|À valider|À choisir|À désigner|À renseigner)[^\]]*\]|PROJET DE DOCUMENT|PROJET DE PAGE|PROJET À COMPLÉTER|DOSSIER DE PRÉPARATION|NE PAS PUBLIER/i.test(body);
     const isDraft = !publicationApproved || s.requiredEnv.some(key => !String(process.env[key] || '').trim()) || hasUnresolvedContent;
     await query('update legal_documents set is_current=false where kind=$1 and is_current=true',[s.kind]);
-    await query(`insert into legal_documents(kind,version,title,body,is_current,is_draft) values($1,'4.0',$2,$3,true,$4) on conflict(kind,version) do update set title=excluded.title,body=excluded.body,is_current=true,is_draft=excluded.is_draft`, [s.kind, s.title, body, isDraft]);
+    await query(`insert into legal_documents(kind,version,title,body,is_current,is_draft) values($1,'5.0',$2,$3,true,$4) on conflict(kind,version) do update set title=excluded.title,body=excluded.body,is_current=true,is_draft=excluded.is_draft`, [s.kind, s.title, body, isDraft]);
   }
 }
 export async function currentLegalDocs() {
   return (await query('select id,kind,version,title,is_draft,published_at from legal_documents where is_current=true order by kind')).rows;
 }
-export async function legalDocumentsReadyForContracts(requiredVersion = '4.0') {
-  const rows = (await query(`select kind from legal_documents where is_current=true and is_draft=false and version=$1 and kind in ('cgv','privacy','legal-notice','cookies')`, [requiredVersion])).rows;
-  return new Set(rows.map((row: any) => row.kind)).size === 4;
+// 15.4.54 (PROMPT D2) — version contractuelle 5.0 : cinq catégories (CGV, confidentialité,
+// mentions légales, cookies, DPA). Les documents en préparation ne bloquent JAMAIS
+// l'inscription (décision éditeur 15.4.40 conservée) : ce contrôle reste informationnel pour
+// l'inscription et exigé par les tests d'intégration de facturation (fixture CI alignée).
+export async function legalDocumentsReadyForContracts(requiredVersion = '5.0') {
+  const rows = (await query(`select kind from legal_documents where is_current=true and is_draft=false and version=$1 and kind in ('cgv','privacy','legal-notice','cookies','dpa')`, [requiredVersion])).rows;
+  return new Set(rows.map((row: any) => row.kind)).size === 5;
 }
 /** Local installation-only workspace creation for evaluation; never enables production signups or paid subscriptions. */
 export function localEvaluationSignupAllowed() {
@@ -114,7 +122,17 @@ export function localEvaluationSignupAllowed() {
   return process.env.NODE_ENV !== 'production' && localMode;
 }
 export async function recordAcceptances(client: { query: (q: string, v?: any[]) => Promise<any> }, userId: string, ip?: string) {
-  await client.query(`insert into legal_acceptances(user_id,document_id,ip_hash) select $1,id,$2 from legal_documents where is_current=true and is_draft=false and kind in ('cgv','privacy')`, [userId, ipHash(ip)]);
+  await client.query(`insert into legal_acceptances(user_id,document_id,ip_hash) select $1,id,$2 from legal_documents where is_current=true and is_draft=false and kind in ('cgv','privacy','dpa')`, [userId, ipHash(ip)]);
+}
+
+// 15.4.54 (PROMPT D2) — état d'acceptation des documents contractuels COURANTS pour un compte :
+// sert à la bannière de re-acceptation (montée de version) et à l'endpoint /legal/acceptance-status.
+// Les documents en brouillon ne sont jamais exigés (décision éditeur : jamais bloquants).
+export async function legalAcceptanceStatus(userId: string) {
+  const required = (await query(`select id,kind,version,title from legal_documents where is_current=true and is_draft=false and kind in ('cgv','privacy','dpa') order by kind`)).rows;
+  const accepted = new Set((await query(`select a.document_id from legal_acceptances a where a.user_id=$1`, [userId])).rows.map((r: any) => String(r.document_id)));
+  const missing = required.filter((d: any) => !accepted.has(String(d.id))).map((d: any) => ({ kind: d.kind, version: d.version, title: d.title }));
+  return { upToDate: missing.length === 0, missing, checkedAt: new Date().toISOString() };
 }
 
 // ---------------------------------------------------------------- abonnement (paiement désactivé : architecture uniquement)

@@ -18,7 +18,7 @@ test('étape 1: les paramètres utilisent cette normalisation pour la détection
   // 15.4.5 : l'implémentation partagée couvre aussi la recherche par nom (renderCompanyChoices).
   // Bloc 7 (15.4.6) : l'import partagé transporte en plus la garde de périmètre propriétaire
   // (isOutOfScopeCompany + OWNER_SCOPE_REFUSAL) et la détection passe par {owner:true}.
-  assert.match(source,/import\{detectCompany,isOutOfScopeCompany,OWNER_SCOPE_REFUSAL,buildProposals,renderProposals,renderCompanyChoices\}from'..\/..\/core\/company-detect.js'/);
+  assert.match(source,/import\{detectCompany,isOutOfScopeCompany,OWNER_SCOPE_REFUSAL,buildProposals,renderProposals,renderCompanyChoices,renderEstablishmentsNote\}from'..\/..\/core\/company-detect.js'/);
   assert.match(source,/\{owner:true\}/);
   assert.match(fs.readFileSync(path.join(root,'assets/js/core/company-detect.js'),'utf8'),/normalizeStreetAddress\(company\.address/);
   assert.match(fs.readFileSync(path.join(root,'assets/js/core/registry-fill.js'),'utf8'),/address: normalizeStreetAddress\(/);

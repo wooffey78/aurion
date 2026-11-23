@@ -72,18 +72,6 @@ jobs:
       # (« cannot reassign ownership … required by the database system ») : l'étape faisait
       # échouer la CI pour une raison d'environnement, pas de code.
 
-      # Le test bloc12 transforme/analyse des documents via l'exécutable soffice.
-      # Installer LibreOffice dans le runner évite un faux échec ENOENT et permet
-      # d'exécuter le test réel avant la génération de l'archive source.
-      - name: Install LibreOffice for PDF document integration tests
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends libreoffice poppler-utils
-          command -v soffice
-          soffice --headless --version
-          command -v pdftotext
-          pdftotext -v
-
       # Porte dédiée : un test d'intégration PostgreSQL, Stripe ou Google ignoré (ou todo)
       # doit faire échouer la CI. Le rapport tests / réussis / ignorés / échecs est publié
       # dans le résumé du run et en artefact, même en cas d'échec.

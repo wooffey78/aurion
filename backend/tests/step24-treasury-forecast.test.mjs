@@ -13,7 +13,7 @@ test('trésorerie : potentiel/engagé/sorties séparés, reste dû des factures 
   // (total TTC + majorations − paiements reçus), les notes de frais à rembourser sont des
   // sorties engagées — jamais de mélange sans libellé, jamais de double comptage.
   assert.match(treasuryRoute, /q\.document_type='quote'\s+and\s+lower\(coalesce\(q\.status,''\)\) not in/);
-  assert.match(treasuryRoute, /'rejected','refused','void','deleted'/);
+  assert.match(treasuryRoute, /'rejected','refused','expired','void','deleted'/);
   assert.doesNotMatch(treasuryRoute, /document_type in \('quote','invoice'\)/);
   assert.match(treasuryRoute, /q\.amount_paid/);
   assert.match(treasuryRoute, /total_penalty_amount/);

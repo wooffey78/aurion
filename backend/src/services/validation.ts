@@ -33,6 +33,9 @@ export const organizationSchema = z.object({
   urssafPeriodicityEffectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   configurationData: z.record(z.string(), z.any()).optional(),
   configurationIncomplete: z.boolean().optional(),
+  // Prompt 01 — provenance déclarée de l'identité légale ('registre-public' quand les
+  // propositions du registre public sont appliquées ; défaut honnête = 'saisie manuelle').
+  identitySource: z.enum(['registre-public', 'saisie manuelle', 'import']).optional(),
 });
 
 export function isValidLuhn(value: string) {

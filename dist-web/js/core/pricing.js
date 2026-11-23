@@ -60,6 +60,8 @@ function contributionBasis(value) {
 export function computePricing(input) {
     const partValue = num(input.partCost, 'pièce', 0, 1e9);
     const shipValue = num(input.shippingCost, 'livraison', 0, 1e9);
+    // Prompt 03 — consommables : coût direct additionnel (hors pièces cataloguées), 0 par défaut.
+    const consumablesValue = num(input.consumablesCostHt, 'consommables', 0, 1e9);
     const kmValue = num(input.mileageKm, 'kilométrage', 0, 1e7);
     const legacyMileageValue = num(input.mileageRate, 'frais kilométriques', 0, 1e4);
     const internalMileageValue = input.mileageInternalRate == null || input.mileageInternalRate === ''
@@ -76,6 +78,7 @@ export function computePricing(input) {
     const targetNetValue = num(input.targetNet, 'résultat net', -1e9, 1e9);
     const part = decimalUnits(partValue, 2, 'pièce');
     const ship = decimalUnits(shipValue, 2, 'livraison');
+    const consumables = decimalUnits(consumablesValue, 2, 'consommables');
     const km = decimalUnits(kmValue, 6, 'kilométrage');
     const legacyMileage = decimalUnits(legacyMileageValue, 6, 'frais kilométriques');
     const internalMileageRate = input.mileageInternalRate == null || input.mileageInternalRate === ''
@@ -87,7 +90,9 @@ export function computePricing(input) {
     const partQuantity = decimalUnits(partQuantityValue, 6, 'quantité de pièces');
     const internalLabor = decimalUnits(internalLaborValue, 2, 'coût interne main-d’œuvre');
     const explicitLabor = explicitLaborValue === null ? null : decimalUnits(explicitLaborValue, 2, 'prix de vente main-d’œuvre');
-    const targetTtc = decimalUnits(targetTtcValue, 2, 'prix TTC');
+    // Prompt 03 — le TTC cible devient mutable : la remise est déduite AVANT calcul, la
+    // valeur d'origine reste tracée dans listPriceTtc.
+    let targetTtc = decimalUnits(targetTtcValue, 2, 'prix TTC');
     const targetNet = decimalUnits(targetNetValue, 2, 'résultat net');
     // Distances et tarifs sont convertis en micro-unités : le résultat reste calculé en centimes.
     const mileageInternal = roundHalfUp(km * internalMileageRate, 10000000000n);
@@ -101,7 +106,21 @@ export function computePricing(input) {
         ? unit === 'percent' ? multiplyRate(part, coefficient) : roundHalfUp(coefficient * partQuantity, UNIT_SCALE)
         : 0n;
     const adjustedPart = part + coefficientMarkup;
-    const minimumSelling = adjustedPart + ship + mileageInternal;
+    // Prompt 03 — les consommables entrent dans le prix plancher comme les autres coûts
+    // directs (0 par défaut : le comportement historique est inchangé).
+    const minimumSelling = adjustedPart + ship + mileageInternal + consumables;
+    // Prompt 03 — remise TTC : déduite du prix cible AVANT calcul, tracée dans le résultat
+    // (listPriceTtc − discountTtc = TTC effectif). Refusée sur le calcul inverse (driver net) :
+    // le prix y est déduit du résultat visé, une remise n'y aurait pas de sens défini.
+    const listPriceTtc = targetTtc;
+    const discount = decimalUnits(num(input.discountTtc, 'remise', 0, 1e9), 2, 'remise');
+    if (discount > 0n) {
+        if (driver === 'net')
+            throw new Error('La remise TTC s’applique au calcul à partir du prix cible (driver « ttc »), pas au calcul inverse par résultat net.');
+        if (discount > targetTtc)
+            throw new Error('La remise dépasse le prix TTC cible.');
+        targetTtc = targetTtc - discount;
+    }
     const contributionsInput = Array.isArray(input.contributions) ? [...input.contributions] : [];
     if (!contributionsInput.length && input.urssafRate !== undefined) {
         contributionsInput.push({ name: 'Cotisations sociales', rate: input.urssafRate, basis: 'ca_ht', mandatory: true });
@@ -128,7 +147,7 @@ export function computePricing(input) {
         const totalRate = contributions.reduce((sum, c) => sum + c.rateBps, 0n);
         if (totalRate >= BASIS_POINTS)
             throw new Error('Le cumul des taux pour le calcul inverse doit rester inférieur à 100 %.');
-        const direct = adjustedPart + ship + mileageInternal + internalLabor;
+        const direct = adjustedPart + ship + mileageInternal + internalLabor + consumables;
         const netForRevenue = (revenue) => {
             const gross = revenue + billedMileage - direct;
             let accumulated = 0n;
@@ -167,7 +186,7 @@ export function computePricing(input) {
         baseTargetTtc = grossTtc(baseRevenue, vatBps);
         baseTtc = baseTargetTtc;
         totalHt = baseRevenue + billedMileage;
-        laborSelling = baseRevenue - adjustedPart - ship - mileageInternal;
+        laborSelling = baseRevenue - adjustedPart - ship - mileageInternal - consumables;
         if (laborSelling < 0n)
             laborSelling = 0n;
     }
@@ -190,12 +209,12 @@ export function computePricing(input) {
         baseTargetTtc = targetTtc;
         baseTtc = targetTtc;
         baseRevenue = roundHalfUp(targetTtc * BASIS_POINTS, BASIS_POINTS + vatBps);
-        laborSelling = explicitLabor ?? (baseRevenue - adjustedPart - ship - mileageInternal);
+        laborSelling = explicitLabor ?? (baseRevenue - adjustedPart - ship - mileageInternal - consumables);
         if (explicitLabor === null && laborSelling < 0n)
             laborSelling = 0n;
         totalHt = baseRevenue + billedMileage;
     }
-    const directCosts = adjustedPart + ship + mileageInternal + internalLabor;
+    const directCosts = adjustedPart + ship + mileageInternal + internalLabor + consumables;
     const grossMargin = totalHt - directCosts;
     const contributionRows = [];
     let contributionsTotal = 0n;
@@ -215,11 +234,17 @@ export function computePricing(input) {
     const safeNetResult = safeCents(netResult, 'Résultat net');
     const grossMarginRate = baseRevenue > 0n ? Number(roundHalfUp(grossMargin * 10000n, baseRevenue)) / 100 : 0;
     const netResultRate = baseRevenue > 0n ? Number(roundHalfUp(netResult * 10000n, baseRevenue)) / 100 : 0;
+    // Prompt 03 — taux de marque : marge brute / prix de vente HT (≠ taux de marge, assis sur le CA).
+    const markupRate = totalHt > 0n ? Number(roundHalfUp(grossMargin * 10000n, totalHt)) / 100 : 0;
     return {
         purchaseHt: euros(part),
         coefficientMarkupHt: euros(coefficientMarkup),
         shippingHt: euros(ship),
         directCostsHt: euros(directCosts),
+        consumablesCostHt: euros(consumables),
+        listPriceTtc: euros(listPriceTtc),
+        discountTtc: euros(discount),
+        markupRate,
         internalLaborCostHt: euros(internalLabor),
         mileageKm: Number(km) / 1_000_000,
         mileageInternalRate: euros(mileageInternal),

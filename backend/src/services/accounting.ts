@@ -43,7 +43,7 @@ export async function monthlyAccounting(orgId:string,activityId:string,year?:num
               *case when coalesce(total_ttc,0)>0 then least(1,base_amount/nullif(total_ttc,0)) else 0 end)::numeric mileage,
           count(distinct quote_id)::int invoice_count
    from allocated where true ${filter}
-   group by 1`,params),query(`select date_trunc('month',entry_date)::date as "month",coalesce(sum(case when entry_type='purchase' then amount else 0 end),0)::numeric purchases,coalesce(sum(case when entry_type='social' then amount else 0 end),0)::numeric social,coalesce(sum(case when entry_type='sav' then amount else 0 end),0)::numeric sav from accounting_entries where organization_id=$1 and activity_id=$2 ${year?"and date_trunc('year',entry_date)=make_date($3,1,1)":''} group by 1`,entParams),
+   group by 1`,params),query(`select date_trunc('month',entry_date)::date as "month",coalesce(sum(case when entry_type='purchase' then amount else 0 end),0)::numeric purchases,coalesce(sum(case when entry_type='social' then amount else 0 end),0)::numeric social,coalesce(sum(case when entry_type='sav' then amount else 0 end),0)::numeric sav from accounting_entries where organization_id=$1 and activity_id=$2 and voided_at is null ${year?"and date_trunc('year',entry_date)=make_date($3,1,1)":''} group by 1`,entParams),
   // Notes de frais (15.4.0) : montant HT en achats, TVA en TVA déductible, au mois de la dépense.
   query(`select date_trunc('month',spent_on)::date as "month",coalesce(sum(amount_ttc-vat_amount),0)::numeric ht,coalesce(sum(vat_amount),0)::numeric vat from expense_reports where organization_id=$1 and activity_id=$2 ${year?"and date_trunc('year',spent_on)=make_date($3,1,1)":''} group by 1`,entParams)]);
  const byMonth=new Map<string,MonthRow>();

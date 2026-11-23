@@ -1,6 +1,6 @@
 # Conditions générales d’utilisation et de vente — Aurion
 
-Version **4.0**, révision du 20 novembre 2026 pour Aurion 15.4.35 (mise à jour de la révision 4.0 du 14 novembre 2026 ; les coordonnées et engagements du propriétaire sont inchangés ; révision technique compatible : droit à l'effacement en ligne depuis l'application et depuis la page publique). Elle décrit le service tel qu’il existe dans cette version et distingue les fonctions immédiatement disponibles des fonctions activables après configuration d’un prestataire.
+Version **5.0**, révision du 23 novembre 2026 pour Aurion 15.4.51 (mise à jour de la version 4.0 du 20 novembre 2026 ; coordonnées et engagements du propriétaire inchangés). Cette révision couvre les fonctions livrées depuis la version 4.0 : portail client invités, partage de liens, webhooks sortants, contrats d’entretien récurrents, préparation de la facturation électronique et re-acceptation versionnée des documents contractuels. Les ajouts sont soumis à la validation juridique externe prévue avant ouverture commerciale.
 
 **Éditeur : Coulibaly Damien, entrepreneur individuel sous le régime micro-entreprise, nom commercial Easyweb-dev. Adresse : 5 Rue Jacques Prevert, 85300 Challans, France. SIRET : 88848569500033 (SIREN : 888485695). TVA non applicable — article 293 B du CGI. Contact : easyfixit.reparation@gmail.com — 07 81 51 33 21.**
 
@@ -84,3 +84,23 @@ Les modifications substantielles sont portées à la connaissance du Client et u
 - [Service Public Entreprendre — rétractation en ligne](https://entreprendre.service-public.gouv.fr/vosdroits/F23455)
 - [Médiation de la consommation : obligations professionnelles](https://entreprendre.service-public.gouv.fr/vosdroits/F33338)
 - [Service Public — calendrier de la facture électronique](https://entreprendre.service-public.gouv.fr/vosdroits/F39785)
+
+## Article 15-bis — Portail client invités et acceptation de devis en ligne
+
+Le service permet à l'abonné de créer, pour chacun de ses clients, un accès au « portail client » : une page publique désignée par un lien à jeton aléatoire, consultable sans création de compte et sans cookie de suivi. Le portail présente exclusivement les devis que l'abonné y a expressément partagés. Le client invité peut y accepter un devis en indiquant son nom de signataire ; l'acceptation est horodatée par le serveur, conservée comme preuve technique (registre des acceptations et, depuis la 15.4.51, chaîne d'intégrité documentaire) et reste opposable dans les limites de la preuve technique : elle ne remplace pas les formalités que l'abonné est seul à maîtriser (signature électronique qualifiée, double exemplaire, etc.). L'abonné demeure seul responsable des devis qu'il publie sur le portail, de leur exactitude et de leur conformité aux obligations d'information précontractuelles qui lui incombent. L'accès peut être révoqué à tout moment par l'abonné ; le lien révoqué cesse de fonctionner immédiatement et un message neutre est présenté au visiteur (aucune information n'est révélée sur l'existence ou l'absence d'un accès).
+
+## Article 15-ter — Webhooks sortants
+
+L'abonné peut enregistrer des URL de réception (« webhooks ») auxquelles le service transmet des notifications d'événements métier, signées numériquement (HMAC). L'abonné reconnaît être seul responsable des URL qu'il configure, de la légalité du transfert de données vers ses propres récepteurs et du traitement de ces données par ses outils. La livraison s'efforce d'être fiable (tentatives répétées avec délai croissant) sans garantie de délai ni d'exclusivité : après épuisement des tentatives, l'événement est placé en « lettre morte », consultable par l'abonné et par l'éditeur à des fins de support. L'abonné peut rejouer manuellement un événement en échec en motivant l'opération, qui est conservée dans l'audit.
+
+## Article 15-quater — Facturation électronique préparatoire et plateforme agréée
+
+Le service prépare la facturation électronique : génération d'un fichier structuré conforme pour les factures émises et affichage d'un statut explicite « préparé, non transmis ». Tant qu'aucune Plateforme Agréée n'est souscrite et configurée par l'éditeur, AUCUNE transmission automatique n'est effectuée et le service ne peut être présenté comme conforme au régime d'obligation d'émission électronique applicable à partir du 1er septembre 2026. La transmission suppose un contrat séparé avec la plateforme retenue ; les coordonnées de celle-ci, les flux et les responsabilités respectives seront décrits dans la présente convention lors de l'activation effective. L'abonné reste responsable de ses obligations déclaratives entre-temps.
+
+## Article 15-quinquies — Contrats d'entretien récurrents
+
+Le service permet de créer des contrats d'entretien périodiques avec un client et de proposer les occurrences à venir (propositions déterministes, validées par l'abonné, jamais automatisées fermées). Les occurrences deviennent des interventions ordinaires après validation de l'abonné ; la facturation reste celle des articles existants.
+
+## Article 16-bis — Acceptation versionnée des documents contractuels
+
+Les présentes conditions, la politique de confidentialité, la politique cookies, les mentions légales et le contrat de sous-traitance de traitement (DPA) sont versionnés. À chaque montée de version substantielle, le compte est informé au prochain accès au service et invité à accepter les documents à jour ; l'acceptation est datée et conservée. La consultation publique des documents reste possible sans compte à l'adresse légale du service.

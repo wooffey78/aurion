@@ -48,6 +48,7 @@ if (!enabled) {
       ['privacy', 'Confidentialité de test — fixture CI'],
       ['legal-notice', 'Mentions légales de test — fixture CI'],
       ['cookies', 'Cookies de test — fixture CI'],
+      ['dpa', 'DPA de test — fixture CI'],
     ];
     for (const [kind, title] of documents) {
       await db.query('update legal_documents set is_current=false where kind=$1 and is_current=true', [kind]);
@@ -56,7 +57,7 @@ if (!enabled) {
         on conflict(kind,version) do update set title=excluded.title,body=excluded.body,is_current=true,is_draft=false,published_at=now()`,
         [kind, ciLegalFixtureVersion, title]);
     }
-    assert.equal(await legalDocumentsReadyForContracts(ciLegalFixtureVersion), true, 'la fixture CI doit satisfaire les quatre catégories contractuelles');
+    assert.equal(await legalDocumentsReadyForContracts(ciLegalFixtureVersion), true, 'la fixture CI doit satisfaire les cinq catégories contractuelles (DPA inclus, 15.4.54)');
   }
 
   async function registerAccount() {

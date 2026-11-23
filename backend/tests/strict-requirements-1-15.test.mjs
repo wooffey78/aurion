@@ -33,7 +33,8 @@ test('requirements 7/11/12/14 remain explicit in the implementation',()=>{
   // Le menu vient d'une définition unique, testée par comportement dans navigation.test.mjs.
   assert.ok(navigationItems({isAdmin:true}).some(item=>item.id==='suppliers'));
   assert.ok(navigationItems({isAdmin:true}).some(item=>item.id==='admin'));
-  assert.match(dashboard,/navigationItems\(\{questionnaire:q,modules:profileModules,isAdmin:S\.isPlatformAdmin\}\)/);
+  assert.match(dashboard,/navigationItems\(\{questionnaire:q,modules:profileModules,isAdmin:S\.isPlatformAdmin,features:cachedFlags\(\)\}\)/);
+  assert.match(dashboard,/loadProfileFeatures/);
   assert.match(other,/Rendez-vous/);
   assert.match(other,/Journal de bord/);
   assert.match(other,/id="forecast-more" hidden/);

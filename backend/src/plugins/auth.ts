@@ -48,12 +48,19 @@ export default fp(async app=>{
     // chaque consultation journalisée, révocation vérifiée EN BASE à chaque requête.
     const path=String(request.url||'').split('?')[0], method=request.method.toUpperCase();
     const acceptPath=path==='/auth/accountant-accept'||path.startsWith('/auth/logout');
+    // Bloc 15 — espace de collaboration : le comptable peut créer et échanger sur les demandes
+    // de documents (c'est sa fonction), mais reste en lecture seule sur TOUT le reste
+    // (aucune émission de facture, aucune modification bancaire, aucune suppression).
+    const accountantCollabWrite=path==='/accountant/requests'||path.startsWith('/accountant/requests/');
     if(request.auth!.role==='accountant'){
-      if(method!=='GET'&&method!=='HEAD'&&!acceptPath)return reply.code(403).send({error:'ROLE_READ_ONLY',message:'Le rôle expert-comptable est en lecture seule : il ne peut ni créer, ni modifier, ni supprimer de données.'});
+      if(method!=='GET'&&method!=='HEAD'&&!acceptPath&&!accountantCollabWrite)return reply.code(403).send({error:'ROLE_READ_ONLY',message:'Le rôle expert-comptable est en lecture seule : seules les demandes et échanges de l\'espace de collaboration sont ouverts à l\'écriture.'});
       const member=await adminQuery("select 1 from organization_members where organization_id=$1 and user_id=$2 and role='accountant'",[request.auth!.organizationId,request.auth!.userId]).catch(()=>({rowCount:0}));
       if(!member.rowCount)return reply.code(403).send({error:'ACCESS_REVOKED',message:'L\'accès comptable a été révoqué.'});
       if(method==='GET'){
         try{await adminQuery('insert into accountant_access_log(organization_id,user_id,path) values($1,$2,$3)',[request.auth!.organizationId,request.auth!.userId,path])}catch{}
+      } else if(accountantCollabWrite){
+        // Chaque écriture de l'espace de collaboration est journalisée comme une consultation.
+        try{await adminQuery('insert into accountant_access_log(organization_id,user_id,path) values($1,$2,$3)',[request.auth!.organizationId,request.auth!.userId,`${method} ${path}`])}catch{}
       }
     }
     const iat=request.authIssuedAt;

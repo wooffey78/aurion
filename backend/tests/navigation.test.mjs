@@ -6,7 +6,7 @@ import { NAV_ITEMS, hiddenViews, navigationItems } from '../../assets/js/core/na
 
 test('le menu par défaut expose les vues métier dans l’ordre attendu', () => {
   assert.deepEqual(navigationItems().map(item => item.id), [
-    'home', 'clients', 'catalog', 'suppliers', 'invoices', 'agenda', 'accounting', 'support', 'settings',
+    'home', 'clients', 'chantiers', 'catalog', 'suppliers', 'invoices', 'agenda', 'accounting', 'support', 'settings',
   ]);
 });
 
@@ -21,7 +21,7 @@ test('le questionnaire masque les menus inutilisés sans toucher aux autres', ()
   const questionnaire = { support: 'Non', agenda: 'Non', accounting: 'Non', parts: 'Non', stock: 'Non' };
   assert.deepEqual([...hiddenViews(questionnaire)].sort(), ['accounting', 'agenda', 'catalog', 'support']);
   const ids = navigationItems({ questionnaire }).map(item => item.id);
-  assert.deepEqual(ids, ['home', 'clients', 'suppliers', 'invoices', 'settings']);
+  assert.deepEqual(ids, ['home', 'clients', 'chantiers', 'suppliers', 'invoices', 'settings']);
 });
 
 test('le catalogue reste visible si une seule des deux Sources est active', () => {

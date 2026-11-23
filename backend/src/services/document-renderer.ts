@@ -29,6 +29,10 @@ const withBreaks=(s:string,tag:string)=>s.replace(/\r?\n/g,tag==='w:t'?'</w:t><w
 /** Données d'un devis / d'une facture : variables de modèles (DOCX/ODT personnalisés) + modèle de mise en page client. */
 export async function documentData(organizationId:string,quoteId:string){
  const r=await query(`select q.*,c.name client_name,c.email client_email,c.phone client_phone,c.address client_address,
+ -- Instantanés client (107) : un document émis garde les coordonnées du moment de sa création —
+ -- une correction de la fiche client ne réécrit jamais les anciens documents (repli = fiche
+ -- courante pour les documents antérieurs aux instantanés).
+ coalesce(q.client_name_snapshot,c.name) client_name,coalesce(q.client_email_snapshot,c.email) client_email,coalesce(q.client_phone_snapshot,c.phone) client_phone,
  o.name company_name,o.activity company_activity,o.custom_activity company_custom_activity,o.siret,o.siren,o.legal_form organization_legal_form,o.address company_address,o.postal_code company_postal_code,o.city company_city,o.website company_website,o.logo_key,o.updated_at organization_updated_at,a.name activity_name,a.description activity_description,a.legal_form,a.payment_terms,a.insurance_info,a.mediator_info,a.legal_notes,a.quote_validity_days,a.vat_rate activity_vat_rate2,a.updated_at activity_updated_at,a.code activity_code,(select profile_code from activity_profile_overrides where activity_id=q.activity_id) profile_override,a.cgv_text activity_cgv,(select coalesce(sum(penalty_amount),0) from invoice_reminders ir where ir.quote_id=q.id) total_penalty_amount
  from quotes q left join clients c on c.id=q.client_id join organizations o on o.id=q.organization_id left join activities a on a.id=q.activity_id
  where q.id=$1 and q.organization_id=$2`,[quoteId,organizationId]);

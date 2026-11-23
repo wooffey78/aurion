@@ -121,12 +121,15 @@ export async function detectCompany(identifier,ui={},options={}){
 /**
  * Affiche les propositions champ par champ. `apply(key,value)` écrit dans le formulaire appelant.
  * Le bouton « Tout appliquer aux champs vides » ne remplit jamais un champ déjà saisi.
+ * Prompt 01 — `meta` (facultatif) affiche la SOURCE des propositions, la date de consultation
+ * et leur caractère indicatif : distinguées explicitement des valeurs saisies et validées.
  */
-export function renderProposals(container,proposals,apply){
+export function renderProposals(container,proposals,apply,meta){
   if(!container)return;
   if(!proposals.length){container.hidden=false;container.innerHTML='<p class="help">Les informations du registre correspondent déjà à votre saisie.</p>';return}
   container.hidden=false;
-  container.innerHTML=`<div class="registry-proposals" role="group" aria-label="Informations proposées par le registre public"><p class="help">Les valeurs déjà saisies ne sont jamais remplacées sans votre accord.</p>${proposals.map((p,i)=>`<div class="registry-proposal" data-i="${i}"><div><b>${esc(p.label)}</b><small>Proposé : <strong>${esc(p.value)}</strong>${p.current?` · actuel : ${esc(p.current)}`:' · champ vide'}</small></div><div class="button-row"><button type="button" class="btn secondary small" data-apply="${i}">Appliquer</button><button type="button" class="link-btn" data-ignore="${i}">Ignorer</button></div></div>`).join('')}<div class="button-row"><button type="button" class="btn primary small" data-apply-empty>Tout appliquer aux champs vides</button></div></div>`;
+  const sourceLine=meta?.source?`<p class="help">Source : ${esc(meta.source)}${meta.consultedOn?` · consultées le ${esc(meta.consultedOn)}`:''} — données indicatives du registre public, à confirmer.</p>`:'';
+  container.innerHTML=`<div class="registry-proposals" role="group" aria-label="Informations proposées par le registre public"><p class="help">Les valeurs déjà saisies ne sont jamais remplacées sans votre accord.</p>${sourceLine}${proposals.map((p,i)=>`<div class="registry-proposal" data-i="${i}"><div><b>${esc(p.label)}</b><small>Proposé : <strong>${esc(p.value)}</strong>${p.current?` · actuel : ${esc(p.current)}`:' · champ vide'}</small></div><div class="button-row"><button type="button" class="btn secondary small" data-apply="${i}">Appliquer</button><button type="button" class="link-btn" data-ignore="${i}">Ignorer</button></div></div>`).join('')}<div class="button-row"><button type="button" class="btn primary small" data-apply-empty>Tout appliquer aux champs vides</button></div></div>`;
   const done=i=>{const row=container.querySelector(`[data-i="${i}"]`);row?.remove();if(!container.querySelector('.registry-proposal')){container.innerHTML='<p class="help">Toutes les propositions ont été traitées.</p>'}};
   container.querySelectorAll('[data-apply]').forEach(b=>b.addEventListener('click',()=>{const p=proposals[Number(b.dataset.apply)];apply(p.key,p.value);done(b.dataset.apply)}));
   container.querySelectorAll('[data-ignore]').forEach(b=>b.addEventListener('click',()=>done(b.dataset.ignore)));
@@ -143,4 +146,20 @@ export function renderCompanyChoices(container,results,onPick){
   container.hidden=false;
   container.innerHTML=`<div class="registry-proposals" role="group" aria-label="Entreprises trouvées par le registre public"><p class="help">Plusieurs entreprises correspondent : choisissez la vôtre, puis reprenez les informations proposées.</p>${results.map((c,i)=>`<div class="registry-proposal" data-c="${i}"><div><b>${esc(c.legalName||'Entreprise')}</b><small>${esc([c.siren?`SIREN ${c.siren}`:'',c.postalCode||c.city?[c.postalCode,c.city].filter(Boolean).join(' '):''].filter(Boolean).join(' · ')||'—')}</small></div><div class="button-row"><button type="button" class="btn secondary small" data-use="${i}">Utiliser cette entreprise</button></div></div>`).join('')}</div>`;
   container.querySelectorAll('[data-use]').forEach(b=>b.addEventListener('click',()=>{const c=results[Number(b.dataset.use)];if(c)onPick?.(c)}));
+}
+
+/**
+ * Prompt 01 — note d'établissements : liste des établissements connus du registre (siège +
+ * secondaires) et divergence explicite si le SIRET retenu n'est pas le siège. Aucune
+ * écriture automatique : information seulement, jamais une vérité métier imposée.
+ */
+export function renderEstablishmentsNote(container,company){
+  if(!container)return;
+  const list=Array.isArray(company?.establishments)?company.establishments:[];
+  if(list.length<2){container.hidden=true;container.innerHTML='';return}
+  const fmt=e=>[e.isHeadOffice?'siège':'établissement',e.siret?[e.postalCode,e.city].filter(Boolean).join(' ')||e.siret:''].filter(Boolean).join(' · ');
+  const retained=String(company.siret||'');
+  const diverges=list.some(e=>e.isHeadOffice&&e.siret&&retained&&e.siret!==retained);
+  container.hidden=false;
+  container.innerHTML=`<div class="registry-proposals" role="group" aria-label="Établissements connus du registre public"><p class="help">${list.length} établissement(s) connu(s) : ${esc(list.map(fmt).join(' ; '))}${diverges?` — le SIRET affiché n'est pas le siège social (divergence à vérifier).`:''}</p></div>`;
 }

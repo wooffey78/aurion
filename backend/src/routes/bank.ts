@@ -98,14 +98,14 @@ export async function bankRoutes(app: FastifyInstance) {
     if (!p) return reply.code(400).send({ error: "INVALID_PAYMENT", message: "Le règlement choisi n'existe pas dans votre organisation." });
     const used = (await query("select id from bank_transactions where matched_payment_id=$1 and organization_id=$2 and id<>$3", [paymentId, org, id])).rowCount;
     if (used) return reply.code(409).send({ error: "PAYMENT_ALREADY_RECONCILED", message: "Ce règlement est déjà rapproché avec une autre opération bancaire." });
-    await query("update bank_transactions set status='matched',matched_payment_id=$2,matched_at=now() where id=$1", [id, paymentId]);
-    return { ok: true, note: "Rapprochement enregistré (annulable). Aucune écriture comptable automatique n'a été modifiée." };
+    await query("update bank_transactions set status='matched',matched_payment_id=$2,matched_at=now(),matched_by=$3 where id=$1", [id, paymentId, r.auth!.userId]);
+    return { ok: true, note: "Rapprochement enregistré (annulable, attribué et journalisé). Aucune écriture comptable automatique n'a été modifiée." };
   });
 
-  // Annulation du rapprochement : jamais d'effet irréversible.
+  // Annulation du rapprochement : jamais d'effet irréversible, attribution conservée.
   app.post("/bank/transactions/:id/unmatch", async (r, reply) => {
     const id = String((r.params as any).id), org = r.auth!.organizationId;
-    const x = await query("update bank_transactions set status='unmatched',matched_payment_id=null,matched_at=null where id=$1 and organization_id=$2 and status='matched' returning id", [id, org]);
+    const x = await query("update bank_transactions set status='unmatched',matched_payment_id=null,matched_at=null,unmatched_by=$2,unmatched_at=now() where id=$1 and organization_id=$3 and status='matched' returning id", [id, r.auth!.userId, org]);
     if (!x.rowCount) return reply.code(404).send({ error: "NOT_FOUND", message: "Aucun rapprochement à annuler." });
     return { ok: true };
   });

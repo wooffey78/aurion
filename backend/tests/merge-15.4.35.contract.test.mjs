@@ -182,12 +182,19 @@ test('config GitHub/Render : autodeploy activé et CI conservée', () => {
   assert.match(ci, /npm audit/);
 });
 
-test('documents juridiques : révision technique 4.0 du 20 novembre 2026 sur les cinq documents publiés', () => {
-  for (const doc of ['docs/CGU-CGV.md', 'docs/COOKIES.md', 'docs/LEGAL-NOTICE.md', 'docs/DECLARATION-ACCESSIBILITE.md', 'docs/POLITIQUE-CONFIDENTIALITE.md']) {
+test('documents juridiques : révision technique tracée sur les cinq documents publiés (4.0 technique ; CGU et confidentialité en 5.0 contractuelle — 15.4.54)', () => {
+  // 15.4.54 : CGU-CGV et POLITIQUE-CONFIDENTIALITE portent la version contractuelle 5.0
+  // (portail, webhooks, e-facture préparatoire, DPA) — la révision 4.0 du 20 novembre reste
+  // citée dans leur historique ; les trois documents techniques restent en révision 4.0.
+  assert.match(read('docs/CGU-CGV.md'), /Version \*\*5\.0\*\*, révision du 23 novembre 2026 pour Aurion 15\.4\.51 \(mise à jour de la version 4\.0 du 20 novembre 2026/);
+  assert.match(read('docs/POLITIQUE-CONFIDENTIALITE.md'), /Version \*\*5\.0\*\*, révision du 23 novembre 2026 pour Aurion 15\.4\.51 \(mise à jour de la version 4\.0 du 20 novembre 2026/);
+  for (const doc of ['docs/COOKIES.md', 'docs/LEGAL-NOTICE.md', 'docs/DECLARATION-ACCESSIBILITE.md']) {
     assert.match(read(doc), /révision du 20 novembre 2026 pour Aurion 15\.4\.35/);
   }
   assert.match(read('docs/POLITIQUE-CONFIDENTIALITE.md'), /Droit à l'effacement en ligne \(15\.4\.35\)/);
   assert.match(read('docs/POLITIQUE-CONFIDENTIALITE.md'), /legal\/suppression-compte/);
+  // Le DPA est désormais un document contractuel versionné (cinq catégories exigées).
+  assert.match(read('docs/DPA-RGPD.md'), /Contrat de sous-traitance de traitement des données personnelles \(article 28 RGPD\)/);
 });
 
 test('versions harmonisées partout (manifestes, lockfiles, service worker)', () => {

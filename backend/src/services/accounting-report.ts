@@ -95,7 +95,7 @@ export async function accountingReportPdf(organizationId: string, activityId: st
         where qi.quote_id=q.id
       ),'[]'::json) items
       from quotes q left join clients c on c.id=q.client_id where q.organization_id=$1 and q.activity_id=$2 and extract(year from q.created_at)=$3 order by q.created_at desc`,[organizationId,activityId,year])).rows;
-  const entries=(await query(`select entry_date,entry_type,amount,label from accounting_entries where organization_id=$1 and activity_id=$2 and extract(year from entry_date)=$3 order by entry_date desc,created_at desc`,[organizationId,activityId,year])).rows;
+  const entries=(await query(`select entry_date,entry_type,amount,label from accounting_entries where organization_id=$1 and activity_id=$2 and voided_at is null and extract(year from entry_date)=$3 order by entry_date desc,created_at desc`,[organizationId,activityId,year])).rows;
   const PDFDocument = await pdfkit();
   const buffer: Buffer = await new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 56, info: { Title: `Export comptable ${year}`, Author: org.name || 'Aurion' } });

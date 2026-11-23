@@ -2,6 +2,7 @@
 export const NAV_ITEMS=[
   {id:'home',label:'Tableau de bord',icon:'⌂'},
   {id:'clients',label:'Clients',icon:'♙'},
+  {id:'chantiers',label:'Chantiers',icon:'▣'},
   {id:'catalog',label:'Catalogue métier',icon:'◈'},
   {id:'suppliers',label:'Fournisseurs',icon:'▱'},
   {id:'invoices',label:'Devis & factures',icon:'▧'},
@@ -25,7 +26,11 @@ export function hiddenViews(questionnaire={},modules=[]){
   return hidden;
 }
 
-export function navigationItems({questionnaire={},modules=[],isAdmin=false}={}){
+// 15.4.50 — visibilité par MÉTIER : l'entrée Chantiers n'est proposée que si le moteur de
+// modularité (profile-features, côté serveur) la déclare pertinente pour le profil actif.
+// Repli non destructif : tant que le moteur n'a pas répondu, l'entrée reste visible.
+export function navigationItems({questionnaire={},modules=[],isAdmin=false,features=null}={}){
   const hidden=hiddenViews(questionnaire,modules);
+  if(features&&features.features&&features.features.chantiers===false)hidden.add('chantiers');
   return NAV_ITEMS.filter(item=>item.admin?isAdmin:!hidden.has(item.id));
 }

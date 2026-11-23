@@ -39,6 +39,11 @@ envVarGroups:
         value: k1
       - key: AURION_CLOUD_QUOTA_THRESHOLDS
         value: "80,90,95,100"
+      # 15.4.51 — supervision : e-mail d'exploitation des lettres mortes (vide = désactivé).
+      # Le journal de sauvegarde vit sur le VPS OVH (cron nightly), pas sur Render : pas de
+      # variable ici ; AURION_BACKUP_LOG_PATH est documenté dans RUNBOOK-PRODUCTION.md §2.
+      - key: AURION_OPS_ALERT_EMAIL
+        sync: false
       - key: BILLING_VAT_RATE_BPS
         value: "0"
       - key: PLATFORM_SMTP_SECURITY

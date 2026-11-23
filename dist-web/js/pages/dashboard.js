@@ -12,9 +12,11 @@ import*as docs from'./dash/docs.js';
 import*as settings from'./dash/settings.js';
 import*as account from'./dash/account.js';
 import{home,clients,agenda,accounting,treasury,support,admin}from'./dash/other.js';
+import{chantiers}from'./dash/chantiers.js';
+import{loadProfileFeatures,cachedFlags}from'../core/profile-features.js';
 import{setCloudOwner}from'../core/cloud-sync.js';
 
-const VIEWS={home,clients,catalog,suppliers,quote,invoices:docs,agenda,accounting,treasury,support,settings,account,admin};
+const VIEWS={home,clients,chantiers,catalog,suppliers,quote,invoices:docs,agenda,accounting,treasury,support,settings,account,admin};
 
 // Garde-fous de rafraîchissement : ne jamais remplacer l’écran en pleine interaction.
 let metricsRefreshInProgress = false;
@@ -97,6 +99,9 @@ async function load(extras=null,viewId=S.view){
   }
   if(full||viewId==='admin'||!S.adminChecked){jobs.push((async()=>{try{S.isPlatformAdmin=!!(await api.adminMe()).admin}catch(x){if(x?.status===401)throw x;S.isPlatformAdmin=false}finally{S.adminChecked=true}})());}
   await Promise.all(jobs);
+  // 15.4.50 — modularité métier : les fonctionnalités proposées dépendent du profil actif
+  // (un seul appel par chargement, cache de session, repli conservateur hors connexion).
+  if(full||!cachedFlags())await loadProfileFeatures(Boolean(full));
   if(full||needConfig||!S.profile)S.profile=await safe(api.activityProfile(getActiveActivity()),S.profile||{});
 }
 
@@ -107,7 +112,7 @@ function show(id){
   const profileModules=Array.isArray(S.profile?.modules)?S.profile.modules.map(x=>String(x).toLowerCase()):[];
   if(hiddenViews(q,profileModules).has(id))id='home';
   S.view=id;hooks.closeMenu?.();
-  const nav=navigationItems({questionnaire:q,modules:profileModules,isAdmin:S.isPlatformAdmin}).map(item=>`<button type="button" data-view="${item.id}" class="${item.id===id?'active':''}" aria-current="${item.id===id?'page':'false'}" title="${item.label}"><i aria-hidden="true">${item.icon}</i>${item.label}</button>`).join('');
+  const nav=navigationItems({questionnaire:q,modules:profileModules,isAdmin:S.isPlatformAdmin,features:cachedFlags()}).map(item=>`<button type="button" data-view="${item.id}" class="${item.id===id?'active':''}" aria-current="${item.id===id?'page':'false'}" title="${item.label}"><i aria-hidden="true">${item.icon}</i>${item.label}</button>`).join('');
   const navRoot=document.querySelector('.nav');
   navRoot.innerHTML=nav;
   navRoot.onclick=ev=>{
@@ -309,6 +314,25 @@ export async function renderDashboard(){
   };
   syncFullscreenButton();
   paintShell();show(initialView);
+  // 15.4.54 (PROMPT D2) — bannière de re-acceptation contractuelle : à chaque montée de version
+  // des documents (CGU / confidentialité / DPA), le compte est invité à accepter les documents
+  // à jour. Les documents en brouillon ne déclenchent jamais la bannière (jamais bloquants) et
+  // l'échec de la vérification n'empêche jamais le tableau de bord de fonctionner.
+  try{
+    const legalStatus=await api.legalAcceptanceStatus();
+    if(legalStatus&&legalStatus.upToDate===false&&Array.isArray(legalStatus.missing)&&legalStatus.missing.length&&!document.querySelector('.legal-accept-bar')){
+      const bar=document.createElement('div');
+      bar.className='notice warn-notice legal-accept-bar';
+      bar.setAttribute('role','status');
+      bar.innerHTML=`Nos conditions contractuelles ont été mises à jour (${e(legalStatus.missing.map(m=>m.title).join(' · '))}). <button class="btn primary small" id="legal-accept-btn">J’accepte les documents à jour</button> <a class="link-btn" href="#/legal/cgv">Les consulter</a>`;
+      document.querySelector('.workspace')?.prepend(bar);
+      bar.querySelector('#legal-accept-btn')?.addEventListener('click',async()=>{
+        const btn=bar.querySelector('#legal-accept-btn');
+        try{btn.disabled=true;await api.acceptLegalDocuments();bar.remove();toast('Merci : vos documents contractuels sont à jour.','success')}
+        catch(x){btn.disabled=false;toast(x.message||'Enregistrement de l\u2019acceptation impossible.','error')}
+      });
+    }
+  }catch{}
   if(requestedSection&&/^[a-z-]+$/.test(requestedSection))window.setTimeout(()=>document.getElementById(requestedSection)?.scrollIntoView({block:'start'}),250);
   window.__aurionMetricsTimer&&clearInterval(window.__aurionMetricsTimer);
   window.__aurionMetricsTimer=setInterval(async()=>{

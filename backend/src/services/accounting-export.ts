@@ -46,6 +46,7 @@ export async function purchasesJournal(orgId: string, activityId: string | null,
   const rows = (await query(
     `select entry_date,entry_type,amount,label from accounting_entries
      where organization_id=$1 and activity_id=$2 and entry_type in ('purchase','sav')
+       and voided_at is null
        and date_trunc('year',entry_date)=make_date($3,1,1)
      order by entry_date,id`,
     [orgId, activityId, year],

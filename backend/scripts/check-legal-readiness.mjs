@@ -36,12 +36,28 @@ const seeds = (() => {
 
 // Motifs de blocage identiques à ceux du code applicatif (échec fermé côté application).
 const UNRESOLVED_RE = /\{\{[A-Z0-9_]+\}\}|\[(?:À compléter|À confirmer|À valider|À choisir|À désigner|À renseigner)[^\]]*\]|PROJET DE DOCUMENT|PROJET DE PAGE|PROJET À COMPLÉTER|DOSSIER DE PRÉPARATION|NE PAS PUBLIER/i;
-const APPROVAL_EXPECTED = '4.0';
+const APPROVAL_EXPECTED = '5.0';
 
 const approval = process.env.AURION_LEGAL_PUBLICATION_APPROVAL || '';
-console.log('== Pré-vol juridique (miroir de la porte de publication 4.0) ==');
+console.log('== Pré-vol juridique (miroir de la porte de publication 5.0 — DPA inclus, 15.4.54) ==');
 console.log(`AURION_LEGAL_PUBLICATION_APPROVAL = ${approval ? `'${approval}'` : '(absent)'} — valeur attendue : '${APPROVAL_EXPECTED}'`);
 if (approval !== APPROVAL_EXPECTED) console.log(`  ⚠ approbation ${approval === '' ? 'absente' : `'${approval}' incorrecte`} → tous les documents resteraient en brouillon`);
+
+// 15.4.53 (PROMPT C4) — cohérence docs/MENTIONS-OBLIGATOIRES.md ↔ BLOCKING_MENTION_KEYS :
+// les clés bloquantes du code doivent être documentées dans le référentiel, et réciproquement.
+const gateKeys = (() => {
+  const src = readFileSync(path.join(BACKEND_ROOT, 'src', 'services', 'mention-gate.ts'), 'utf8');
+  return [...src.matchAll(/'([a-z-]+)'/g)].map(x => x[1]).filter(k => !['quote', 'invoice'].includes(k));
+})();
+const mentionsDoc = existsSync(path.join(PROJECT_ROOT, 'docs', 'MENTIONS-OBLIGATOIRES.md'))
+  ? readFileSync(path.join(PROJECT_ROOT, 'docs', 'MENTIONS-OBLIGATOIRES.md'), 'utf8') : '';
+console.log('\n== Cohérence mentions bloquantes (code ↔ référentiel) ==');
+let gateCoherent = gateKeys.length > 0;
+for (const k of gateKeys) {
+  const documented = mentionsDoc.includes(`\`${k}\``);
+  console.log(`  ${documented ? '✔' : '✖'} clé bloquante « ${k} » ${documented ? 'documentée' : 'ABSENTE de docs/MENTIONS-OBLIGATOIRES.md'}`);
+  if (!documented) gateCoherent = false;
+}
 
 let ready = 0;
 for (const s of seeds) {
@@ -71,6 +87,6 @@ const configured = allVars.filter(k => String(process.env[k] || '').trim());
 console.log('\n== Variables d\'identité présentes ==');
 for (const k of [...new Set(allVars)]) console.log(`  ${k} = ${configured.includes(k) ? mask(process.env[k]) : '(absent)'}`);
 
-console.log(`\n== Bilan : ${ready}/${seeds.length} documents prêts ; approbation : ${approval === APPROVAL_EXPECTED ? 'OK' : 'à compléter'} ==`);
+console.log(`\n== Bilan : ${ready}/${seeds.length} documents prêts ; approbation : ${approval === APPROVAL_EXPECTED ? 'OK' : 'à compléter'} ; mentions bloquantes : ${gateCoherent ? 'cohérentes' : 'DIVERGENCE document/code'} ==`);
 console.log('La publication effective est ensuite effectuée par l\'application au démarrage (statut brouillon échoué fermé tant que ces blocages existent).');
-if (strict && (ready !== seeds.length || approval !== APPROVAL_EXPECTED)) process.exit(1);
+if (strict && (ready !== seeds.length || approval !== APPROVAL_EXPECTED || !gateCoherent)) process.exit(1);

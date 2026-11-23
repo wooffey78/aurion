@@ -11,7 +11,7 @@ test('accueil et trésorerie partagent le même calcul de devis TTC et SAV finan
   assert.match(service, /sum\(total_ttc\)/);
   assert.match(service, /document_type='quote'/);
   assert.match(service, /lower\(coalesce\(status,''\)\) not in/);
-  assert.match(service, /'rejected','refused','void','deleted'/);
+  assert.match(service, /'rejected','refused','expired','void','deleted'/);
   assert.match(service, /sum\(amount_ttc\)/);
   assert.match(service, /sav_type='financial'/);
   assert.match(service, /entries: quotesTtc \+ savTtc/);

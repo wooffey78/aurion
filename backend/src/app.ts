@@ -31,6 +31,21 @@ import { paymentRoutes } from "./routes/payments.js";
 import { paOutgoingRoutes } from "./routes/pa-outgoing.js";
 import { paEreportingRoutes } from "./routes/pa-ereporting.js";
 import { syncReplicationRoutes } from "./routes/sync.js";
+import { stockRoutes } from "./routes/stock.js";
+import { purchaseRoutes } from "./routes/purchases.js";
+import { taskRoutes } from "./routes/tasks.js";
+import { automationRoutes } from "./routes/automation.js";
+import { accountantCollabRoutes } from "./routes/accountant-collab.js";
+import { shareLinkRoutes } from "./routes/share-links.js";
+import { agendaRoutes } from "./routes/agenda.js";
+import { outboxRoutes } from "./routes/outbox.js";
+// 15.4.50 — chantiers (B1/B6), portail client invités (A1/A2), webhooks sortants (B8),
+// maintenance/intégrité/prix (B2/B5/B4), modularité métier et rapport mensuel (B7/B3-bis).
+import { chantierRoutes, deviationRoutes } from "./routes/chantiers.js";
+import { portalGuestRoutes, portalPublicRoutes } from "./routes/portal-guest.js";
+import { webhookOutRoutes } from "./routes/webhooks-out.js";
+import { maintenanceRoutes, integrityRoutes, priceHistoryRoutes } from "./routes/maintenance.js";
+import { profileFeatureRoutes } from "./routes/profile-services.js";
 import { androidAssetLinksRoutes } from "./routes/assetlinks.js";
 import { AurionError } from "./services/errors.js";
 import { query, db, tenantRequestScope } from "./db.js";
@@ -137,6 +152,26 @@ export async function buildApp() {
   await app.register(paOutgoingRoutes);
   await app.register(paEreportingRoutes);
   await app.register(syncReplicationRoutes);
+  // Blocs 10/13/14/15/16 — stock traçable, achats, tâches, automatisations déterministes,
+  // collaboration comptable, partages documentaires (fondation du portail client).
+  await app.register(stockRoutes);
+  await app.register(purchaseRoutes);
+  await app.register(taskRoutes);
+  await app.register(automationRoutes);
+  await app.register(accountantCollabRoutes);
+  await app.register(shareLinkRoutes);
+  await app.register(agendaRoutes);
+  await app.register(outboxRoutes);
+  // 15.4.50 — enregistrement additif : les routes existantes sont inchangées.
+  await app.register(chantierRoutes);
+  await app.register(deviationRoutes);
+  await app.register(portalGuestRoutes);
+  await app.register(portalPublicRoutes);
+  await app.register(webhookOutRoutes);
+  await app.register(maintenanceRoutes);
+  await app.register(integrityRoutes);
+  await app.register(priceHistoryRoutes);
+  await app.register(profileFeatureRoutes);
 
   // Isolation multi-tenant (RLS 074) : enveloppe du cycle de vie complet de chaque requête HTTP dans un
   // contexte AsyncLocalStorage. Le plugin d'authentification y inscrit l'organisation active

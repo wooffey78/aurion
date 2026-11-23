@@ -215,3 +215,54 @@ export async function recordThresholdAlerts(orgId: string, year: number, statuse
     }
   }
 }
+
+// ---------------------------------------------------------------------------------------
+// Prompt 04 — seuils réglementaires VERSIONNÉS en base (migration 105). La version à la
+// date demandée est lue dans regulatory_thresholds (référentiel global en lecture seule) ;
+// en l'absence de version applicable (base vide, avant 2026, base indisponible), le repli
+// reste les constantes documentées du code — AUCUN taux n'est jamais inventé.
+// ---------------------------------------------------------------------------------------
+
+/** Clés attendues dans `values` jsonb ; toute clé manquante ou invalide → null (repli constant). */
+const THRESHOLD_VALUE_KEYS = ['sale', 'services', 'vatSaleBase', 'vatServicesBase', 'vatSaleMajorated', 'vatServicesMajorated'] as const;
+
+/** Convertit une ligne regulatory_thresholds en référence utilisable — fonction PURE, testée sans base. */
+export function thresholdsFromRow(row: { effective_from?: unknown; source?: unknown; verified_on?: unknown; values?: unknown } | null | undefined): ThresholdRef | null {
+  if (!row) return null;
+  const values = row.values as Record<string, unknown> | null;
+  if (!values || typeof values !== 'object') return null;
+  const read = (key: (typeof THRESHOLD_VALUE_KEYS)[number]): number | null => {
+    const n = Number((values as any)[key]);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  const parsed = THRESHOLD_VALUE_KEYS.map(read);
+  if (parsed.some(v => v === null)) return null;
+  const iso = (d: unknown) => d instanceof Date ? d.toISOString().slice(0, 10) : String(d ?? '').slice(0, 10);
+  const [sale, services, vatSaleBase, vatServicesBase, vatSaleMajorated, vatServicesMajorated] = parsed as number[];
+  return {
+    version: iso(row.effective_from),
+    verifiedOn: iso(row.verified_on),
+    source: String(row.source ?? ''),
+    sale, services, vatSaleBase, vatServicesBase, vatSaleMajorated, vatServicesMajorated,
+  };
+}
+
+/**
+ * Charge la référence de seuils en vigueur à une date donnée (date d'effet incluse, date de
+ * fin exclue). Repli déterministe sur THRESHOLDS_2026 si aucune version en base ne couvre
+ * la date (ou si la base est indisponible) — le comportement historique est conservé.
+ */
+export async function loadThresholdsRef(dateISO: string): Promise<ThresholdRef> {
+  try {
+    const rows = (await query(
+      `select effective_from,source,verified_on,values from regulatory_thresholds
+       where domain='micro' and effective_from<=$1::date and (effective_to is null or $1::date<effective_to)
+       order by effective_from desc limit 1`,
+      [String(dateISO || '').slice(0, 10)],
+    )).rows;
+    const parsed = thresholdsFromRow(rows[0]);
+    return parsed ?? THRESHOLDS_2026;
+  } catch {
+    return THRESHOLDS_2026;
+  }
+}

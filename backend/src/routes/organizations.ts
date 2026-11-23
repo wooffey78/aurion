@@ -17,7 +17,7 @@ export async function organizationRoutes(app: FastifyInstance) {
   app.get("/organization", async (request, reply) => {
     await syncPrimaryActivityFromOrganization(request.auth!.organizationId);
     const r = await query(
-      `select id,name,activity,custom_activity,siren,siret,legal_form,address,postal_code,city,website,configuration_data,configuration_incomplete,vl_option,vl_verified,vl_effective_from,urssaf_periodicity,urssaf_periodicity_effective_from,urssaf_periodicity_changed_at,(logo_key is not null) as has_logo,created_at,updated_at
+      `select id,name,activity,custom_activity,siren,siret,legal_form,address,postal_code,city,website,configuration_data,configuration_incomplete,vl_option,vl_verified,vl_effective_from,urssaf_periodicity,urssaf_periodicity_effective_from,urssaf_periodicity_changed_at,identity_source,identity_checked_at,(logo_key is not null) as has_logo,created_at,updated_at
        from organizations where id=$1`,
       [request.auth!.organizationId],
     );
@@ -39,11 +39,20 @@ export async function organizationRoutes(app: FastifyInstance) {
     }
 
     const d = parsed.data;
+    // Prompt 01 — provenance de l'identité légale : la source est déclarée par l'interface
+    // ('registre-public' quand les propositions du registre sont appliquées) ou déduite
+    // honnêtement ('saisie manuelle'). Jamais de fausse provenance : sans changement des
+    // champs d'identité, la provenance existante reste inchangée.
+    const IDENTITY_SOURCES = ['registre-public', 'saisie manuelle', 'import'] as const;
+    const declaredIdentitySource = (d as any).identitySource !== undefined ? String((d as any).identitySource) : null;
+    const identitySource = declaredIdentitySource && (IDENTITY_SOURCES as readonly string[]).includes(declaredIdentitySource)
+      ? declaredIdentitySource
+      : 'saisie manuelle';
     // Bloc 9 — options fiscales déclarées (versement libératoire, périodicité URSSAF).
     // Les changements sont horodatés dans fiscal_options_history (reconstitution historique,
     // mise à jour en cours d'année) ; aucune détection automatique au SIRET.
     const before = (await query(
-      `select vl_option,vl_verified,vl_effective_from,urssaf_periodicity,urssaf_periodicity_effective_from from organizations where id=$1`,
+      `select vl_option,vl_verified,vl_effective_from,urssaf_periodicity,urssaf_periodicity_effective_from,name,siren,siret,legal_form,address from organizations where id=$1`,
       [request.auth!.organizationId],
     )).rows[0];
     const vlOption = (d as any).vlOption !== undefined ? (d as any).vlOption : (before?.vl_option || 'inconnu');
@@ -63,9 +72,13 @@ export async function organizationRoutes(app: FastifyInstance) {
            siren=nullif($4,''),siret=nullif($5,''),legal_form=nullif($6,''),address=nullif($7,''),postal_code=nullif($8,''),city=nullif($9,''),website=nullif($10,''),configuration_data=coalesce($11::jsonb,configuration_data),configuration_incomplete=coalesce($12,configuration_incomplete),updated_at=now(),
            vl_option=$13,vl_verified=$14,vl_effective_from=$15::date,
            urssaf_periodicity=$16::varchar,urssaf_periodicity_effective_from=$17::date,
-           urssaf_periodicity_changed_at=case when $16::varchar is not null and $16::varchar is distinct from $18::varchar then now() else urssaf_periodicity_changed_at end
-       where id=$19
-       returning id,name,activity,custom_activity,siren,siret,legal_form,address,postal_code,city,website,configuration_data,configuration_incomplete,vl_option,vl_verified,vl_effective_from,urssaf_periodicity,urssaf_periodicity_effective_from,urssaf_periodicity_changed_at,(logo_key is not null) as has_logo,updated_at`,
+           urssaf_periodicity_changed_at=case when $16::varchar is not null and $16::varchar is distinct from $18::varchar then now() else urssaf_periodicity_changed_at end,
+           identity_source=case when ($4::varchar is distinct from $20::varchar or $5::varchar is distinct from $21::varchar or $1::varchar is distinct from $22::varchar or $6::varchar is distinct from $23::varchar or $7::varchar is distinct from $24::varchar)
+                                then coalesce($19::varchar,'saisie manuelle') else identity_source end,
+           identity_checked_at=case when $19::varchar='registre-public' and ($4::varchar is distinct from $20::varchar or $5::varchar is distinct from $21::varchar or $1::varchar is distinct from $22::varchar or $6::varchar is distinct from $23::varchar or $7::varchar is distinct from $24::varchar)
+                                then now() else identity_checked_at end
+       where id=$25
+       returning id,name,activity,custom_activity,siren,siret,legal_form,address,postal_code,city,website,configuration_data,configuration_incomplete,vl_option,vl_verified,vl_effective_from,urssaf_periodicity,urssaf_periodicity_effective_from,urssaf_periodicity_changed_at,identity_source,identity_checked_at,(logo_key is not null) as has_logo,updated_at`,
       [
         d.name,
         d.activity,
@@ -85,6 +98,12 @@ export async function organizationRoutes(app: FastifyInstance) {
         urssafPeriodicity,
         urssafPeriodicityFrom,
         before?.urssaf_periodicity ?? null,
+        declaredIdentitySource ? identitySource : null,
+        before?.siren ?? null,
+        before?.siret ?? null,
+        before?.name ?? null,
+        before?.legal_form ?? null,
+        before?.address ?? null,
         request.auth!.organizationId,
       ],
     );
@@ -98,10 +117,30 @@ export async function organizationRoutes(app: FastifyInstance) {
       await query('insert into fiscal_options_history(organization_id,field,value,effective_from,source) values($1,$2,$3,coalesce($4::date,current_date),$5)',
         [request.auth!.organizationId, field, value, effective, vlOption === value || field === 'urssaf_periodicity' ? 'déclaration utilisateur (parcours/paramètres)' : 'déclaration utilisateur']);
     }
+    // Prompt 01 — historique des identifiants légaux (103) : une ligne par champ d'identité
+    // réellement modifié (ancienne valeur → nouvelle valeur, source déclarée, acteur
+    // identifié). Jamais d'écriture sans changement ; aucune réécriture de l'historique.
+    const identityHistory: Array<[string, unknown, unknown]> = [
+      ['name', before?.name, d.name],
+      ['siren', before?.siren, d.siren || null],
+      ['siret', before?.siret, d.siret || null],
+      ['legal_form', before?.legal_form, (d as any).legalForm || null],
+      ['address', before?.address, (d as any).address || null],
+    ];
+    const identityChanged = identityHistory.some(([, o, n]) => String(o ?? '') !== String(n ?? ''));
+    if (identityChanged) {
+      for (const [field, oldValue, newValue] of identityHistory) {
+        if (String(oldValue ?? '') === String(newValue ?? '')) continue;
+        await query(
+          'insert into organization_identity_history(organization_id,field,old_value,new_value,source,actor_id) values($1,$2,$3,$4,$5,$6)',
+          [request.auth!.organizationId, field, oldValue == null ? null : String(oldValue), newValue == null ? null : String(newValue), identitySource, request.auth!.userId],
+        );
+      }
+    }
     await syncPrimaryActivityFromOrganization(request.auth!.organizationId, { forceIdentity: true });
     await applyConfigurationQuestionnaire(request.auth!.organizationId, (d as any).configurationData);
     const fresh = await query(
-      `select id,name,activity,custom_activity,siren,siret,legal_form,address,postal_code,city,website,configuration_data,configuration_incomplete,vl_option,vl_verified,vl_effective_from,urssaf_periodicity,urssaf_periodicity_effective_from,urssaf_periodicity_changed_at,(logo_key is not null) as has_logo,created_at,updated_at
+      `select id,name,activity,custom_activity,siren,siret,legal_form,address,postal_code,city,website,configuration_data,configuration_incomplete,vl_option,vl_verified,vl_effective_from,urssaf_periodicity,urssaf_periodicity_effective_from,urssaf_periodicity_changed_at,identity_source,identity_checked_at,(logo_key is not null) as has_logo,created_at,updated_at
        from organizations where id=$1`,
       [request.auth!.organizationId],
     );

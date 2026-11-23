@@ -1,6 +1,6 @@
 # Politique de confidentialité et annexe de sous-traitance — Aurion
 
-Version **4.0**, révision du 20 novembre 2026 pour Aurion 15.4.35 (mise à jour de la révision 4.0 du 14 novembre 2026 ; les coordonnées et engagements du propriétaire sont inchangés ; révision technique compatible : droit à l'effacement en ligne depuis l'application et depuis la page publique).
+Version **5.0**, révision du 23 novembre 2026 pour Aurion 15.4.51 (mise à jour de la version 4.0 du 20 novembre 2026 ; coordonnées et engagements inchangés). Cette révision décrit les données introduites par le portail client invités, les webhooks sortants, la supervision des lettres mortes et la chaîne d’intégrité documentaire. Ajouts soumis à la validation juridique externe prévue avant ouverture commerciale.
 
 **Responsable de traitement : Coulibaly Damien, entrepreneur individuel, nom commercial Easyweb-dev. Adresse : 5 Rue Jacques Prevert, 85300 Challans, France. SIREN : 888485695. Contact données personnelles : easyfixit.reparation@gmail.com.** Cette politique décrit les traitements du service ; pour les dossiers que le client professionnel saisit dans son espace, le client demeure responsable de ses propres contacts (voir l’article 1).
 
@@ -98,3 +98,15 @@ Au choix du client et selon les obligations légales applicables, l’Éditeur r
 - [CNIL — gérer la sous-traitance](https://www.cnil.fr/fr/securite-gerer-la-sous-traitance)
 - [RGPD, article 28 — sous-traitant](https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=fr)
 - [RGPD, chapitre V — transferts](https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=fr)
+
+## 14-bis — Données du portail client invités
+
+Le portail client (accès par jeton, sans compte) traite les données suivantes pour le compte de l'abonné, responsable de traitement : l'adresse de courriel du contact saisi par l'abonné, le nom du contact facultatif, un jeton technique stocké exclusivement sous forme hachée, les dates de création, d'activation, de dernier accès, d'expiration et, le cas échéant, de révocation de l'accès, ainsi que les acceptations de devis (nom du signataire tel que saisi, horodatage serveur, empreinte technique de la demande). Base de traitement : exécution du service demandé par l'abonné (art. 6-1-b) dans l'intérêt légitime de disposer d'une preuve de l'accord du client. Conservation : pendant la durée de vie de l'accès, puis suppression avec le compte de l'abonné ou sur demande. Le visiteur du portail n'est soumis à aucun cookie de suivi ; seuls des journaux techniques de sécurité (limitation de débit) sont conservés à des fins de protection du service.
+
+## 14-ter — Webhooks sortants et supervision des lettres mortes
+
+Lorsque l'abonné configure des webhooks, les données de notification qu'il choisit sont transmises aux URL qu'il désigne : l'abonné demeure responsable de ces transferts et de ses récepteurs. Les échecs de livraison sont conservés sous forme technique (type d'événement, nombre de tentatives, dernier message d'erreur tronqué, horodatages) pour permettre le rejeu motivé et le support ; le résumé quotidien adressé à l'adresse d'exploitation de l'éditeur ne contient aucun contenu métier, uniquement ces éléments techniques. Conservation : 90 jours glissants pour les événements clos.
+
+## 14-quater — Chaîne d'intégrité documentaire
+
+À chaque émission de facture, une empreinte du contenu canonique du document (identifiant, numéro, client, totaux, lignes, échéance) et un horodatage serveur sont enregistrés dans une chaîne d'intégrité « append-only », chaînée à l'empreinte précédente de l'entreprise. Cette chaîne ne contient ni pièce jointe ni contenu libre : uniquement ces empreintes et horodatages, conservés tant que le document de l'abonné existe, pour offrir une preuve technique d'intégrité depuis l'émission.

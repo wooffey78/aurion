@@ -10,6 +10,17 @@
 //  - limite : 7 requêtes/s par adresse IP, HTTP 429 + Retry-After en cas de dépassement.
 import { isValidLuhn } from './validation.js';
 
+/** Établissement connu du registre (siège + établissements secondaires renvoyés par l'API). */
+export interface RegistryEstablishment {
+  siret: string;
+  address: string;
+  postalCode: string;
+  city: string;
+  isHeadOffice: boolean;
+  closed: boolean;
+  closedOn?: string;
+}
+
 export type RegistryCompany = {
   siren: string;
   siret: string;
@@ -29,6 +40,8 @@ export type RegistryCompany = {
   closed?: boolean;
   establishmentClosed?: boolean;
   closedOn?: string;
+  /** Prompt 01 — établissements connus (siège inclus) : divergence siège / secondaire visible. */
+  establishments?: RegistryEstablishment[];
 };
 
 const normalize = (v: unknown) => String(v ?? '').replace(/\s+/g, ' ').trim();
@@ -94,6 +107,27 @@ export async function lookupFrenchCompany(identifier: string, fetcher: typeof fe
   if (raw.length === 14 && !etab) return null;
   const place = etab || siege;
   const code = normalize(hit.nature_juridique);
+  // Prompt 01 — liste des établissements connus (siège + matching, dédupliqués par SIRET,
+  // au plus 10 comme la limite demandée à l'API). Les consommateurs actuels ignorent ce
+  // champ : purement additif.
+  const establishmentSource = [siege, ...(Array.isArray(hit.matching_etablissements) ? hit.matching_etablissements : [])];
+  const seenSirets = new Set<string>();
+  const establishments: RegistryEstablishment[] = [];
+  for (const e of establishmentSource) {
+    const siretValue = normalize(e?.siret);
+    if (!siretValue || seenSirets.has(siretValue)) continue;
+    seenSirets.add(siretValue);
+    establishments.push({
+      siret: siretValue,
+      address: [e.adresse, e.complement_adresse].filter(Boolean).map(normalize).join('\n'),
+      postalCode: normalize(e.code_postal),
+      city: normalize(e.libelle_commune || e.commune),
+      isHeadOffice: e === siege || e?.est_siege === true,
+      closed: normalize(e.etat_administratif) === 'F' || normalize(e.etat_administratif) === 'C',
+      closedOn: normalize(e.date_fermeture) || undefined,
+    });
+    if (establishments.length >= 10) break;
+  }
   return {
     siren,
     siret: normalize(place.siret || (raw.length === 14 ? raw : '')),
@@ -111,6 +145,7 @@ export async function lookupFrenchCompany(identifier: string, fetcher: typeof fe
     closed: normalize(hit.etat_administratif) === 'C',
     establishmentClosed: normalize(place.etat_administratif) === 'F' || normalize(place.etat_administratif) === 'C',
     closedOn: normalize(place.date_fermeture || hit.date_fermeture) || undefined,
+    establishments,
   };
 }
 

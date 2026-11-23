@@ -12,7 +12,7 @@ import { query } from '../db.js';
 //     par le backend au rejeu : le client n'a jamais d'état réglementaire autorisé localement ;
 //   - toute requête passe par le contexte tenant (RLS 074, échec fermé) ; la projection est
 //     en lecture seule (to_jsonb), jamais d'écriture directe sur ces tables depuis l'API.
-export const SYNC_SCHEMA_VERSION = 3; // v3 : complétude Bloc 2 (086) // v2 : quote_items, journal, e-reporting ajoutés au registre (085)
+export const SYNC_SCHEMA_VERSION = 4; // v4 : stock, réservations, achats, tâches, demandes comptable (095-102) // v3 : complétude Bloc 2 (086) // v2 : quote_items, journal, e-reporting ajoutés au registre (085)
 
 // Bloc 2 — keyColumn : clé naturelle quand la table n'a pas de colonne `id` (ex. activity_id).
 // Les exclusions restent justifiées ici : secrets/sessions/tokens (mail_accounts, google_oauth_states,
@@ -48,6 +48,14 @@ export const SYNC_ENTITIES: Record<string, { table: string; orderColumn?: string
   // Clé naturelle (084, déclencheur membre) : entity_id = user_id, pas de colonne id.
   organization_members: { table: 'organization_members', keyColumn: 'user_id', orderColumn: 'user_id', label: 'Membres de l\'organisation' },
   parts: { table: 'parts', label: 'Pièces' },
+  // Blocs 10/13/15 — consultation hors connexion des nouveaux modules (mouvements et
+  // réservations en lecture ; les réceptions et runs restent exécutés côté serveur).
+  stock_movements: { table: 'stock_movements', label: 'Mouvements de stock' },
+  part_reservations: { table: 'part_reservations', label: 'Réservations de pièces' },
+  purchase_orders: { table: 'purchase_orders', label: 'Commandes fournisseurs' },
+  purchase_order_lines: { table: 'purchase_order_lines', label: 'Lignes de commandes fournisseurs' },
+  tasks: { table: 'tasks', label: 'Tâches' },
+  accountant_requests: { table: 'accountant_requests', label: 'Demandes comptable' },
   quotes: { table: 'quotes', label: 'Devis et factures' },
   sav_cases: { table: 'sav_cases', label: 'Dossiers SAV' },
   suppliers: { table: 'suppliers', label: 'Fournisseurs' },

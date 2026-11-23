@@ -158,21 +158,48 @@ function stepActivity(slot){
   const c=state.company,q=c.configuration_data?.questionnaire||{};const a=state.activities[0]||{};
   slot.innerHTML=`<form class="stack" novalidate><h2>Votre activité</h2>
     <p class="help">Le métier adapte le catalogue, les calculs et le vocabulaire des documents. Les modules peuvent être modifiés plus tard dans Paramètres.</p>
-    <label class="field" for="ob-profile"><span>Métier</span><select id="ob-profile"><option value="">Votre choix</option>${state.profiles.map(p=>`<option value="${esc(p.code)}" ${a.profile_code===p.code?'selected':''}>${esc(p.title)}</option>`).join('')}</select><small class="help" id="ob-profile-help" aria-live="polite"></small></label>
+    <label class="field" for="ob-profile"><span>Métier</span><select id="ob-profile"><option value="">Votre choix</option>${state.profiles.map(p=>`<option value="${esc(p.code)}" ${a.profile_code===p.code?'selected':''}>${esc(p.title)}</option>`).join('')}</select><small class="help" id="ob-profile-help" aria-live="polite"></small></label><div class="profile-proposals" id="ob-proposals" aria-live="polite"></div>
     ${field('ob-custom','Activité précise',c.custom_activity||'','maxlength="240"','Ex. réparation de smartphones, plomberie, création de sites web')}
+    <label class="field" for="ob-secondary"><span>Activités secondaires ou complémentaires</span><textarea id="ob-secondary" name="ob-secondary" rows="3" maxlength="600" aria-describedby="ob-secondary-help">${esc(c.configuration_data?.secondary_activities||'')}</textarea><small class="help" id="ob-secondary-help">Facultatif — une par ligne (ex. vente d’accessoires) ; elles affinent les propositions de métier.</small></label>
     <fieldset class="ob-modules"><legend>Modules Aurion</legend>${QUESTIONS.map(([k,l])=>`<label class="field" for="ob-q-${k}"><span>${esc(l)}</span><select id="ob-q-${k}"><option value="">Votre choix</option><option ${q[k]==='Oui'?'selected':''}>Oui</option><option ${q[k]==='Non'?'selected':''}>Non</option></select></label>`).join('')}</fieldset>
     ${nav()}</form>`;
   // Préremplissage déterministe du métier à partir de l'activité (aucune IA) : proposé, jamais imposé.
-  if(!a.profile_code)api.detectProfile({name:c.activity||c.name||'',description:c.custom_activity||c.activity||'',nafCode:c.configuration_data?.naf_code||$('#ob-naf')?.value||''}).then(r=>{const sel=slot.querySelector('#ob-profile');if(sel&&!sel.value&&r?.code&&[...sel.options].some(o=>o.value===r.code)){sel.value=r.code;slot.querySelector('#ob-profile-help').textContent=`Métier proposé : ${r.title}. Vous pouvez le modifier.`}}).catch(()=>{});
+  // V2 — la liste classée est affichée avec son niveau de confiance et ses raisons ; chaque
+  // proposition peut être utilisée d'un clic (le choix n'est enregistré qu'à la validation).
+  // 15.4.45 — les activités secondaires déclarées (une par ligne) alimentent le moteur de
+  // propositions : la saisie ou la correction relance la détection (jamais la sélection).
+  const secList=()=>(document.getElementById('ob-secondary')?.value||'').split('\n').map(x=>x.trim()).filter(Boolean).slice(0,10);
+  // Traçabilité V2 : si le métier a été choisi d'un clic « Utiliser » sur une proposition,
+  // l'enregistrement devient une confirmation explicite (origine 'confirmed', journalisée)
+  // au lieu d'un choix manuel — l'utilisateur voit la bonne origine dans Paramètres.
+  let chosenFromProposal=null;
+  const runDetection=()=>api.detectProfile({name:c.activity||c.name||'',description:document.getElementById('ob-custom')?.value?.trim()||c.custom_activity||c.activity||'',nafCode:c.configuration_data?.naf_code||$('#ob-naf')?.value||'',secondaryActivities:secList(),activityId:a.id||undefined}).then(r=>{const sel=slot.querySelector('#ob-profile');if(sel&&!sel.value&&r?.code&&[...sel.options].some(o=>o.value===r.code)){sel.value=r.code;slot.querySelector('#ob-profile-help').textContent=`Métier proposé : ${r.title}. Vous pouvez le modifier.`}
+    const box=slot.querySelector('#ob-proposals');
+    if(!box)return;
+    // 15.4.46 — liste sémantique (ul/li) et nom accessible par bouton (« Utiliser » seul
+    // était ambigu pour un lecteur d'écran : chaque proposition se nomme désormais).
+    const list=(r?.proposals||[]).map(p=>`<li class="profile-proposal-row"><div><b>${esc(p.title)}</b><span class="pill">${esc(p.confidenceLabel)}</span>${(p.reasons||[]).map(x=>`<small>${esc(x)}</small>`).join('')}</div><button class="btn secondary" type="button" data-profile-use="${esc(p.profile)}" aria-label="Utiliser la proposition ${esc(p.title)}">Utiliser</button></li>`).join('');
+    if(!list){box.innerHTML='';return}
+    box.innerHTML=`<div class="section-title"><h3>Propositions de métier</h3><span class="pill">Classement automatique</span></div><ul class="profile-proposal-list">${list}</ul>${r?.requiresConfirmation?'<small class="help">Correspondance incertaine : précisez la description de votre activité ou choisissez directement le métier qui correspond le mieux.</small>':''}`;
+    box.querySelectorAll('[data-profile-use]').forEach(btn=>btn.addEventListener('click',()=>{if(sel){sel.value=btn.dataset.profileUse||'';chosenFromProposal=btn.dataset.profileUse||null;slot.querySelector('#ob-profile-help').textContent='Métier sélectionné : il sera enregistré avec votre activité.'}}));
+  }).catch(()=>{});
+  if(!a.profile_code)runDetection();
+  let obTimer;['ob-custom','ob-secondary'].forEach(id=>{const el=document.getElementById(id);el?.addEventListener('input',()=>{clearTimeout(obTimer);obTimer=setTimeout(runDetection,600)})});
   bindForm(slot,async()=>{
     const answers=Object.fromEntries(QUESTIONS.map(([k])=>[k,val(`ob-q-${k}`)]));
-    state.company=await api.updateOrganization(orgBody({customActivity:val('ob-custom')},{questionnaire:{...(state.company.configuration_data?.questionnaire||{}),...answers},completed:true}));
+    state.company=await api.updateOrganization(orgBody({customActivity:val('ob-custom')},{questionnaire:{...(state.company.configuration_data?.questionnaire||{}),...answers},completed:true,secondary_activities:val('ob-secondary')}));
     const modules={support:'support',agenda:'agenda',accounting:'accounting',parts:'easyfixit',stock:'stock'};
     for(const [k,v] of Object.entries(answers))if(v&&modules[k]){try{await api.setModule(modules[k],v==='Oui')}catch{}}
     const profileCode=val('ob-profile');
     if(a.id&&profileCode&&profileCode!==a.profile_code){
+      // Traçabilité V2 : l'enregistrement de l'activité passe d'abord (mise à jour du
+      // métier), PUIS la confirmation explicite d'une proposition est journalisée —
+      // l'ordre compte : la confirmation doit être la DERNIÈRE écriture de l'origine,
+      // sinon le choix redeviendrait 'manual' (une nouvelle décision à code différent
+      // n'est pas protégée par la non-régression).
       const updated=await api.updateActivity(a.id,{name:a.name,description:a.description||val('ob-custom')||'',profileCode,legalForm:state.company.legal_form||a.legal_form||undefined,autoFiscalDetect:true});
       state.activities=state.activities.map(x=>x.id===a.id?{...x,...updated}:x);
+      try{if(chosenFromProposal&&chosenFromProposal===profileCode)await api.profileChoice(a.id,{profileCode,confirmProposalId:chosenFromProposal})}catch{}
     }
     await saveProgress('activity');
   });

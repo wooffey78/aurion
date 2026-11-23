@@ -7,6 +7,7 @@ import{getCachedSession,setSession,invalidateSession}from'./core/session.js';
 import{renderAuth}from'./pages/auth.js';import{renderVipInvite}from'./pages/vip-invite.js';
 import{renderDashboard}from'./pages/dashboard.js';
 import{renderOnboarding}from'./pages/onboarding.js';
+import{renderPortal}from'./pages/portal.js';
 
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});window.__aurionDeferredInstall=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();window.__aurionDeferredInstall=e});
 
@@ -38,6 +39,10 @@ async function render(){
   if(r==='/legal'||r.startsWith('/legal/'))return renderLegal(r.split('/')[2]||'');
   if(r==='/transparence')return renderTransparency();
   if(r==='/withdrawal')return renderWithdrawal();
+  // 15.4.52 (PROMPT B4) — portail client invités : page PUBLIQUE consommée par token, sans
+  // session. Traitée dans le bloc des routes publiques (avant les vues authentifiées) ; les
+  // deux préfixes sont acceptés (#/portail/ canonical, #/portal/ alias de compatibilité).
+  if(r.startsWith('/portail/')||r.startsWith('/portal/'))return renderPortal(r.split('/')[2]||'');
   if(r==='/onboarding'){if(!await getSession())return go('/auth');return renderOnboarding()}
   if(r==='/dashboard'){if(!await getSession())return go('/auth');const q=routeQuery();if(q.get('billing')==='success'&&q.get('session_id')){try{await api.completeCheckout(q.get('session_id'));toast('Paiement confirmé. Votre abonnement est actif.','success')}catch(x){toast(x.message,'error')}location.hash='#/dashboard';return}return renderDashboard()}
   if(r==='/'){

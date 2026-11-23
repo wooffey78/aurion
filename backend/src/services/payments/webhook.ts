@@ -7,6 +7,7 @@
 import { createHmac, timingSafeEqual, randomUUID as cryptoRandomUUID } from 'node:crypto';
 import { query, withTenant } from '../../db.js';
 import { calculateInvoicePayment } from '../invoice-workflow.js';
+import { publishInTransaction } from '../events-outbox.js';
 
 export class PaymentWebhookError extends Error { constructor(public code: string, message: string) { super(message); } }
 
@@ -102,8 +103,10 @@ export async function processPaymentWebhook(envelope: PayWebhookEnvelope, payloa
     );
     const paidInFull = Number(link.total_ttc) + Number(penaltyRow?.total || 0) <= Number(link.amount_paid || 0) + calc.amount + 0.004;
     // Même effet que le règlement manuel : montant encaissé, statut de la facture, écriture comptable.
+    // 15.4.49 (prompt 07) : la facture réglée ne doit plus être relancée — next_reminder_at est
+    // neutralisé comme le fait déjà le règlement manuel (les relances cessent quand régularisé).
     await query(
-      "update quotes set amount_paid=$1::numeric,payment_status=$2::varchar(20),paid_at=case when $2::varchar(20)='paid' then $3::timestamptz else paid_at end,status=case when $2::varchar(20)='paid' then 'paid' else status end,updated_at=now() where id=$4::uuid and organization_id=$5::uuid",
+      "update quotes set amount_paid=$1::numeric,payment_status=$2::varchar(20),paid_at=case when $2::varchar(20)='paid' then $3::timestamptz else paid_at end,status=case when $2::varchar(20)='paid' then 'paid' else status end,next_reminder_at=case when $2::varchar(20)='paid' then null else next_reminder_at end,updated_at=now() where id=$4::uuid and organization_id=$5::uuid",
       [calc.paidAmount, calc.status, paidAt, link.invoice_id, orgId],
     );
     if (link.activity_id) {
@@ -112,6 +115,15 @@ export async function processPaymentWebhook(envelope: PayWebhookEnvelope, payloa
         [orgId, link.activity_id, calc.amount, paidAt, paymentId, `Paiement en ligne facture ${link.invoice_number || ''}`],
       );
     }
+    // Prompt 05 — paiement confirmé : événement publié dans l'outbox (livraison au journal
+    // par le worker), idempotent par identifiant de règlement.
+    await publishInTransaction({ query }, orgId, {
+      type: 'invoice_payment_confirmed',
+      idempotencyKey: `payment-confirmed:${paymentId}`,
+      sourceEntityType: 'invoice',
+      sourceEntityId: link.invoice_id,
+      payload: { title: 'Paiement en ligne confirmé', description: `Règlement en ligne confirmé par le prestataire pour la facture ${link.invoice_number || ''} (${Number(calc.amount).toFixed(2)} €).`, severity: 'success' },
+    });
     await query("update payment_links set status=$1,provider_ref=coalesce($2,provider_ref),updated_at=now() where id=$3",
       [paidInFull ? 'paid' : 'partially_paid', envelope.providerRef || null, link.id]);
     await query('update payment_webhook_events set processed_at=now() where provider=$1 and event_id=$2 and organization_id=$3', [provider, envelope.eventId, orgId]);

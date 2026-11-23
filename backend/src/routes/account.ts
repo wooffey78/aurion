@@ -9,7 +9,7 @@ import { db, query, adminDb, logAdminAccess, withTenant, beginTenant } from '../
 import { signAccessToken } from '../plugins/auth.js';
 import {
   requestPasswordReset, validateResetToken, resetPassword, changePassword, bumpSessions, currentLegalDocs, legalDocumentsReadyForContracts,
-  subscriptionState, subscriptionEvent,
+  subscriptionState, subscriptionEvent, legalAcceptanceStatus, recordAcceptances,
 } from '../services/account.js';
 import { AurionError } from '../services/errors.js';
 import { transparencySnapshot } from '../services/transparency.js';
@@ -68,6 +68,26 @@ export async function accountRoutes(app: FastifyInstance) {
     const r = await query('select kind,version,title,body,is_draft,published_at from legal_documents where kind=$1 and is_current=true', [(request.params as any).kind]);
     if (!r.rowCount) return reply.code(404).send({ error: 'NOT_FOUND' });
     return r.rows[0];
+  });
+
+  // 15.4.54 (PROMPT D2) — acceptation des documents contractuels : état par compte (bannière de
+  // re-acceptation à la montée de version) et enregistrement motivé de l'acceptation courante.
+  // Les documents en brouillon ne sont jamais exigés (décision éditeur 15.4.40 : jamais bloquants) ;
+  // le blocage dur des écritures reste une décision d'éditeur distincte (rapport 15.4.51, D2).
+  app.get('/legal/acceptance-status', { preHandler: app.requireAuth }, async (request) => {
+    return await legalAcceptanceStatus(request.auth!.userId);
+  });
+  app.post('/legal/accept', { preHandler: app.requireAuth, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const body: any = request.body || {};
+    if (body.accept !== true) return reply.code(400).send({ error: 'ACCEPT_REQUIRED', message: 'L’acceptation explicite est requise.' });
+    const ip = (request.headers['x-forwarded-for'] as string)?.split(',')[0] || request.ip;
+    const client = await db.connect();
+    try {
+      await recordAcceptances(client, request.auth!.userId, ip);
+      return await legalAcceptanceStatus(request.auth!.userId);
+    } finally {
+      client.release();
+    }
   });
 
   // Page publique « Suppression de compte » : accessible sans installer l'application,

@@ -46,3 +46,12 @@ les variables réelles.
   (`data_read_only_until`) ; les pièces comptables et factures obéissent aux obligations
   de conservation des documents commerciaux (durée exacte à confirmer juridiquement).
 - Journaux techniques : rétention à définir au bloc 24 (observabilité).
+
+---
+
+## Mise à jour 15.4.51 (PROMPT D3)
+
+- **Statut vérifié à date (23 novembre 2026)** : hébergement applicatif Render (Francfort, gratuit temporaire) → cible production OVHcloud Francfort (VPS + PostgreSQL gérée + Object Storage `de`) ; Auth0 (identité), Stripe (abonnement, si configuré), Brevo/SMTP de plateforme, Google API (connecteurs choisis par l'abonné), superviseur externe de disponibilité (au choix de l'éditeur, à ajouter ici dès configuration — PROMPT A6).
+- **Plateforme agréée de facturation électronique** : « à venir » — aucune donnée n'est transmise avant souscription d'un contrat réel (CGU art. 15-quater ; statut technique : `prepared_not_transmitted`).
+- La liste **active** reste servie dynamiquement par `GET /transparency` (calculée depuis la configuration effective) : un sous-traitant sans configuration réelle n'y figure pas.
+- Ces éléments alimentent le DPA (docs/DPA-RGPD.md, article 4) et le registre (docs/REGISTRE-TRAITEMENTS.md).

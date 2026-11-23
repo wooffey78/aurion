@@ -198,3 +198,33 @@ export async function savePrivateUpload(org: string, part: { filename: string; f
   }
   return { id: randomUUID(), safe, target, size };
 }
+
+/**
+ * Variante bloc mémoire (bloc 16) : le contenu a déjà été lu pour l'analyse par signature et
+ * le calcul d'empreinte SHA-256. Mêmes garanties : nom sûr UUID+extension, contrôle de taille,
+ * écriture atomique (drapeau wx) puis stockage privé (local ou S3).
+ */
+export async function savePrivateBuffer(org: string, filename: string, buffer: Buffer, maxBytes: number) {
+  const ext = path.extname(filename).toLowerCase().replace(/[^a-z0-9.]/g, '');
+  const safe = `${randomUUID()}${ext.length >= 2 && ext.length <= 10 ? ext : '.bin'}`;
+  const remote = !!s3Config();
+  const root = remote ? path.join(STORAGE_BASE, 'tmp', 'uploads') : privateRoot(org);
+  await mkdir(root, { recursive: true });
+  const target = path.join(root, safe);
+  try {
+    await writeFile(target, buffer, { flag: 'wx' });
+    if (buffer.length > maxBytes) throw new Error('FILE_TOO_LARGE');
+    await writePrivateObject(`private/${org}/${safe}`, buffer);
+  } catch (e) {
+    try { await unlink(target); } catch {}
+    if (String(e).includes('FILE_TOO_LARGE')) {
+      const x = new Error('FILE_TOO_LARGE'); (x as any).statusCode = 413; throw x;
+    }
+    throw e;
+  }
+  if (remote) {
+    const cleanup = setTimeout(() => { void unlink(target).catch(() => {}); }, 15 * 60_000);
+    cleanup.unref?.();
+  }
+  return { id: randomUUID(), safe, target, size: buffer.length };
+}

@@ -57,6 +57,16 @@ export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(tex
   }
 }
 
+// 15.4.52 — Exécuteur SQL conforme au type SqlExecutor ({ query }), prêt à passer aux services
+// qui acceptent un client de transaction OU un pool tenant. Avant cette version, plusieurs
+// routes coulaient la FONCTION query directement (`query as unknown as SqlExecutor`) : une
+// fonction n'a pas de méthode .query, d'où un 500 « INTERNAL_ERROR » sur ces endpoints en
+// conditions réelles (rentabilité chantier, rapport mensuel, bibliothèque de prestations,
+// fiabilité client, horaires de contrat, vue du portail invité). Toujours passer sqlExecutor
+// hors transaction, et le `client` de transaction DANS une transaction (il possède .query).
+import type { SqlExecutor } from './services/sql-executor.js';
+export const sqlExecutor: SqlExecutor = { query: (text: string, values: unknown[] = []) => query(text, values as any[]) };
+
 /** Ouvre une transaction explicite en appliquant le tenant courant (SET LOCAL, périmètre transaction uniquement). */
 export async function beginTenant(client: pg.PoolClient): Promise<void> {
   await client.query('begin');

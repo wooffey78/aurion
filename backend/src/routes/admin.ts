@@ -19,6 +19,18 @@ export async function adminRoutes(app:FastifyInstance){
   // RLS 074 : la console franchit explicitement l'isolation inter-entreprises ; chaque accès est journalisé.
   app.addHook('preHandler',async(request)=>{await logAdminAccess('admin.http',{method:request.method,path:request.url.split('?')[0],userId:request.auth?.userId})});
   app.get('/admin/me',async r=>({admin:true,userId:r.auth!.userId}));
+  // 15.4.51 (PROMPT A4) — supervision transverse des lettres mortes de l'outbox : liste des
+  // événements en échec définitif toutes organisations confondues, pour l'exploitation.
+  // Lecture seule : le rejeu organisant reste celui de /journal/outbox/:id/replay (motif requis).
+  app.get('/admin/outbox/dead-lettered',async()=>{
+    const rows=(await query(
+      `select e.id,e.event_type as "eventType",e.organization_id as "organizationId",o.name as "organizationName",
+              e.attempts,e.last_error as "lastError",e.created_at as "createdAt",e.processed_at as "processedAt"
+       from business_events_outbox e join organizations o on o.id=e.organization_id
+       where e.status='dead_lettered'
+       order by e.created_at desc limit 200`,[])).rows;
+    return { deadLettered: rows.length, events: rows };
+  });
   app.get('/admin/stats',async()=>{
     const totals=(await query(`
       with org_access as (
@@ -257,5 +269,26 @@ export async function adminRoutes(app:FastifyInstance){
       doc.end();
     });
     reply.header('Content-Type','application/pdf').header('Content-Disposition','attachment; filename="aurion-invites-vip.pdf"').send(buffer);
+  });
+
+  // V2 — export d'exploitation du journal des propositions de métiers (audit/traçabilité).
+  // Console d'administration uniquement (RLS franchie explicitement et journalisée par les
+  // hooks ci-dessus) ; filtre facultatif par organisation ; export plafonné et daté.
+  app.get('/admin/profile-proposal-journal.csv',async(request,reply)=>{
+    const orgId=String((request.query as any)?.organizationId||'').trim();
+    const sql=`select p.created_at,p.kind,p.organization_id,p.activity_id,p.profile_code,p.confidence,p.reasons,p.proposal,a.name activity_name
+      from profile_proposal_events p left join activities a on a.id=p.activity_id
+      ${orgId?'where p.organization_id=$1':''} order by p.created_at desc limit 5000`;
+    const rows=(await query(sql,orgId?[orgId]:[])).rows as any[];
+    const cell=(v:any)=>`"${String(v===null||v===undefined?'':v).replaceAll('"','""')}"`;
+    const lines=rows.map(r=>[
+      r.created_at instanceof Date?r.created_at.toISOString():r.created_at,
+      r.kind,r.organization_id,r.activity_name||r.activity_id,r.profile_code||'',r.confidence||'',
+      Array.isArray(r.reasons)?r.reasons.map((x:any)=>typeof x==='string'?x:(x?.reason||'')).join(' | '):'',
+      r.proposal?JSON.stringify(r.proposal):'',
+    ].map(cell).join(';'));
+    reply.header('Content-Type','text/csv; charset=utf-8').header('Content-Disposition','attachment; filename="aurion-journal-propositions-metiers.csv"');
+    // BOM UTF-8 : ouverture directe dans un tableur avec les accents corrects.
+    return '\uFEFF'+['date;evenement;organisation;activite;metier;confiance;raisons;contenu_propose',...lines].join('\r\n');
   });
 }

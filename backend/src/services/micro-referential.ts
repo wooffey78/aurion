@@ -35,6 +35,11 @@ export interface MicroReferentialVersion {
   effectiveTo: string | null;
   source: string;
   verifiedOn: string;
+  /** Métadonnées 105 (prompt 04) — présentes uniquement pour les versions lues en base. */
+  publishedOn?: string | null;
+  jurisdiction?: string | null;
+  scope?: string | null;
+  verificationStatus?: string | null;
   rates: MicroRate[];
 }
 
@@ -78,7 +83,7 @@ const CATEGORY_OF = (c: string): SplitCategory => {
 export async function loadReferentialVersions(client?: { query: (sql: string, params?: unknown[]) => Promise<any> }): Promise<MicroReferentialVersion[]> {
   try {
     const ex = client ?? { query };
-    const versions = (await ex.query('select id,version,effective_from,effective_to,source,verified_on from micro_referential_versions order by effective_from asc')).rows;
+    const versions = (await ex.query('select id,version,effective_from,effective_to,source,verified_on,published_on,jurisdiction,scope,verification_status from micro_referential_versions order by effective_from asc')).rows;
     if (!versions.length) return BUILTIN_VERSIONS;
     const rates = (await ex.query('select version_id,category,label,social_rate,cfp_rate,tax_rate,basis from micro_rates order by category')).rows;
     const byVersion = new Map<string, any[]>();
@@ -90,6 +95,12 @@ const iso = (d: unknown) => d instanceof Date ? d.toISOString().slice(0, 10) : S
       effectiveTo: v.effective_to ? iso(v.effective_to) : null,
       source: String(v.source),
       verifiedOn: iso(v.verified_on),
+      // Prompt 04 — métadonnées complètes (publication, juridiction, champ d'application,
+      // statut de vérification) : exposées telles quelles, sans valeur inventée.
+      publishedOn: v.published_on ? iso(v.published_on) : null,
+      jurisdiction: v.jurisdiction ?? null,
+      scope: v.scope ?? null,
+      verificationStatus: v.verification_status ?? null,
       rates: (byVersion.get(String(v.id)) || []).map((r: any) => ({
         category: CATEGORY_OF(String(r.category)),
         label: String(r.label),

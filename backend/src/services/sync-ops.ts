@@ -46,6 +46,9 @@ const ALLOWED_PATH_PATTERNS: RegExp[] = [
   /^\/expense-reports(\/[A-Za-z0-9-]+)?$/,
   /^\/activities(\/[A-Za-z0-9-]+)?$/,
   /^\/quotes(\/[A-Za-z0-9-]+)?(\/invoice)?$/,
+  /^\/quotes\/[A-Za-z0-9-]+\/(accept|reject|cancel)$/, // 106 — décisions explicites du cycle commercial (idempotence : re-decision fermée → 409 honnête)
+  /^\/clients\/[A-Za-z0-9-]+\/(archive|unarchive|merge)$/, // 107 — archivage réversible et fusion auditée
+  /^\/agenda\/unavailabilities(\/[A-Za-z0-9-]+)?$/, // 108 — indisponibilités d'agenda
   /^\/invoices\/[A-Za-z0-9-]+\/(payments|installments|reminders|penalty|payment-link)$/,
   /^\/settings\/draft$/,
   /^\/document-template-choices$/,

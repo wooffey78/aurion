@@ -46,3 +46,14 @@ Un test de restauration est la seule preuve que les sauvegardes servent à quelq
 - L'instance historique `aurion-web` (Oregon) reste la voie de retour arrière pendant la bascule ; après bascule DNS + fenêtre de retour, la supprimer dans Render (elle est hors blueprint, la synchronisation ne la touchera pas).
 - Retour applicatif : redéployer l'image/commit précédent via « Manual Deploy » ; ne jamais revenir en arrière sur le schéma de base sans sauvegarde préalable et décision explicite (les migrations sont additives).
 - Incident de données : figer les écritures, restaurer selon la section 3 sur l'environnement jetable, comparer, puis basculer. Toute suppression de données source est précédée d'un inventaire et respecte les durées de conservation comptables.
+
+---
+
+## Mise à jour 15.4.51 — sauvegarde quotidienne orchestrée (PROMPT A5)
+
+Le script `backend/scripts/backup-nightly.mjs` enchaîne : dump `backup-db.mjs` → vérification de lisibilité → rétention → **journal JSON** (`--out/backup-log.json` ou chemin `AURION_BACKUP_LOG_PATH`, exposé dans `/health` : `lastBackupAt`) → copie facultative vers un second emplacement (`--secondary`, règle 3-2-1).
+
+- Planification recommandée : cron du VPS OVH — `30 2 * * * node /opt/aurion/backend/scripts/backup-nightly.mjs --out /var/backups/aurion --prune-days 30 --secondary /mnt/backup2/aurion` (chemins à adapter).
+- Alerte d'absence : si `lastBackupAt` date de plus de 26 h, l'alerte quotidienne des lettres mortes (même canal e-mail d'exploitation) le signale ; la supervision externe de `/health` peut également surveiller ce champ.
+- La clé de chiffrement reste sauvegardée SÉPARÉMENT des données (règle §2 inchangée) : sans elle, les secrets et fichiers chiffrés sont illisibles après restauration.
+- Test de restauration (§3) : à rejouer AVANT l'ouverture commerciale puis au moins une fois pendant le pilote (critère F5-6 de docs/PILOTE-SUIVI.md). Statuts honnêtes : voir docs/GO-LIVE-15.4.51.md.

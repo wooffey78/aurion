@@ -7,6 +7,8 @@
 // elle n'est jamais appliquée silencieusement (détection au clic, proposition
 // « appliquer / ignorer », valeurs de l'utilisateur conservées).
 import type { MicroCategoryCode } from './micro-referential.js';
+import { MICRO_CATEGORIES } from './micro-referential.js';
+import { PROFILE_CODES, RULES, EXTRA_KEYWORDS } from './profiles.js';
 
 export interface CategoryProposal {
   nafCode: string;
@@ -115,8 +117,8 @@ export const NAF_PROFILE_HINTS: { prefix: string; profile: string; note: string 
   { prefix: '95.25', profile: 'smartphone-repair', note: 'Réparation d’articles personnels (téléphones) → réparation smartphone.' },
   { prefix: '43.21', profile: 'electrical', note: 'Installation électrique → électricité / domotique.' },
   { prefix: '43.22', profile: 'plumbing', note: 'Plomberie / chauffage → plomberie / chauffage.' },
-  { prefix: '43.31', profile: 'building', note: 'Peinture / vitrerie → bâtiment / rénovation.' },
-  { prefix: '43.34', profile: 'building', note: 'Menuiserie intérieure → bâtiment / rénovation.' },
+  { prefix: '43.31', profile: 'building', note: 'Travaux de plâtrerie → bâtiment / rénovation.' },
+  { prefix: '43.34', profile: 'building', note: 'Travaux de peinture et vitrerie → bâtiment / rénovation.' },
   { prefix: '43.39', profile: 'building', note: 'Finitions du bâtiment → bâtiment / rénovation.' },
   { prefix: '96.02', profile: 'beauty', note: 'Coiffure / soins de beauté → coiffure / esthétique.' },
   { prefix: '96.04', profile: 'beauty', note: 'Entretien corporel (massage) → bien-être.' },
@@ -160,6 +162,43 @@ export const NAF_PROFILE_HINTS: { prefix: string; profile: string; note: string 
   { prefix: '47.19', profile: 'retail', note: 'Autre commerce de détail → commerce de détail.' },
   { prefix: '31.09', profile: 'handcraft', note: 'Fabrication de meubles → artisanat / création.' },
   { prefix: '32.99', profile: 'handcraft', note: 'Fabrication d’objets → artisanat / création.' },
+  // Calibrage étendu (chantier 3, 15.4.44) : divisions et sous-divisions NAF révision 2
+  // courantes du micro, préfixes disjoints des entrées existantes ; les notes décrivent la
+  // division (elles restent indicatives : jamais une preuve des prestations réelles).
+  { prefix: '41.20', profile: 'building', note: 'Construction de bâtiments → bâtiment / rénovation (régime des constructions à confirmer).' },
+  { prefix: '43.32', profile: 'building', note: 'Travaux de menuiserie bois et PVC → bâtiment / rénovation.' },
+  { prefix: '43.33', profile: 'building', note: 'Travaux de revêtement des sols et des murs (carrelage) → bâtiment / rénovation.' },
+  { prefix: '43.91', profile: 'building', note: 'Travaux de couverture (toiture) → bâtiment / rénovation.' },
+  { prefix: '43.99', profile: 'building', note: 'Autres travaux spécialisés de construction → bâtiment / rénovation.' },
+  { prefix: '45.20', profile: 'auto', note: 'Entretien et réparation de véhicules automobiles → garage / mécanique.' },
+  { prefix: '45.31', profile: 'auto', note: 'Commerce de voitures → garage (vente : règles BIC spécifiques à confirmer).' },
+  { prefix: '49.39', profile: 'transport', note: 'Transports terrestres de voyageurs → transport.' },
+  { prefix: '52.29', profile: 'transport', note: 'Services auxiliaires de transport (logistique) → transport / livraison.' },
+  { prefix: '55.30', profile: 'hospitality', note: 'Camping et parcs de caravanes → hébergement touristique.' },
+  { prefix: '55.90', profile: 'hospitality', note: 'Autres hébergements touristiques → hébergement / location meublée.' },
+  { prefix: '56.29', profile: 'catering', note: 'Autres services de restauration → traiteur / restauration (règles spécifiques à confirmer).' },
+  { prefix: '62.03', profile: 'web-development', note: 'Gestion d’installations informatiques → informatique / maintenance.' },
+  { prefix: '62.09', profile: 'web-development', note: 'Autres services informatiques → développement / maintenance.' },
+  { prefix: '63.11', profile: 'web-development', note: 'Traitement de données et hébergement → hébergement web / informatique.' },
+  { prefix: '69.20', profile: 'consulting', note: 'Activités comptables → conseil / gestion (réglementation comptable à confirmer).' },
+  { prefix: '70.21', profile: 'creative', note: 'Relations publiques et communication → communication.' },
+  { prefix: '70.22', profile: 'consulting', note: 'Conseil pour les affaires et le management → conseil / gestion.' },
+  { prefix: '74.10', profile: 'creative', note: 'Activités de design et graphisme → graphisme / création visuelle.' },
+  { prefix: '78.10', profile: 'consulting', note: 'Agences de placement (RH) → accompagnement / gestion des ressources humaines.' },
+  { prefix: '80.30', profile: 'security', note: 'Activités d’enquêtes → sécurité (profession réglementée à confirmer).' },
+  { prefix: '81.29', profile: 'cleaning', note: 'Autres services d’entretien (désinfection) → nettoyage / entretien.' },
+  { prefix: '85.32', profile: 'lessons', note: 'Enseignement technique et professionnel → cours / formation.' },
+  { prefix: '85.52', profile: 'lessons', note: 'Enseignement culturel (musique, langues) → cours.' },
+  { prefix: '85.53', profile: 'sport', note: 'Clubs de sports → coaching sportif.' },
+  { prefix: '88.51', profile: 'childcare', note: 'Crèches et garde d’âge préscolaire → garde d’enfants (régime spécifique à confirmer).' },
+  { prefix: '90.02', profile: 'events', note: 'Soutien au spectacle vivant → événementiel / spectacle.' },
+  { prefix: '95.22', profile: 'couture', note: 'Réparation d’articles personnels (vêtements) → couture / retouches.' },
+  { prefix: '95.23', profile: 'couture', note: 'Réparation de chaussures et articles en cuir → retouches / maroquinerie.' },
+  { prefix: '01.11', profile: 'agriculture', note: 'Culture de céréales → agriculture (MSA à confirmer).' },
+  { prefix: '01.47', profile: 'agriculture', note: 'Élevage de volailles → agriculture (MSA à confirmer).' },
+  { prefix: '32.12', profile: 'handcraft', note: 'Bijouterie fantaisie → bijoux / création.' },
+  { prefix: '47.75', profile: 'retail', note: 'Vente de produits cosmétiques et d’hygiène → commerce de détail.' },
+  { prefix: '47.78', profile: 'retail', note: 'Autres commerces de détail spécialisés → commerce de détail.' },
 ];
 
 /** Suggère un métier (profil) à partir d'un code APE/NAF détecté — proposition indicative. */
@@ -201,5 +240,270 @@ export function proposeCategoryFromNaf(nafCode: unknown, atISO = new Date().toIS
     note: rule.note,
     source: PROPOSAL_SOURCE,
     proposedAt: atISO.slice(0, 10),
+  };
+}
+
+// ── V2 (chantier 2) — Moteur de propositions de métiers ────────────────────────────
+// Conception V2 : classement multi-signaux de plusieurs profils métiers, niveaux de
+// confiance explicites et expliqués, conservation systématique des choix manuels.
+// Le moteur est DÉTERMINISTE et LOCAL (aucun service d'IA distante — standard posé en
+// 15.4.0 avec le retrait de l'IA et respecté par bordereau-parser). Il ne sait PAS
+// écrire : il ne touche jamais la sélection retenue (activity_profile_overrides) —
+// seule une action utilisateur explicite l'écrit, via les routes prévues.
+//
+// Pondérations documentées (score entier interne, plafonné à 100, jamais affiché
+// comme un pourcentage de certitude) — CENTRALISÉES dans la constante unique
+// PROPOSAL_TUNING ci-dessous, conformément à l'exigence de conception : « les seuils
+// de classement doivent être centralisés et configurables, et non dispersés dans
+// plusieurs fichiers ». Ajuster un poids ou un seuil se fait à un seul endroit.
+//   - code APE/NAF précis (préfixe connu)       : +50
+//   - mots-clés de la description de l'activité : +10 par mot-clé reconnu, max +25
+//   - mots-clés du nom de l'activité            : +15 (si au moins un mot-clé)
+//   - prestations du catalogue correspondantes  : +6 par prestation, max +24
+//   - pièces du catalogue correspondantes       : +4 par pièce, max +12
+//     (catalogue plafonné à +30 au total)
+//   - activités secondaires ou complémentaires  : +8 par mot-clé reconnu, max +15
+export const PROPOSAL_TUNING = {
+  /** Code APE/NAF précis (préfixe de règle connue vers ce profil). */
+  nafPrecisePoints: 50,
+  /** Mots-clés de la description de l'activité (+10 par mot-clé reconnu). */
+  descriptionPerKeyword: 10,
+  descriptionCap: 25,
+  /** Mots-clés du nom de l'activité (forfait si au moins un mot-clé reconnu). */
+  nameMatchPoints: 15,
+  /** Prestations du catalogue correspondantes (+6 par prestation reconnue). */
+  servicePerMatch: 6,
+  /** Pièces du catalogue correspondantes (+4 par pièce reconnue). */
+  partPerMatch: 4,
+  /** Plafond de la famille catalogue (prestations + pièces cumulées). */
+  catalogueCap: 30,
+  /** Activités secondaires ou complémentaires (+8 par mot-clé reconnu). */
+  secondaryPerKeyword: 8,
+  secondaryCap: 15,
+  /** Plafond du score interne (jamais affiché comme un pourcentage de certitude). */
+  maxScore: 100,
+  /** Nombre maximal de propositions affichées (conception : une liste de 2 à 5). */
+  maxProposals: 5,
+  /** Catalogue étayé seul : nombre de prestations reconnues à partir duquel la
+   * correspondance devient « moyen » (plausible, à confirmer). */
+  catalogueAloneThreshold: 2,
+  /** Contradiction : score texte minimal d'un profil concurrent pour signaler que le
+   * code NAF pointe ici alors que le texte (description, catalogue) désigne nettement
+   * un autre métier (conception V2, tableau 2 des critères de confiance). */
+  textContradictionThreshold: 20,
+} as const;
+//
+// Échelle de confiance (mapping déterministe, critères écrits ici et testés par contrat,
+// conformes au tableau 2 de la conception V2) :
+//   - très élevé : code NAF précis ET au moins deux autres familles concordantes ET
+//                  aucune contradiction détectée ;
+//   - élevé      : code NAF précis ET au moins une autre famille ; OU trois familles
+//                  ou plus concordantes sans code NAF précis ; une contradiction
+//                  détectée et AFFICHÉE (raison sourcée) compte comme « expliquée » :
+//                  elle bloque le niveau très élevé sans rétrograder le niveau élevé ;
+//   - moyen      : code NAF précis seul ; OU deux familles concordantes sans code NAF
+//                  précis ; OU catalogue étayé seul (au moins deux prestations reconnues) ;
+//   - faible     : un seul signal non étayé ou aucun (demande de confirmation requise).
+export interface ProfileProposal {
+  profile: string;
+  score: number;
+  confidence: 'tres-eleve' | 'eleve' | 'moyen' | 'faible';
+  confidenceLabel: string;
+  reasons: string[];
+  /** Signaux contradictoires détectés entre familles (conception V2, tableau 2 :
+   * « signaux contradictoires entre familles »). Cités comme raisons sourcées et
+   * affichés à l'utilisateur ; bloquent le niveau « très élevé ». */
+  contradictions: string[];
+  category: MicroCategoryCode | null;
+  categoryLabel: string | null;
+  matchedNaf: string | null;
+}
+
+export interface ProfileSignals {
+  nafCode?: string | null;
+  name?: string | null;
+  description?: string | null;
+  services?: string[] | null;
+  parts?: string[] | null;
+  secondaryActivities?: string[] | null;
+}
+
+export interface ProfileProposalsResult {
+  proposals: ProfileProposal[];
+  requiresConfirmation: boolean;
+  source: string;
+}
+
+export const PROFILE_PROPOSAL_SOURCE =
+  'Moteur de propositions Aurion (V2) — propositions classées, indicatives et expliquées ; jamais appliquées sans confirmation explicite.';
+
+const CONFIDENCE_LABELS: Record<ProfileProposal['confidence'], string> = {
+  'tres-eleve': 'Très élevé — correspondance particulièrement forte',
+  eleve: 'Élevé — correspondance cohérente et bien étayée',
+  moyen: 'Moyen — correspondance plausible, à confirmer',
+  faible: 'Faible — correspondance incertaine, informations complémentaires nécessaires',
+};
+
+/** Texte normalisé (minuscules, sans accents) pour la comparaison des mots-clés. */
+function normText(s: unknown): string {
+  return String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function uniq(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
+/** Fragments réellement reconnus d'un profil dans un texte (preuves citables, sans doublons). */
+function matchedKeywords(text: string, code: string): string[] {
+  if (!text) return [];
+  const raw = String(text).toLowerCase();
+  const nrm = normText(text);
+  const frags: string[] = [];
+  for (const [c, re] of RULES) {
+    if (c !== code) continue;
+    const m = re.exec(raw) || re.exec(nrm);
+    if (m?.[0]) frags.push(m[0].trim());
+  }
+  for (const w of EXTRA_KEYWORDS[code] || []) {
+    if (raw.includes(w) || nrm.includes(normText(w))) frags.push(w);
+  }
+  return uniq(frags.map(f => f.trim()).filter(Boolean));
+}
+
+/** Propose plusieurs métiers classés par pertinence à partir de tous les signaux disponibles.
+ * Sortie pure (aucune écriture) : la sélection retenue n'est modifiée que par une action
+ * utilisateur explicite (routes dédiées), conformément à l'invariant V2 de conservation
+ * des choix manuels. */
+export function proposeProfilesFromSignals(signals: ProfileSignals): ProfileProposalsResult {
+  const tuning = PROPOSAL_TUNING;
+  const nafRaw = String(signals.nafCode ?? '').trim();
+  const name = String(signals.name ?? '');
+  const description = String(signals.description ?? '');
+  const services = Array.isArray(signals.services) ? signals.services.map(v => String(v)).filter(Boolean) : [];
+  const parts = Array.isArray(signals.parts) ? signals.parts.map(v => String(v)).filter(Boolean) : [];
+  const secondary = Array.isArray(signals.secondaryActivities) ? signals.secondaryActivities.map(v => String(v)).filter(Boolean) : [];
+
+  // Signaux NAF calculés une fois : préfixes précis vers un profil + catégorie micro cohérente.
+  const nafNormalized = nafRaw.toUpperCase().replace(/[^0-9.]/g, '');
+  const nafHints = nafNormalized ? NAF_PROFILE_HINTS.filter(h => nafNormalized.startsWith(h.prefix)) : [];
+  const nafCategory = nafRaw ? proposeCategoryFromNaf(nafRaw) : null;
+
+  // Passe 1 — score de chaque profil candidat depuis toutes les familles de signaux.
+  type Draft = {
+    code: string;
+    score: number;
+    textScore: number;
+    families: string[];
+    svcCount: number;
+    reasons: string[];
+    hint: (typeof nafHints)[number] | null;
+  };
+  const drafts: Draft[] = [];
+  for (const code of PROFILE_CODES) {
+    const reasons: string[] = [];
+    const families: string[] = [];
+    let score = 0;
+    let textScore = 0;
+    // 1) Code APE/NAF précis (préfixe connu) — signal « registre », hors score texte.
+    const hint = nafHints.find(h => h.profile === code) || null;
+    if (hint) {
+      score += tuning.nafPrecisePoints;
+      families.push('naf');
+      reasons.push(`Code APE/NAF ${nafRaw} (INSEE) : ${hint.note}`);
+    }
+    // 2) Description de l'activité renseignée par l'utilisateur.
+    const desc = matchedKeywords(description, code);
+    if (desc.length) {
+      const pts = Math.min(tuning.descriptionCap, desc.length * tuning.descriptionPerKeyword);
+      score += pts; textScore += pts;
+      families.push('description');
+      reasons.push(`Description de l'activité : « ${desc.slice(0, 3).join(' », « ')} »`);
+    }
+    // 3) Nom de l'activité.
+    const nm = matchedKeywords(name, code);
+    if (nm.length) {
+      score += tuning.nameMatchPoints; textScore += tuning.nameMatchPoints;
+      families.push('nom');
+      reasons.push(`Nom de l'activité : « ${nm.slice(0, 2).join(' », « ')} »`);
+    }
+    // 4) Prestations et pièces effectivement proposées (catalogue réel).
+    const svc = uniq(services.map(s => matchedKeywords(s, code)[0]).filter(Boolean) as string[]);
+    const prt = uniq(parts.map(s => matchedKeywords(s, code)[0]).filter(Boolean) as string[]);
+    if (svc.length) reasons.push(`Prestations du catalogue : « ${svc.slice(0, 3).join(' », « ')} »`);
+    if (prt.length) reasons.push(`Pièces du catalogue : « ${prt.slice(0, 3).join(' », « ')} »`);
+    if (svc.length || prt.length) {
+      const pts = Math.min(tuning.catalogueCap, svc.length * tuning.servicePerMatch + prt.length * tuning.partPerMatch);
+      score += pts; textScore += pts;
+      families.push('catalogue');
+    }
+    const svcCount = svc.length + prt.length;
+    // 5) Activités secondaires ou complémentaires déclarées.
+    const sec = uniq(secondary.map(s => matchedKeywords(s, code)[0]).filter(Boolean) as string[]);
+    if (sec.length) {
+      const pts = Math.min(tuning.secondaryCap, sec.length * tuning.secondaryPerKeyword);
+      score += pts; textScore += pts;
+      families.push('secondaire');
+      reasons.push(`Activités secondaires : « ${sec.slice(0, 2).join(' », « ')} »`);
+    }
+    if (!score) continue;
+    drafts.push({ code, score, textScore, families, svcCount, reasons, hint });
+  }
+
+  // Contradiction (conception V2, tableau 2) : profil qui ressort LE PLUS fort du texte
+  // hors code NAF. Déterministe — égalité départagée par code de profil.
+  const textLeader = drafts
+    .filter(d => d.textScore >= tuning.textContradictionThreshold)
+    .sort((a, b) => b.textScore - a.textScore || (a.code < b.code ? -1 : 1))[0] || null;
+
+  // Passe 2 — niveau de confiance, contradiction, données manquantes, classement.
+  const proposals: ProfileProposal[] = drafts.map(d => {
+    const nafPrecis = d.families.includes('naf');
+    const others = d.families.filter(f => f !== 'naf').length;
+    let confidence: ProfileProposal['confidence'];
+    if (nafPrecis && others >= 2) confidence = 'tres-eleve';
+    else if (nafPrecis && others === 1) confidence = 'eleve';
+    else if (nafPrecis) confidence = 'moyen';
+    else if (d.families.length >= 3) confidence = 'eleve';
+    else if (d.families.length === 2) confidence = 'moyen';
+    else if (d.families[0] === 'catalogue' && d.svcCount >= tuning.catalogueAloneThreshold) confidence = 'moyen';
+    else confidence = 'faible';
+
+    // Contradiction : le code NAF précis pointe ici alors que le texte désigne nettement
+    // un autre profil. Critère du tableau 2 : « très élevé » exige l'absence de
+    // contradiction ; expliquée par une raison sourcée, elle ne rétrograde pas « élevé ».
+    const contradictions: string[] = [];
+    if (nafPrecis && textLeader && textLeader.code !== d.code) {
+      contradictions.push(`Signal contraire : la description et le catalogue ressortent pour « ${textLeader.code} » alors que le code APE/NAF pointe ici — décision à l'utilisateur.`);
+    }
+    if (confidence === 'tres-eleve' && contradictions.length) confidence = 'eleve';
+
+    // Raisons (2 à 4, courtes et sourcées) : preuves d'abord, contradiction ensuite,
+    // données manquantes enfin (exigence §5 : expliquer aussi les données manquantes).
+    const out: string[] = d.reasons.slice(0, contradictions.length ? 3 : 4);
+    out.push(...contradictions);
+    if (!nafRaw) out.push('Donnée manquante : aucun code APE/NAF exploitable — la correspondance ne s’appuie pas sur le registre.');
+    if (!description.trim()) out.push('Donnée manquante : aucune description d’activité — ajoutez-la pour affiner le classement.');
+    if (!services.length && !parts.length) out.push('Donnée manquante : aucune prestation ni pièce du catalogue reconnue.');
+    if (out.length < 2) out.push('Correspondance incertaine : informations complémentaires nécessaires avant confirmation.');
+    return {
+      profile: d.code,
+      score: Math.min(tuning.maxScore, d.score),
+      confidence,
+      confidenceLabel: CONFIDENCE_LABELS[confidence],
+      reasons: out.slice(0, 4),
+      contradictions,
+      category: nafCategory?.category ?? null,
+      categoryLabel: nafCategory ? MICRO_CATEGORIES[nafCategory.category] : null,
+      matchedNaf: d.hint ? nafRaw : null,
+    };
+  })
+    .sort((a, b) => b.score - a.score || (a.profile < b.profile ? -1 : 1))
+    .slice(0, tuning.maxProposals);
+
+  const best = proposals[0];
+  return {
+    proposals,
+    requiresConfirmation: !best || best.confidence === 'faible',
+    source: PROFILE_PROPOSAL_SOURCE,
   };
 }
