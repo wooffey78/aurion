@@ -95,7 +95,7 @@ jobs:
 
       - name: Upload integration skip report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: aurion-integration-tests-${{ github.sha }}
           path: |
@@ -141,7 +141,7 @@ jobs:
           sha256sum dist-artifacts/*.zip
 
       - name: Upload complete source archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: aurion-source-${{ github.sha }}
           path: |
