@@ -1108,3 +1108,38 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="
 .portal-quote-body strong{font-size:1.15rem}
 .portal-quote .pill.ok{background:#e7f3ef;color:#2c4f58}
 @media (max-width:640px){.portal-card{padding:16px}.portal-quote-body{grid-template-columns:1fr}}
+
+/* ============================================================
+   Aurion 15.4.53 — harmonisation design : graphiques au choix, encarts
+   chantiers, alertes au thème clair. Jetons d'accent ajoutés à la charte
+   15.2.50 : --accent = bleu fonctionnel, --accent-2 = vert (série
+   secondaire). Réglages à base de jetons, aucune palette hors charte.
+   ============================================================ */
+:root{--accent:#0f2aa6;--accent-2:#166534}
+/* Barre de types de graphique (charts.js) : contrôle segmenté au design
+   Aurion, même grammaire visuelle que .auth-tabs et .settings-nav. */
+.chart-toolbar{display:inline-flex;flex-wrap:wrap;gap:4px;background:var(--bg2);border:1px solid var(--line);border-radius:11px;padding:4px;margin:6px 0 10px}
+.chart-type-btn{border:1px solid transparent;background:transparent;color:var(--muted);padding:8px 12px;border-radius:8px;font-weight:650;min-height:36px;display:inline-flex;align-items:center;gap:7px;font-size:.86rem}
+.chart-type-btn:hover{color:var(--text);background:color-mix(in srgb,var(--accent) 7%,var(--panel))}
+.chart-type-btn.active{background:var(--panel);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 35%,var(--line))}
+.chart-type-btn:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.chart-container{min-height:120px}
+.chart-wrap,.chart-pie-wrap{color:var(--text)}
+.chart-pie-wrap{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:14px;align-items:center}
+.chart-legend{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:.86rem;color:var(--text)}
+.chart-legend li{display:flex;align-items:center;gap:8px}
+.legend-dot{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+@media(max-width:640px){.chart-pie-wrap{grid-template-columns:1fr}}
+/* Encarts chantiers : filtre de statut et listes alignés sur les composants existants. */
+.section-title .field.section-filter{margin-left:auto;min-width:180px;max-width:240px}
+.section-title .field.section-filter select{min-height:38px;padding:8px 10px}
+#chantier-charts>.panel{margin-top:12px}
+.chantier-reasons{margin:10px 0 0;padding-left:18px}
+/* Alertes au thème clair : rouge de la charte, jamais l'ancien rose sombre. */
+.error{color:var(--red)!important}
+.alert-loss{background:#f6e7e7!important;border-color:#e5a6a6!important;color:var(--red)!important}
+/* Dialogues de confirmation : icône lisible au thème clair, variante danger rouge. */
+.confirm-icon{color:#193b68;background:#dce9f9;border-color:#9fbde0;box-shadow:none}
+.confirm-icon.danger{color:var(--red);background:#f6e7e7;border-color:#e5a6a6;box-shadow:none}
+/* Bannière de re-acceptation contractuelle : cohérente avec les .notice. */
+.legal-accept-bar{margin:0 0 16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px}

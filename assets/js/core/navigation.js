@@ -6,6 +6,7 @@ export const NAV_ITEMS=[
   {id:'catalog',label:'Catalogue métier',icon:'◈'},
   {id:'suppliers',label:'Fournisseurs',icon:'▱'},
   {id:'invoices',label:'Devis & factures',icon:'▧'},
+  {id:'templates',label:'Modèles de documents',icon:'▤'},
   {id:'agenda',label:'Agenda',icon:'◷'},
   {id:'accounting',label:'Comptabilité & trésorerie',icon:'∑'},
   {id:'support',label:'Support Aurion',icon:'?'},

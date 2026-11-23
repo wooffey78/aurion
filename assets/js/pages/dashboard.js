@@ -11,12 +11,12 @@ import*as quote from'./dash/quote.js';
 import*as docs from'./dash/docs.js';
 import*as settings from'./dash/settings.js';
 import*as account from'./dash/account.js';
-import{home,clients,agenda,accounting,treasury,support,admin}from'./dash/other.js';
+import{home,clients,agenda,accounting,treasury,support,templates,admin}from'./dash/other.js';
 import{chantiers}from'./dash/chantiers.js';
 import{loadProfileFeatures,cachedFlags}from'../core/profile-features.js';
 import{setCloudOwner}from'../core/cloud-sync.js';
 
-const VIEWS={home,clients,chantiers,catalog,suppliers,quote,invoices:docs,agenda,accounting,treasury,support,settings,account,admin};
+const VIEWS={home,clients,chantiers,catalog,suppliers,quote,invoices:docs,templates,agenda,accounting,treasury,support,settings,account,admin};
 
 // Garde-fous de rafraîchissement : ne jamais remplacer l’écran en pleine interaction.
 let metricsRefreshInProgress = false;
@@ -44,6 +44,7 @@ const DATASETS={
   accounting:['accounting','treasury','quotes','sav','expenseReports'],
   treasury:['treasury','accounting','quotes','sav','expenseReports'],
   settings:['templates','mail'],
+  templates:['templates','mail'],
   home:['clients','quotes','appointments'], 
 };
 const ALL_DATASETS=[...new Set(Object.values(DATASETS).flat())];
