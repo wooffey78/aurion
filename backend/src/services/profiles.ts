@@ -432,30 +432,69 @@ export const RULES: [string, RegExp][] = [
 export const PROFILE_CODES = Object.keys(DEFS);
 export function listProfiles() { return PROFILE_CODES.map(c => ({ code: c, title: DEFS[c]!.title, summary: DEFS[c]!.summary })); }
 
+// 15.4.55 — robustesse de la détection : les saisies réelles contiennent des apostrophes
+// typographiques (« l'électricité », « chambres d’hôtes »), des espaces insécables et des
+// accents dont certaines variantes de mots-clés ne disposent pas. Le texte est donc testé
+// TEL QUE SAISI (minuscules) ET sous forme repliée (accents supprimés, apostrophes droitifiées) :
+// jamais de régression (le match sur le texte d'origine reste vérifié), seulement des gains.
+const FOLDED_KEYWORDS = new Map<string, string>();
+
+function foldText(value: string): string {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/[’‘‛]/g, "'")
+    .replace(/[\u00a0\u202f\u2009]/g, ' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function foldedKeyword(word: string): string {
+  let folded = FOLDED_KEYWORDS.get(word);
+  if (folded === undefined) {
+    folded = foldText(word);
+    FOLDED_KEYWORDS.set(word, folded);
+  }
+  return folded;
+}
+
 /** Métier reconnu par le vocabulaire complémentaire (score de mots-clés), ou null. */
 function keywordProfile(text: string) {
   let best: string | null = null, bestScore = 0;
   for (const [code, words] of Object.entries(EXTRA_KEYWORDS)) {
-    const score = words.reduce((total, word) => total + (text.includes(word) ? 1 : 0), 0);
+    const score = words.reduce((total, word) => total + (text.includes(word) || text.includes(foldedKeyword(word)) ? 1 : 0), 0);
     if (score > bestScore) { best = code; bestScore = score; }
   }
   return best;
 }
 
+// 15.4.55 — memoïsation bornée de profileFor : le moteur est appelé plusieurs fois par requête
+// (rendu de document, mentions légales, listes d'activités, propositions de métier) toujours
+// avec les mêmes (nom, description, override). Résultat pur et déterministe → cache associatif
+// de taille fixe : au-delà du plafond, le cache est vidé (aucune croissance indéfinie).
+const PROFILE_CACHE_LIMIT = 600;
+const PROFILE_CACHE = new Map<string, Profile>();
+
 export function profileFor(name: string, description: string = '', override?: string | null): Profile {
-  const s = (name + ' ' + description).toLowerCase();
-  let code = override && DEFS[override] ? override : (RULES.find(([, re]) => re.test(s))?.[0] || keywordProfile(s) || 'generic-services');
+  const cacheKey = `${override || ''}\u0000${name}\u0000${description}`;
+  const cached = PROFILE_CACHE.get(cacheKey);
+  if (cached) return cached;
+  const raw = (name + ' ' + description).toLowerCase();
+  const s = foldText(raw);
+  let code = override && DEFS[override] ? override : (RULES.find(([, re]) => re.test(raw) || re.test(s))?.[0] || keywordProfile(raw) || keywordProfile(s) || 'generic-services');
   const d = DEFS[code]!;
   const servicesExtra: [string, number][] = EXTRA_SERVICES[code] || [];
   const services: [string, number][] = [...d.services, ...servicesExtra];
   const parts: string[] = [...new Set([...d.parts, ...(EXTRA_PARTS[code] || [])])];
-  return {
+  const profile: Profile = {
     code, title: code === 'generic-services' && name ? name : d.title, summary: d.summary,
     clientLabel: 'Clients', itemLabel: d.item, serviceLabel: d.service, deviceLabel: d.device, quoteLabel: d.quote, modules: d.modules,
     suggestedParts: parts, suggestedServices: services.map(x => x[0]), serviceMinutes: Object.fromEntries(services), warranty: d.warranty,
     doc: { interventionLabel: d.doc[0], itemsLabel: d.doc[1], quantityLabel: d.doc[4] || 'Qté', quoteTitle: d.doc[2], invoiceTitle: d.doc[3] },
     calc: { items: d.calc.items, itemsTitle: d.calc.title, itemPlaceholder: d.calc.placeholder, shipping: d.calc.shipping !== false, shippingLabel: d.calc.shipping || '', hint: d.calc.hint },
   };
+  if (PROFILE_CACHE.size >= PROFILE_CACHE_LIMIT) PROFILE_CACHE.clear();
+  PROFILE_CACHE.set(cacheKey, profile);
+  return profile;
 }
 
 export function defaultCgvFor(code: string, title: string, legalForm = '') {

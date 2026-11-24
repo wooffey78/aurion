@@ -10,7 +10,8 @@ const business=fs.readFileSync(path.join(root,'backend/src/routes/business.ts'),
 
 test('enregistrement devis : la vente à perte est autorisée uniquement après confirmation explicite',()=>{
   assert.match(quote,/let allowLoss=false;if\(r\.loss\)\{if\(!await askConfirm\(/);
-  assert.match(quote,/finalPriceTtc:num\('#targetTtc'\),mileageMode:/);
+  // 15.4.55 : le TTC visé est transmis arrondi au centime (r2) — le rapport au calculateur reste inchangé.
+  assert.match(quote,/finalPriceTtc:r2\(num\('#targetTtc'\)\),mileageMode:/);
   assert.match(business,/if\(!b\.allowLoss&&p\.belowMinimumPrice\)return reply\.code\(400\)\.send\(\{error:'MARGIN_GUARD'/);
   assert.match(business,/mileageMode/);
   assert.match(business,/final_price_ttc/);

@@ -1,4 +1,4 @@
-# Mentions obligatoires — référentiel des factures émises (15.4.53)
+# Mentions obligatoires — référentiel des factures émises (révisé 15.4.54)
 
 Ce document est la **référence unique** partagée par le code (`backend/src/services/mention-gate.ts`, constante `BLOCKING_MENTION_KEYS`) et par l'interface (fenêtre « Facturer »). Il répertorie les mentions légales appliquées aux factures et devis par le moteur de mentions (`backend/src/services/mentions.ts`), leur provenance et leur effet à l'émission. Sources internes : textes cités dans le moteur (Code de la consommation L217-3 s., Code civil 1641 s.), formulation des pénalités (taux légal ×3 + indemnité de recouvrement 40 € pour les professionnels) et documents juridiques du dépôt (docs/Aurion-15.4.22-Textes-juridiques-4.0.docx). **Toute nouvelle obligation est d'abord ajoutée au moteur, puis à ce tableau, puis à la constante de blocage — dans cet ordre, jamais l'inverse** (règle : Aurion n'invente pas une valeur juridique, il exige qu'elle soit saisie).
 
@@ -8,14 +8,16 @@ Ce document est la **référence unique** partagée par le code (`backend/src/se
 |---|---|---|---|---|
 | `identity` | Dénomination, forme juridique, SIREN/SIRET de l'entreprise | Toutes | Paramètres → Identité légale (SIRET/SIREN de l'entreprise) | Émission refusée : `422 MENTIONS_INCOMPLETES` (clé `identity`) |
 | `insurance` | Assurance professionnelle / décennale (assureur, n° de contrat, couverture) | Métiers travaux : plomberie, électricité, bâtiment, auto (liste `WORKS` du moteur) | Paramètres → Mentions légales de l'activité (`insurance_info`) | Émission refusée (clé `insurance`) |
-| `mediator` | Médiateur de la consommation (vente aux clients particuliers) | Vente aux particuliers (liste `CONSUMER` du moteur) | Paramètres → Mentions légales de l'activité (`mediator_info`) | Émission refusée (clé `mediator`) |
 
-La mention `identity` est calculée sur les données de l'**organisation** (SIRET/SIREN) ; `insurance` et `mediator` sur les paramètres de l'**activité** du document. Le verdict est calculé côté serveur à l'émission (source de vérité) ; la pré-vérification `GET /mentions/blocking?documentId=…` utilise le même moteur et n'est qu'une aide d'affichage.
+La mention `identity` est calculée sur les données de l'**organisation** (SIRET/SIREN) ; `insurance` sur les paramètres de l'**activité** du document. Le verdict est calculé côté serveur à l'émission (source de vérité) ; la pré-vérification `GET /mentions/blocking?documentId=…` utilise le même moteur et n'est qu'une aide d'affichage.
+
+**Révision 15.4.54 — le médiateur n'est plus bloquant** : le choix produit constate qu'exiger le médiateur avant toute émission bloquait des factures légalement émissibles et que la valeur restait difficile à trouver. La mention reste gérée par le moteur (jamais inventée) mais sort de `BLOCKING_MENTION_KEYS` et entre dans `REMINDER_MENTION_KEYS` : elle est configurable et signalée, sans jamais refuser l'émission.
 
 ## Mentions NON bloquantes (formulées automatiquement ou détectées)
 
 | Clé | Mention | Comportement |
 |---|---|---|
+| `mediator` | Médiateur de la consommation (vente aux clients particuliers) — nom et coordonnées de l'organisme de médiation | **Rappel non bloquant (15.4.54)** : saisie dans Paramètres → Activités → Facturation et documents (`mediator_info`) ; tant qu'elle manque, la fenêtre « Facturer » affiche un simple rappel avec renvoi Paramètres — l'émission n'est jamais refusée (clé `mediator`, liste `REMINDER_MENTION_KEYS`) |
 | `vat` | TVA au taux configuré, ou « TVA non applicable, article 293 B du CGI » | Auto (avec note de confirmation pour la franchise en base) — jamais `needs_confirmation` : ne bloque pas |
 | `payment` | Conditions de paiement ; à défaut, formulation générale légale (pénalités au taux légal ×3, indemnité 40 € clients professionnels) | Auto — adaptée dans Paramètres → Mentions légales |
 | `validity` | Validité du devis (30 jours par défaut, paramétrable) | Auto / saisie — concerne les devis, jamais bloquante |

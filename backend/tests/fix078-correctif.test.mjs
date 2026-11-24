@@ -54,12 +54,19 @@ test('correctif 078 · phase D : défilement du calculateur présent et encart d
   const css = read('../../assets/css/app.css');
   // calculateur : barre de défilement verticale (vérification du « présent en CSS » du diagnostic)
   assert.match(css, /\.calculation\{max-height:calc\(100vh - 130px\);overflow-y:auto/);
-  // encart de pièces : aucune règle dédiée avant le correctif, désormais le conteneur défile horizontalement
+  // encart de pièces : aucune règle dédiée avant le correctif, désormais le conteneur défile
+  // horizontalement. 15.4.54 : la grille passe à 6 colonnes (type de prestation au format
+  // Aurion ajouté) avec la même largeur minimale de défilement.
   assert.match(css, /\.lines-scroll \{\s*overflow-x: auto;/);
-  assert.match(css, /\.lines-scroll \.line-row \{\s*grid-template-columns: minmax\(240px, 3fr\)/);
+  assert.match(css, /\.lines-scroll \.line-row \{\s*grid-template-columns: minmax\(220px, 3fr\) 60px 110px 90px 150px 70px;/);
   const quote = read('../../assets/js/pages/dash/quote.js');
   assert.match(quote, /<div class="lines-scroll"><div class="lines-head">/);
   assert.match(quote, /<div id="lines"><\/div><\/div>/);
+  // 15.4.54 — la colonne « Type de prestation » est déclarée dans l'en-tête et le sélecteur
+  // par ligne suit le format Aurion (« Votre choix » en première option).
+  assert.match(quote, /<span>Type de prestation<\/span>/);
+  assert.match(quote, /<select class="ln-cat" aria-label="Type de prestation de la ligne"><option value="">Votre choix<\/option>/);
+  assert.match(css, /\.line-row input,\.line-row select\{width:100%;/);
 });
 
 test('correctif 078 · phase E : la sélection du logo vit dans l’état du parcours et survit au re-rendu', () => {

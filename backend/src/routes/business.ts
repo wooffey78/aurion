@@ -37,7 +37,7 @@ import type { PenaltyMode } from '../services/invoice-workflow.js';
 import { clientReliability } from '../services/payment-reliability.js';
 import { detectDeviation, type DeviationRubric } from '../services/deviation-guard.js';
 import { computeMentions } from '../services/mentions.js';
-import { blockingMentionGaps } from '../services/mention-gate.js';
+import { blockingMentionGaps, mentionReminders } from '../services/mention-gate.js';
 import { canonicalInvoiceContent, sha256Hex, recordDocumentIntegrity } from '../services/integrity-chain.js';
 import { companyDisplayName } from '../services/company.js';
 
@@ -1081,8 +1081,10 @@ export async function businessRoutes(app:FastifyInstance){
     if(!exists)return reply.code(404).send({error:'NOT_FOUND'});
     return await clientReliability(sqlExecutor,org,id);
   });
-  // 15.4.53 (PROMPT C3) — pré-vérification des mentions bloquantes AVANT la fenêtre d'émission :
-  // la modal « Facturer » affiche les champs à compléter et renvoie vers Paramètres ; la source
+  // 15.4.53 (PROMPT C3) + 15.4.54 — pré-vérification AVANT la fenêtre d'émission : `gaps` liste
+  // les seules mentions BLOQUANTES (identité, assurance travaux) ; `reminders` signale les
+  // mentions manquantes NON bloquantes (médiateur de la consommation) comme simple rappel.
+  // La modal « Facturer » affiche les champs à compléter et renvoie vers Paramètres ; la source
   // de vérité reste le contrôle serveur du POST d'émission (même moteur, jamais de cache UI).
   app.get('/mentions/blocking',async(r,reply)=>{
     const documentId=String((r.query as any)?.documentId||'');
@@ -1091,7 +1093,7 @@ export async function businessRoutes(app:FastifyInstance){
     if(!q)return reply.code(404).send({error:'NOT_FOUND'});
     if(q.document_type==='invoice')return reply.code(409).send({error:'ALREADY_INVOICE',message:'Ce document est déjà une facture.'});
     const mentions=computeMentions(await invoiceMentionContext(r.auth!.organizationId,q.activity_id));
-    return {kind:'invoice',mentions,gaps:blockingMentionGaps(mentions).map(m=>({key:m.key,note:m.note}))};
+    return {kind:'invoice',mentions,gaps:blockingMentionGaps(mentions).map(m=>({key:m.key,note:m.note})),reminders:mentionReminders(mentions).map(m=>({key:m.key,note:m.note}))};
   });
   app.get('/suppliers',async r=>(await query('select * from suppliers where organization_id=$1 and activity_id=$2 order by name',[r.auth!.organizationId,activityId(r)])).rows);
   // Détection SIRET/SIREN ou par NOM (au clic, une requête par action, débit limité, journalisation sans identifiant).
@@ -1762,10 +1764,12 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     const invoiceAddressSource=['client','intervention','free'].includes(String(b.invoiceAddressSource))?String(b.invoiceAddressSource):'client';
     const freeBillingAddress=String(b.billingAddress||'').trim()||null;
     if(invoiceAddressSource==='free'&&!freeBillingAddress)return reply.code(400).send({error:'INVALID_INPUT',message:'Saisissez une adresse de facturation libre.'});
-    // 15.4.53 (PROMPT C2) — porte des mentions obligatoires : les mentions « needs_confirmation »
-    // bloquantes (SIRET/SIREN, assurance des métiers travaux, médiateur grand public) refusent
-    // l'émission AVANT toute écriture. Aurion n'invente jamais une valeur juridique : les
-    // documents émis avant 15.4.53 ne sont pas re-contrôlés (grandfathering documenté).
+    // 15.4.53 (PROMPT C2) + 15.4.54 — porte des mentions obligatoires : seules les mentions
+    // « needs_confirmation » BLOQUANTES (SIRET/SIREN, assurance des métiers travaux) refusent
+    // l'émission AVANT toute écriture. Le médiateur de la consommation n'est plus bloquant
+    // (choix produit 15.4.54) : il reste configurable dans Paramètres et signalé en rappel.
+    // Aurion n'invente jamais une valeur juridique : les documents émis avant 15.4.53 ne sont
+    // pas re-contrôlés (grandfathering documenté).
     const mentionCtx=await invoiceMentionContext(org,initial.activity_id);
     const invoiceMentions=computeMentions(mentionCtx);
     const mentionGaps=blockingMentionGaps(invoiceMentions);

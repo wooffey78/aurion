@@ -15,17 +15,19 @@
     <path d="M87 78 108 35l21 43h-12l-9-18-9 18Z" fill="url(#blue)"/>
     <text x="140" y="70" fill="#fff" font-family="Arial,sans-serif" font-size="25" font-weight="700" letter-spacing="2">AURION</text>
     <text x="141" y="91" fill="#9db8de" font-family="Arial,sans-serif" font-size="11" font-weight="700" letter-spacing="3">PRO</text>
-    <g font-family="Arial,sans-serif" font-size="15" fill="#b9c9df">
-      <rect x="55" y="123" width="171" height="44" rx="11" fill="#213d63"/>
-      <rect x="68" y="137" width="16" height="16" rx="5" fill="#27bde9"/><text x="98" y="153" fill="#fff" font-weight="700">Tableau de bord</text>
-      <circle cx="76" cy="204" r="8" fill="#5285f7"/><text x="98" y="209">Clients</text>
-      <circle cx="76" cy="251" r="8" fill="#52c4b6"/><text x="98" y="256">Catalogue métier</text>
-      <circle cx="76" cy="298" r="8" fill="#f6a84d"/><text x="98" y="303">Fournisseurs</text>
-      <circle cx="76" cy="345" r="8" fill="#a27bf5"/><text x="98" y="350">Devis &amp; factures</text>
-      <circle cx="76" cy="392" r="8" fill="#ed8e52"/><text x="98" y="397">Agenda</text>
-      <circle cx="76" cy="439" r="8" fill="#45c3e7"/><text x="98" y="444">Comptabilité</text>
-      <circle cx="76" cy="486" r="8" fill="#f07a8b"/><text x="98" y="491">Support Aurion</text>
-      <circle cx="76" cy="533" r="8" fill="#a5b6cb"/><text x="98" y="538">Paramètres</text>
+    <g font-family="Arial,sans-serif" font-size="14" fill="#b9c9df">
+      <rect x="55" y="123" width="176" height="40" rx="10" fill="#213d63"/>
+      <rect x="68" y="135" width="16" height="16" rx="5" fill="#27bde9"/><text x="96" y="149" fill="#fff" font-weight="700">Tableau de bord</text>
+      <circle cx="76" cy="188" r="7" fill="#5285f7"/><text x="96" y="193">Clients</text>
+      <circle cx="76" cy="228" r="7" fill="#8fbf7f"/><text x="96" y="233">Chantiers</text>
+      <circle cx="76" cy="268" r="7" fill="#52c4b6"/><text x="96" y="273">Catalogue métier</text>
+      <circle cx="76" cy="308" r="7" fill="#f6a84d"/><text x="96" y="313">Fournisseurs</text>
+      <circle cx="76" cy="348" r="7" fill="#a27bf5"/><text x="96" y="353">Devis &amp; factures</text>
+      <circle cx="76" cy="388" r="7" fill="#d7a3f0"/><text x="96" y="393">Modèles de documents</text>
+      <circle cx="76" cy="428" r="7" fill="#ed8e52"/><text x="96" y="433">Agenda</text>
+      <circle cx="76" cy="468" r="7" fill="#45c3e7"/><text x="96" y="473">Comptabilité &amp; trésorerie</text>
+      <circle cx="76" cy="508" r="7" fill="#f07a8b"/><text x="96" y="513">Support Aurion</text>
+      <circle cx="76" cy="548" r="7" fill="#a5b6cb"/><text x="96" y="553">Paramètres</text>
     </g>
     <circle cx="74" cy="713" r="6" fill="#30ce9b"/><text x="91" y="718" fill="#b9c9df" font-family="Arial,sans-serif" font-size="12">Système opérationnel</text>
 

@@ -49,7 +49,9 @@ test('bloc16: champs libres à vide avec placeholder, vide ≠ zéro dans le mot
   const pricing = read('../src/services/pricing.ts');
   assert.match(pricing, /laborSellingHt.*undefined|undefined.*laborSellingHt/);
   const quoteDraft = quote.slice(quote.indexOf('laborSellingHt:$(\'#laborSellingHt\')'));
-  assert.match(quoteDraft, /value===''\?undefined:num\('#laborSellingHt'\)/, 'champ vide → absent (undefined), jamais 0');
+  // 15.4.55 : le champ vide reste ABSENT (undefined, jamais 0) ; une valeur saisie est arrondie
+  // au centime (r2) avant envoi — le contrat d'absence est conservé à l'identique.
+  assert.match(quoteDraft, /value===''\?undefined:r2\(num\('#laborSellingHt'\)\)/, 'champ vide → absent (undefined), jamais 0 ; valeur saisie → arrondi centime');
   // Le moteur de calcul (build) ne confond pas vide et zéro :
   const engine = await import(new URL('../dist/services/pricing.js', import.meta.url).pathname);
   const empty = engine.computePricing({ mileageKm: '', laborSellingHt: undefined, vatRate: 0, urssafRate: 0, partCost: 100, laborInternalCostHt: 0 });

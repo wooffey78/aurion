@@ -134,17 +134,23 @@ export function bind(){
     // 15.4.53 (PROMPT C3) — pré-vérification des mentions bloquantes AVANT d'ouvrir la fenêtre :
     // les champs manquants sont listés avec un renvoi exact vers Paramètres ; la source de
     // vérité reste le contrôle serveur du POST d'émission (422 MENTIONS_INCOMPLETES).
+    // 15.4.54 — seules les mentions BLOQUANTES (identité légale, assurance travaux) ouvrent la
+    // fenêtre « Émission bloquée » ; le médiateur de la consommation n'est plus bloquant : il
+    // apparaît au pire comme un rappel informatif dans la fenêtre de facturation elle-même.
+    let mentionReminders=[];
     try{
       const pre=await api.blockingMentions(q.id);
       if(Array.isArray(pre?.gaps)&&pre.gaps.length){
-        const labels={identity:'Identité légale (SIRET/SIREN)',insurance:'Assurance professionnelle / décennale',mediator:'Médiateur de la consommation'};
+        const labels={identity:'Identité légale (SIRET/SIREN)',insurance:'Assurance professionnelle / décennale'};
         const rows=pre.gaps.map(g=>`<div class="list-row"><div><b>${e(labels[g.key]||g.key)}</b><small>${e(g.note||'À renseigner dans Paramètres.')}</small></div></div>`).join('');
         return modalForm('Émission bloquée : mentions obligatoires manquantes',`<p class="help">Aurion ne peut pas émettre cette facture tant que ces mentions ne sont pas renseignées. Cette information est obligatoire et reste modifiable dans Paramètres — aucune valeur n'est inventée.</p>${rows}<p class="help">Référentiel complet : docs/MENTIONS-OBLIGATOIRES.md</p>`,()=>{hooks.show('settings')},{label:'Compléter dans Paramètres'});
       }
+      mentionReminders=Array.isArray(pre?.reminders)?pre.reminders:[];
     }catch{/* pré-vérification indisponible : le contrôle serveur de l'émission reste la porte */}
+    const reminderNotice=mentionReminders.some(x=>x.key==='mediator')?'<p class="help">Rappel non bloquant : le médiateur de la consommation n’est pas renseigné. Vous pouvez le saisir dans Paramètres → Activités → Facturation et documents ; il figurera sur les prochains documents.</p>':'';
     const rubrics=(q.items||[]).map(x=>({label:String(x.label||x.name||'Ligne'),amountHt:Number(x.quantity||0)*Number(x.unitPrice??x.unit_cost??0)}));
     const convert=(dueAt2,interval2,source2,extra={})=>api.convertQuote(q.id,true,{dueAt:dueAt2,reminderIntervalDays:interval2,invoiceAddressSource:source2,quoteRubrics:rubrics,invoiceRubrics:rubrics,...extra});
-    const m=modalForm(`Transformer ${e(q.number)} en facture`,`<p class="muted">La facture sera le document envoyé au client. Elle ne sera intégrée aux calculs Aurion qu’après déclaration d’un paiement.</p><div class="grid-2"><label class="field"><span>Échéance de paiement</span><input id="convertDueAt" type="date" required></label><label class="field"><span>Délai entre les relances (jours)</span><input id="convertReminderInterval" type="number" min="0" max="365" step="1" placeholder="0"></label></div><label class="field"><span>Adresse de facturation</span><select id="convertAddressSource"><option value="">Votre choix</option><option value="client">Adresse du client</option><option value="intervention">Adresse d’intervention</option></select></label>`,async m=>{
+    const m=modalForm(`Transformer ${e(q.number)} en facture`,`<p class="muted">La facture sera le document envoyé au client. Elle ne sera intégrée aux calculs Aurion qu’après déclaration d’un paiement.</p>${reminderNotice}<div class="grid-2"><label class="field"><span>Échéance de paiement</span><input id="convertDueAt" type="date" required></label><label class="field"><span>Délai entre les relances (jours)</span><input id="convertReminderInterval" type="number" min="0" max="365" step="1" placeholder="0"></label></div><label class="field"><span>Adresse de facturation</span><select id="convertAddressSource"><option value="">Votre choix</option><option value="client">Adresse du client</option><option value="intervention">Adresse d’intervention</option></select></label>`,async m=>{
       const dueAt=m.querySelector('#convertDueAt').value||null;if(!dueAt)throw new Error('Indiquez une échéance de paiement.');
       const rawInterval=m.querySelector('#convertReminderInterval').value.trim();const interval=rawInterval===''?0:Math.min(365,Math.max(0,Number(rawInterval)));
       const invoiceAddressSource=m.querySelector('#convertAddressSource').value;

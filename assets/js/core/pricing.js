@@ -57,7 +57,28 @@ function contributionBasis(value) {
     const normalized = String(value || 'ca_ht');
     return normalized === 'gross_margin' ? 'gross_margin' : normalized === 'profit' ? 'profit' : 'ca_ht';
 }
+// 15.4.55 — memoïsation pure du dernier appel : l'éditeur de devis/facture recalcule à chaque
+// frappe (input + change déclenchent le même calcul) et le serveur re-calcule à chaque rendu de
+// document. La fonction reste 100 % déterministe et sans effet de bord : entrée identique
+// (sérialisation stable, indépendante de l'ordre des clés) → même objet de résultat.
+// Un seul créneau mémoire : l'entrée courante, jamais une table qui croît.
+let memoKey = null;
+let memoResult = null;
+/** Sérialisation STABLE d'une entrée de calcul (clés triées récursivement, indépendante de l'ordre d'insertion). */
+function stableKey(value) {
+    if (value === null || typeof value !== 'object')
+        return JSON.stringify(value ?? null);
+    if (Array.isArray(value))
+        return `[${value.map(stableKey).join(',')}]`;
+    const entries = Object.entries(value)
+        .filter(([, v]) => v !== undefined)
+        .sort(([a], [b]) => (a < b ? -1 : 1));
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableKey(v)}`).join(',')}}`;
+}
 export function computePricing(input) {
+    const key = stableKey(input);
+    if (key === memoKey && memoResult)
+        return memoResult;
     const partValue = num(input.partCost, 'pièce', 0, 1e9);
     const shipValue = num(input.shippingCost, 'livraison', 0, 1e9);
     // Prompt 03 — consommables : coût direct additionnel (hors pièces cataloguées), 0 par défaut.
@@ -236,7 +257,7 @@ export function computePricing(input) {
     const netResultRate = baseRevenue > 0n ? Number(roundHalfUp(netResult * 10000n, baseRevenue)) / 100 : 0;
     // Prompt 03 — taux de marque : marge brute / prix de vente HT (≠ taux de marge, assis sur le CA).
     const markupRate = totalHt > 0n ? Number(roundHalfUp(grossMargin * 10000n, totalHt)) / 100 : 0;
-    return {
+    const result = {
         purchaseHt: euros(part),
         coefficientMarkupHt: euros(coefficientMarkup),
         shippingHt: euros(ship),
@@ -275,4 +296,7 @@ export function computePricing(input) {
         driver,
         mileageMode,
     };
+    memoKey = key;
+    memoResult = result;
+    return result;
 }

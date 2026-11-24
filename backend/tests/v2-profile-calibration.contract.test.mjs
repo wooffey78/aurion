@@ -6,6 +6,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
+// 15.4.55 — environnement requis par config.ts (pattern des autres contrats) : les imports
+// dist chargent la configuration, qui exige DATABASE_URL et JWT_SECRET même hors base.
+process.env.DATABASE_URL ||= 'postgres://x:y@127.0.0.1:1/z';
+process.env.JWT_SECRET ||= 'x'.repeat(40);
 
 const distProfiles = new URL('../dist/services/profiles.js', import.meta.url);
 const distDetection = new URL('../dist/services/micro-detection.js', import.meta.url);

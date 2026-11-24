@@ -14,17 +14,22 @@ const mentions = readFileSync(new URL('../src/services/mentions.ts', import.meta
 const gate = dist('../dist/services/mention-gate.js');
 const chain = dist('../dist/services/integrity-chain.js');
 
-test('unitaire — porte des mentions : seules identity/insurance/mediator bloquent, jamais une mention auto', { skip: !gate }, async () => {
-  const { blockingMentionGaps } = await import(gate);
+test('unitaire — porte des mentions (révisé 15.4.54) : seules identity/insurance bloquent ; le médiateur devient un rappel non bloquant', { skip: !gate }, async () => {
+  const { blockingMentionGaps, mentionReminders } = await import(gate);
   const M = (key, source) => ({ key, text: source === 'auto' ? 'x' : '', source });
   const gaps = blockingMentionGaps([
     M('identity', 'needs_confirmation'), M('insurance', 'needs_confirmation'),
     M('mediator', 'needs_confirmation'), M('vat', 'auto'), M('payment', 'auto'),
     M('legal-warranty', 'auto'), M('validity', 'auto'),
   ]);
-  assert.deepEqual(gaps.map(g => g.key).sort(), ['identity', 'insurance', 'mediator']);
-  assert.equal(blockingMentionGaps([M('identity', 'provided'), M('mediator', 'detected')]).length, 0);
+  // Le médiateur ne bloque PLUS l'émission : il sort des gaps bloquants…
+  assert.deepEqual(gaps.map(g => g.key).sort(), ['identity', 'insurance']);
+  assert.equal(blockingMentionGaps([M('identity', 'provided'), M('mediator', 'needs_confirmation')]).length, 0);
   assert.equal(blockingMentionGaps([]).length, 0);
+  // …et devient un rappel informatif (configurable, jamais refusé).
+  assert.deepEqual(mentionReminders([M('mediator', 'needs_confirmation')]).map(g => g.key), ['mediator']);
+  assert.equal(mentionReminders([M('identity', 'needs_confirmation'), M('insurance', 'needs_confirmation')]).length, 0);
+  assert.equal(mentionReminders([]).length, 0);
 });
 
 test('unitaire — contenu canonique de facture : stable, sensible aux montants et aux lignes', { skip: !chain }, async () => {

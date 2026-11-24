@@ -79,10 +79,11 @@ const activityForm=(a={},profiles=[])=>{
       <div>${manualInput('urssafRate','Taux agrégé utilisé par le calculateur %','Selon le régime','type="number" step="0.001" min="0" max="99.99')}</div>
     </div>
   </section>
-  <section class="settings-subsection" data-settings-text="facturation documents délai pénalités mentions légales cgv">
+  <section class="settings-subsection" data-settings-text="facturation documents délai pénalités mentions légales cgv médiateur médiation consommation assurance">
     <div class="section-title"><div><h3>Facturation et documents</h3><small>Ces informations alimentent automatiquement les devis et factures de cette activité.</small></div></div>
     <div class="grid-2">${manualInput('quoteValidityDays','Validité des devis (jours)','30','type="number" min="1" max="365" step="1"')}${manualInput('paymentTerms','Délais de paiement','Ex. 30 jours')}</div>
-    <div class="grid-2">${manualInput('insuranceInfo','Assurance / responsabilité','Mention légale facultative')}${manualInput('mediatorInfo','Médiateur','Mention légale facultative')}</div>
+    ${manualInput('insuranceInfo','Assurance / responsabilité','Ex. AXA Pro — contrat n° 12345 — couverture France','maxlength="4000"')}
+    <label class="field"><span>Médiateur de la consommation <em class="tag">facultatif</em></span><input id="mediatorInfo" maxlength="4000" placeholder="Ex. CM2C — 14 rue Saint-Jean, 75017 Paris — cm2c.net" value="${e(a.mediator_info||'')}"><small class="help">Organisme de médiation cité sur vos documents quand vous vendez à des clients particuliers (Code de la consommation). Le renseigner ici suffit : il figure sur les devis et factures de cette activité et n’empêche jamais l’émission d’une facture s’il manque.</small></label>
     <label class="field"><span>Notes légales</span><textarea id="legalNotes" rows="3" placeholder="Mentions complémentaires">${e(a.legal_notes||'')}</textarea></label>
   </section>
   <section class="settings-subsection" data-settings-text="tarification coefficients pièces main oeuvre aurion">
@@ -158,7 +159,7 @@ export const view=()=>{
     <div id="mailbox-slot"></div>
   </section>
   ${configurationSection()}
-  <section class="panel stack settings-section" id="settings-activities" data-settings-text="activités métiers fiscalité facturation tarification coefficients">
+  <section class="panel stack settings-section" id="settings-activities" data-settings-text="activités métiers fiscalité facturation tarification coefficients médiateur médiation consommation mentions légales assurance">
     <div class="section-title"><div><h2>4 · Activités et calculs métier</h2><small>Chaque activité conserve ses paramètres propres ; les informations juridiques de l’entreprise ne sont jamais dupliquées.</small></div><button class="btn secondary" id="add-activity">+ Ajouter une activité</button></div>
     ${S.activities.map(a=>`<div class="activity-row"><div><b>${e(a.name)}</b><small>${e(a.description||'')} · TVA ${a.vat_rate??'—'} % · Cotisations ${a.urssaf_rate==null?'à configurer':a.urssaf_rate+' %'}</small></div><div class="button-row"><button class="btn ${a.id===getActiveActivity()?'primary':'secondary'} small switch-activity" data-id="${a.id}">${a.id===getActiveActivity()?'Active':'Activer'}</button><button class="btn secondary small edit-activity" data-id="${a.id}">${a.configuration_defined?'Modifier':'Définir'}</button><button class="btn danger small del-activity" data-id="${a.id}">Supprimer</button></div></div>`).join('')||'<div class="empty">Aucune activité configurée.</div>'}
   </section>

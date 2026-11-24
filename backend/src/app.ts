@@ -72,15 +72,24 @@ export async function buildApp() {
   // les sources du frontend (assets/js/config.js lit cette balise) ; le mode local Windows et
   // les enveloppes natives qui posent window.AURION_API_URL avant config.js restent inchangés.
   const indexFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../index.html");
+  // 15.4.55 — le HTML d'accueil est lu UNE FOIS puis mis en cache mémoire : « / » est le chemin
+  // public le plus chaud du service (chaque chargement d'application, chaque vérification de
+  // disponibilité) et n'avait aucune raison de déclencher une lecture disque par requête.
+  // L'injection de la configuration canonique (meta aurion-api-base) est pré-calculée ; le cache
+  // est recalculé si APP_BASE_URL change (redémarrage) — contenu statique, aucun frais caché.
+  let indexCache: { base: string; html: string } | null = null;
   const serveIndex = async (_request: unknown, reply: any) => {
     const base = config.APP_BASE_URL.trim().replace(/"/g, "&quot;");
+    if (!indexCache || indexCache.base !== base) {
+      const html = readFileSync(indexFile, "utf8");
+      indexCache = { base, html: base ? html.replace(/<head([^>]*)>/i, `<head$1><meta name="aurion-api-base" content="${base}">`) : html };
+    }
     reply
       .header("Cache-Control", "no-cache, no-store, must-revalidate")
       .header("Pragma", "no-cache")
       .header("Expires", "0")
       .type("text/html; charset=utf-8");
-    const html = readFileSync(indexFile, "utf8");
-    return reply.send(base ? html.replace(/<head([^>]*)>/i, `<head$1><meta name="aurion-api-base" content="${base}">`) : html);
+    return reply.send(indexCache.html);
   };
   app.get("/", serveIndex);
   app.get("/index.html", serveIndex);

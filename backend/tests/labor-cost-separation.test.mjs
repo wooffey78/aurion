@@ -8,8 +8,10 @@ test('le coût interne de main-d’œuvre est distinct du prix de vente', () => 
   const quote = read('../../assets/js/pages/dash/quote.js');
   assert.match(quote, /id="laborSellingHt"/);
   assert.match(quote, /id="laborInternalCostHt"/);
-  assert.match(quote, /laborInternalCostHt:num\('#laborInternalCostHt'\)/);
-  assert.match(quote, /labor_internal_cost_ht:num\('#laborInternalCostHt'\)/);
+  // 15.4.55 : la valeur transmise est arrondie au centime (r2) — la séparation du coût interne
+  // et du prix de vente reste inchangée (mêmes champs, même round-trip).
+  assert.match(quote, /laborInternalCostHt:r2\(num\('#laborInternalCostHt'\)\)/);
+  assert.match(quote, /labor_internal_cost_ht:r2\(num\('#laborInternalCostHt'\)\)/);
   assert.doesNotMatch(quote, /laborInternalCostHt:\$\('#laborSellingHt'\)/);
 });
 
