@@ -63,9 +63,10 @@ test('interface : charts.js quatre types, barre de commutation, refus honnête d
   assert.doesNotMatch(charts, /import\s+.*from\s+['"][a-z@][^']*node_modules/); // aucune dépendance externe
   const nav = read('../../assets/js/core/navigation.js');
   assert.match(nav, /\{id:'chantiers',label:'Chantiers',icon:'▣'\}/);
-  // 15.4.59 — la section Chantiers redevient toujours visible (demande utilisateur) :
-  // plus aucune règle de masquage par profil pour cette entrée de menu.
-  assert.doesNotMatch(nav, /features\.features\.chantiers===false/);
+  // 15.4.61 — retour au fonctionnement d'avant 15.4.59 (demande utilisateur : le masquage par
+  // activité « était finalement une bonne chose ») : l'entrée Chantiers est de nouveau masquée
+  // quand le catalogue profile-features la déclare hors cœur pour le métier actif.
+  assert.match(nav, /features\.features\.chantiers===false/);
   const dash = read('../../assets/js/pages/dashboard.js');
   assert.match(dash, /import\{chantiers\}from'\.\/dash\/chantiers\.js'/);
   assert.match(dash, /loadProfileFeatures/);
@@ -75,6 +76,6 @@ test('interface : charts.js quatre types, barre de commutation, refus honnête d
   assert.match(other, /chartToolbar\('chart-home-ca'/);
   const pf = read('../../assets/js/core/profile-features.js');
   assert.match(pf, /Repli conservateur/);
-  assert.match(pf, /chantiers: true/);
+  assert.match(pf, /chantiers: false/);
   assert.match(pf, /loadProfileFeatures/);
 });

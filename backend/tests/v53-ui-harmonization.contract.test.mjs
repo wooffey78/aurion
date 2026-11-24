@@ -29,12 +29,18 @@ test('B-fix — « + devis » depuis la fiche client et la carte client ouvre l�
 test('B-fix — vue « Modèles de documents » branchée : VIEWS, navigation, datasets, bind sans crash', () => {
   assert.match(dashboard, /import\{home,clients,agenda,accounting,treasury,support,templates,admin\}from'\.\/dash\/other\.js';/);
   assert.match(dashboard, /const VIEWS=\{home,clients,chantiers,catalog,suppliers,quote,invoices:docs,templates,agenda,accounting,treasury,support,settings,account,admin\};/);
-  assert.match(dashboard, /templates:\['templates','mail'\],/);
+  // 15.4.61 — le dataset « templates » (téléversement retiré) n'est plus chargé.
+  assert.match(dashboard, /templates:\['mail'\],/);
   assert.match(navigation, /\{id:'templates',label:'Modèles de documents',icon:'▤'\},/);
   // La zone de dépôt porte désormais l’id attendu par bind() (sinon TypeError et écran inerte).
-  assert.match(other, /<div class="drop-zone" id="template-drop">/);
+  // 15.4.61 — le téléversement de modèles personnels est retiré : l'anneau natif est la seule
+  // mise en page proposée (les modèles déjà téléversés restent rendus côté serveur).
+  assert.doesNotMatch(other, /id="template-drop"/);
+  assert.doesNotMatch(other, /uploadTemplate/);
+  assert.doesNotMatch(other, /delete-template/);
   // Après upload : re-rendu explicite de la vue (pendingView fixé), jamais un refresh muet.
-  assert.match(other, /hooks\.refresh\('templates',\{navigation:true\}\)/);
+  // 15.4.61 — sans téléversement, bind() recharge les choix de modèles natifs sans crash.
+  assert.match(other, /S\.templateChoices=await api\.documentTemplateChoices\(\)/);
 });
 
 test('Design — barre de types de graphique au design Aurion (CSS livré, jetons de charte)', () => {

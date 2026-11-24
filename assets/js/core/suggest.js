@@ -22,19 +22,31 @@ export function attachSuggest(input,getItems,{onPick,max=100,title='Votre choix'
     if(isPicked&&idx>=0){const active=box.querySelector('.suggest-item.active');active?.scrollIntoView({block:'nearest'})}
   };
   const mark=()=>[...box.querySelectorAll('.suggest-item')].forEach((n,i)=>n.classList.toggle('active',i===idx));
+  const pickedNow=()=>lastPicked&&norm(input.value)===norm(lastPicked);
   const pick=i=>{const it=shown[i];if(!it)return;input.value=it.value;lastPicked=it.value;box.hidden=true;toggle.setAttribute('aria-expanded','false');input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));onPick?.(it);box.hidden=true;toggle.setAttribute('aria-expanded','false')};
   toggle.setAttribute('aria-expanded','false');
-  input.addEventListener('focus',()=>{if(box.hidden)render()});
+  // 15.4.61 — repli du menu après choix : le focus (programmatique, clavier ou re-rendu) ne
+  // rouvre plus la liste quand la valeur vient d'être choisie — seul un clic sur l'input ou
+  // sur le bouton ▾ la rouvre volontairement. Avant, la liste restait ouverte après la
+  // sélection d'une prestation.
+  input.addEventListener('focus',()=>{if(box.hidden&&!pickedNow())render()});
   toggle.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();if(box.hidden){lastPicked='';render();input.focus()}else{box.hidden=true;toggle.setAttribute('aria-expanded','false')}});
   input.addEventListener('click',ev=>{ev.stopPropagation();if(box.hidden){lastPicked='';render()}});
   input.addEventListener('input',()=>{if(norm(input.value)!==norm(lastPicked)){lastPicked='';render()}});
+  // 15.4.61 — repli garanti : le commit sans sélection (flou/Enter hors liste) referme la liste.
+  input.addEventListener('change',()=>{if(!box.hidden){box.hidden=true;toggle.setAttribute('aria-expanded','false')}});
   const outside=ev=>{if(!wrap.contains(ev.target)){box.hidden=true;toggle.setAttribute('aria-expanded','false')}};
   document.addEventListener('pointerdown',outside);
   input.addEventListener('keydown',ev=>{
     if(box.hidden)return;
     if(ev.key==='ArrowDown'){ev.preventDefault();idx=Math.min(shown.length-1,idx+1);mark()}
     else if(ev.key==='ArrowUp'){ev.preventDefault();idx=Math.max(0,idx-1);mark()}
-    else if(ev.key==='Enter'&&idx>=0){ev.preventDefault();pick(idx)}
+    else if(ev.key==='Enter'){
+      // 15.4.61 — Entrée après saisie (aucune option active) : la liste se replie et le
+      // formulaire n'est pas soumis par inadvertance. Avec une option active : sélection.
+      ev.preventDefault();
+      if(idx>=0)pick(idx);else{box.hidden=true;toggle.setAttribute('aria-expanded','false')}
+    }
     else if(ev.key==='Escape'){box.hidden=true;toggle.setAttribute('aria-expanded','false')}
   });
   // Ne pas sélectionner au pointerdown : sur tactile, cela empêche le scroll de la liste.

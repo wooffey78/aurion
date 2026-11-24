@@ -186,12 +186,18 @@ export async function bind(){
   };
   let learnedParts=[];
   let detectedService=null;
+  // 15.4.61 — une pièce proposée automatiquement reste MODIFIABLE et SUPPRIMABLE : (1) les
+  // redraws périodiques (détection de prestation, 350 ms après la saisie) préservent d'abord
+  // les valeurs tapées non encore validées ; (2) une pièce retirée par l'utilisateur n'est
+  // plus ré-ajoutée automatiquement au changement de prestation.
+  const dismissedParts=new Set();
+  const syncLinesFromDom=()=>{document.querySelectorAll('.line-row').forEach(row=>{const l=lines[Number(row.dataset.i)];if(!l)return;const g=s=>row.querySelector(s)?.value;const label=g('.ln-label');if(label!=null)l.label=label;const qty=g('.ln-qty');if(qty!=null)l.quantity=qty;const cost=g('.ln-cost');if(cost!=null)l.unitCost=cost;const sale=g('.ln-sale');if(sale!=null)l.unitPrice=sale;const cat=g('.ln-cat');if(cat!=null)l.activityCategory=cat||null})};
   const partItems=()=>{const ranked=rankRelevantParts(detectedService,S.parts,learnedParts);const list=ranked.length?ranked:S.parts;return list.map(x=>({value:x.name,hint:`Achat ${money(cheapest(x))} HT · Vente ${money(Number(x.selling_price||0))} HT`,partId:x.id}))};
   const suggestLines=()=>document.querySelectorAll('.ln-label').forEach(i=>attachSuggest(i,partItems,{title:`Suggestions · ${prof().itemLabel||'catalogue'}`,onPick:item=>{const row=i.closest('.line-row');if(!row)return;const l=lines[Number(row.dataset.i)];const part=S.parts.find(x=>x.id===item.partId)||S.parts.find(x=>x.name.toLowerCase()===String(item.value).trim().toLowerCase());if(!l||!part)return;l.label=part.name;l.partId=part.id;l.unitCost=cheapest(part);l.unitPrice=Number(part.selling_price||0)>0?Number(part.selling_price):'';l.saleCoefficientPercent=null;catalogPricing=true;row.querySelector('.ln-cost').value=String(l.unitCost);row.querySelector('.ln-sale').value=l.unitPrice===''?'':Number(l.unitPrice).toFixed(2);syncCatalogTarget();recalc();persistDraft();}}));
   attachSuggest($('#intervention'),()=>S.interventions.map(i=>({value:i.name,hint:Number(i.default_price)?money(i.default_price)+' TTC':(i.default_duration_minutes?i.default_duration_minutes+' min':'')})),{title:`Suggestions · ${prof().serviceLabel||'prestations'}`});
   const warrantyScopeLabel=g=>g.scope_type==='parts'?'Pièces uniquement':g.scope_type==='labor'?'Main-d’œuvre uniquement':g.scope_type==='both'?'Pièces et main-d’œuvre':'';
   attachSuggest($('#warrantyText'),()=>[...S.policies.map(g=>({value:g.name,scopeType:g.scope_type,hint:warrantyScopeLabel(g)})),...(prof().warranty||[]).map(v=>({value:v}))],{title:'Suggestions · garanties',onPick:item=>{const scope=warrantyScopeLabel(item);if(scope&&!/pi[eè]ces?|main.?d.?oeuvre/i.test(item.value))$('#warrantyText').value=`${item.value} · ${scope}`;}});
-  const drawAll=()=>{draw();suggestLines()};
+  const drawAll=()=>{syncLinesFromDom();draw();suggestLines()};
   const refreshServiceDetection=async()=>{detectedService=detectService($('#intervention').value,S.interventions);suggestLines();if(!detectedService)return;const label=document.querySelector('#service-detected');if(label)label.textContent=`Prestation détectée : ${detectedService.name}`;try{const r=await api.priceSuggestions({service:detectedService.name,parts:S.parts.map(x=>({id:x.id,name:x.name,model:x.model,variant:x.variant,color:x.color,quality:x.quality,reference:x.reference}))});learnedParts=r.recommendedPartSignatures||[];const iv=S.interventions.find(i=>i.name.trim().toLowerCase()===detectedService.name.trim().toLowerCase());if(r.servicePrice!=null&&!Number(iv?.default_price||0)&&!num('#targetTtc')){$('#targetTtc').value=String(Number(r.servicePrice));driver='ttc';recalc();persistDraft()}const ranked=rankRelevantParts(detectedService,S.parts,learnedParts);if(ranked.length)drawAll()}catch{}};
   drawAll();
   const updateLine=ev=>{
@@ -216,7 +222,9 @@ export async function bind(){
   $('#lines').addEventListener('input',updateLine);$('#lines').addEventListener('change',updateLine);
   $('#lines').addEventListener('click',ev=>{
     if(!ev.target.classList.contains('ln-del'))return;
-    lines.splice(Number(ev.target.closest('.line-row').dataset.i),1);if(!lines.length)lines=[blank()];drawAll();recalc();persistDraft();
+    const idx=Number(ev.target.closest('.line-row').dataset.i);
+    if(lines[idx]?.partId)dismissedParts.add(lines[idx].partId);
+    lines.splice(idx,1);if(!lines.length)lines=[blank()];drawAll();recalc();persistDraft();
   });
   $('#add-line').onclick=()=>{lines.push(blank());drawAll();syncCatalogTarget();recalc();persistDraft();$('#lines').lastElementChild?.querySelector('input')?.focus()};
   $('#deviceSerialNumber')?.addEventListener('input',persistDraft);$('#deviceImei')?.addEventListener('input',persistDraft);$('#targetTtc').addEventListener('input',()=>{catalogPricing=false;driver='ttc';recalc();persistDraft()});$('#laborSellingHt').addEventListener('input',()=>{if($('#laborSellingHt').value!==''){catalogPricing=false;driver='ttc';}recalc();persistDraft()});$('#laborInternalCostHt').addEventListener('input',()=>{recalc();persistDraft()});
@@ -256,7 +264,7 @@ export async function bind(){
     if(iv&&Number(iv.default_price)&&!num('#targetTtc')){$('#targetTtc').value=Number(iv.default_price);driver='ttc';recalc()}
     if(!editing){syncCatalogTarget();if(!num('#targetTtc')){driver='net';recalc()}}
     if(!$('#warrantyText').value&&S.policies[0])$('#warrantyText').value=`Garantie ${S.policies[0].duration_months} mois`;
-    if(learnedParts.length){const wanted=S.parts.filter(x=>learnedParts.includes([x.name,x.model,x.variant,x.color,x.quality,x.reference].map(v=>String(v||'').trim().toLowerCase()).join('|')));for(const x of wanted){if(!lines.some(l=>l.partId===x.id)){lines.push({label:x.name,quantity:1,unitCost:cheapest(x),partId:x.id,saleCoefficientPercent:null});}}if(wanted.length){drawAll();recalc();}}
+    if(learnedParts.length){const wanted=S.parts.filter(x=>learnedParts.includes([x.name,x.model,x.variant,x.color,x.quality,x.reference].map(v=>String(v||'').trim().toLowerCase()).join('|')));for(const x of wanted){if(dismissedParts.has(x.id))continue;if(!lines.some(l=>l.partId===x.id)){lines.push({label:x.name,quantity:1,unitCost:cheapest(x),partId:x.id,saleCoefficientPercent:null});}}if(wanted.length){drawAll();recalc();}}
     persistDraft();
   });
   if(!q&&S.policies[0])$('#warrantyText').value=`Garantie ${S.policies[0].duration_months} mois`;

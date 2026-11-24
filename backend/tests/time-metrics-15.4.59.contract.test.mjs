@@ -116,7 +116,9 @@ test('la moyenne historique du prévisionnel n’est plus diluée par la fenêtr
   assert.match(business, /const effectiveHistoryMonths=Math\.max\(1,monthsSinceFirstPayment\|\|historyMonths\)/);
   assert.match(business, /const historicalAverage=Number\(historical\?\.total\|\|0\)\/effectiveHistoryMonths/);
   assert.match(business, /monthsSinceFirstPayment/);
-  assert.match(business, /count\(distinct date_trunc\('month',p\.paid_at\)\)::int/);
+  // 15.4.61 — la moyenne croise paiements détaillés et factures payées (union « cash »).
+  assert.match(business, /with cash as \(/);
+  assert.match(business, /count\(distinct date_trunc\('month',paid_at\)\)::int/);
   // La formule de l'année reste intacte (contrat accounting-engine-coherence).
   assert.match(business, /yearToDateHt\+historicalAverage\*remainingMonths\+open/);
   // La transparence : le nombre de mois effectifs est exposé et rappelé dans la méthode.
@@ -124,18 +126,18 @@ test('la moyenne historique du prévisionnel n’est plus diluée par la fenêtr
   assert.match(business, /mois effectivement historisés/);
 });
 
-test('la section Chantiers redevient toujours visible, quel que soit le métier', () => {
+test('Chantiers : retour au masquage par activité (fonctionnement antérieur à 15.4.59, demande utilisateur)', () => {
   const nav = read('assets/js/core/navigation.js');
   const catalog = read('backend/src/services/profile-features.ts');
   const pfFront = read('assets/js/core/profile-features.js');
-  // Le menu ne masque plus Chantiers selon le profil.
+  // Le menu masque de nouveau Chantiers quand le catalogue le déclare hors cœur.
   assert.match(nav, /\{id:'chantiers',label:'Chantiers',icon:'▣'\}/);
-  assert.doesNotMatch(nav, /features\.features\.chantiers===false/);
-  // Le catalogue serveur la traite comme capacité cœur (jamais listée comme masquée).
-  assert.match(catalog, /const CORE: FeatureKey\[\] = \['client_portal', 'chantiers'\]/);
-  assert.match(catalog, /const chantiers = true/);
-  assert.doesNotMatch(catalog, /Profil de métier non reconnu : seules les fonctions communes/);
-  // Le repli hors connexion la conserve également.
-  assert.match(pfFront, /chantiers: true/);
-  assert.doesNotMatch(pfFront, /chantiers: false/);
+  assert.match(nav, /features\.features\.chantiers===false/);
+  // Le catalogue serveur redevient sélectif : mots-clés métier, core sans chantiers.
+  assert.match(catalog, /const CORE: FeatureKey\[\] = \['client_portal'\]/);
+  assert.match(catalog, /const chantiers = has\('installation'\)/);
+  assert.match(catalog, /Profil de métier non reconnu : seules les fonctions communes/);
+  // Le repli hors connexion masque également (réapparition à la reconnexion).
+  assert.match(pfFront, /chantiers: false/);
+  assert.doesNotMatch(pfFront, /chantiers: true/);
 });

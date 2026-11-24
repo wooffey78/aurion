@@ -29,11 +29,12 @@ export function hiddenViews(questionnaire={},modules=[]){
 
 // 15.4.50 — visibilité par MÉTIER : les entrées non cœur peuvent être masquées selon le
 // questionnaire et les modules déclarés de l'activité.
-// 15.4.59 — la section Chantiers redevient TOUJOURS visible dans le menu (demande
-// utilisateur) : la rentabilité réelle par ouvrage est une capacité cœur d'Aurion, utile
-// quel que soit le métier. Le catalogue profile-features ne la masque plus non plus
-// (chantiers traité comme core côté serveur) et le repli hors connexion la conserve.
+// 15.4.61 — retour au fonctionnement d'avant 15.4.59 (demande utilisateur : le masquage par
+// activité « était finalement une bonne chose ») : l'entrée Chantiers n'est proposée que si
+// le moteur de modularité (profile-features, côté serveur) la déclare pertinente pour le
+// profil actif. Repli non destructif : tant que le moteur n'a pas répondu, elle reste visible.
 export function navigationItems({questionnaire={},modules=[],isAdmin=false,features=null}={}){
   const hidden=hiddenViews(questionnaire,modules);
+  if(features&&features.features&&features.features.chantiers===false)hidden.add('chantiers');
   return NAV_ITEMS.filter(item=>item.admin?isAdmin:!hidden.has(item.id));
 }

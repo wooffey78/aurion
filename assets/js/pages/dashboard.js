@@ -43,8 +43,8 @@ const DATASETS={
   agenda:['appointments','clients','quotes'],
   accounting:['accounting','treasury','quotes','sav','expenseReports'],
   treasury:['treasury','accounting','quotes','sav','expenseReports'],
-  settings:['templates','mail'],
-  templates:['templates','mail'],
+  settings:['mail'],
+  templates:['mail'],
   home:['clients','quotes','appointments'], 
 };
 const ALL_DATASETS=[...new Set(Object.values(DATASETS).flat())];
@@ -62,12 +62,12 @@ async function load(extras=null,viewId=S.view){
     S.company=company;S.activities=activities;lastConfigLoadedAt=Date.now();
     if((!getActiveActivity()||!activities.some(a=>a.id===getActiveActivity()))&&activities[0])setActiveActivity(activities[0].id);
   }
-  const fallback={clients:[],quotes:[],appointments:[],suppliers:[],parts:[],interventions:[],supplies:[],warranties:[],policies:[],devices:[],sav:[],templates:[],accounting:{},treasury:{},expenseReports:{expenses:[],totals:{}},mail:{configured:false},timeMetrics:null,dashboardSummary:S.dashboardCounters};
+  const fallback={clients:[],quotes:[],appointments:[],suppliers:[],parts:[],interventions:[],supplies:[],warranties:[],policies:[],devices:[],sav:[] ,accounting:{},treasury:{},expenseReports:{expenses:[],totals:{}},mail:{configured:false},timeMetrics:null,dashboardSummary:S.dashboardCounters};
   const fetchers={
     clients:()=>api.clients(),quotes:()=>api.quotes(),appointments:()=>api.appointments(),
     suppliers:()=>api.suppliers(),parts:()=>api.parts(),interventions:()=>api.interventions(),
     supplies:()=>api.supplies(),warranties:()=>api.warranties(),policies:()=>api.warrantyPolicies(),
-    devices:()=>api.devices(),sav:()=>api.sav(),templates:()=>api.documentTemplates(),
+    devices:()=>api.devices(),sav:()=>api.sav(),
     accounting:()=>api.accounting(S.accountingYear||new Date().getFullYear()),treasury:()=>api.treasury(),
     mail:()=>api.mailStatus(),expenseReports:()=>api.expenseReports(S.accountingYear||new Date().getFullYear()),timeMetrics:()=>api.timeMetrics(),
     dashboardSummary:async()=>{const counters=await api.dashboardSummary(S.forecastMonths||6);try{const sub=await api.subscription();counters.trialDaysLeft=Number(sub.daysLeft||0);counters.subscription=sub}catch{}return counters;},
@@ -77,7 +77,7 @@ async function load(extras=null,viewId=S.view){
   // le serveur est injoignable (statut 0), via le même store que la réplication (aucune donnée
   // non autorisée : le store est déjà cloisonné par compte/organisation/appareil). Les agrégats
   // lourds (comptabilité, trésorerie) gardent le dernier état connu en ligne — PARTIEL documenté.
-  const LOCAL_ENTITY={clients:'clients',quotes:'quotes',appointments:'appointments',suppliers:'suppliers',parts:'parts',interventions:'interventions',supplies:'supplies',warranties:'warranties',policies:'warranty_policies',devices:'devices',sav:'sav_cases',templates:'document_templates',expenseReports:'expense_reports'};
+  const LOCAL_ENTITY={clients:'clients',quotes:'quotes',appointments:'appointments',suppliers:'suppliers',parts:'parts',interventions:'interventions',supplies:'supplies',warranties:'warranties',policies:'warranty_policies',devices:'devices',sav:'sav_cases',expenseReports:'expense_reports'};
   const offlineLocal=async key=>{
     if(!LOCAL_ENTITY[key])return null;
     try{

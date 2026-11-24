@@ -7,7 +7,10 @@ const suggest = fs.readFileSync(new URL('../../assets/js/core/suggest.js', impor
 test('dropdown interaction keeps the menu open while toggling and typing', () => {
   assert.match(suggest, /toggle\.addEventListener\('click',ev=>\{ev\.preventDefault\(\);ev\.stopPropagation\(\)/);
   assert.match(suggest, /input\.addEventListener\('click',ev=>\{ev\.stopPropagation\(\)/);
-  assert.match(suggest, /input\.addEventListener\('focus',\(\)=>\{if\(box\.hidden\)render\(\)\}\)/);
+  // 15.4.61 — le focus ouvre la liste sauf si la valeur vient d'être choisie (repli garanti
+  // après sélection d'une prestation) ; clic sur l'input ou ▾ rouvre volontairement.
+  assert.match(suggest, /input\.addEventListener\('focus',\(\)=>\{if\(box\.hidden&&!pickedNow\(\)\)render\(\)\}\)/);
+  assert.match(suggest, /const pickedNow=\(\)=>lastPicked&&norm\(input\.value\)===norm\(lastPicked\);/);
 });
 
 test('choosing an item closes the dropdown explicitly after dispatching the change', () => {

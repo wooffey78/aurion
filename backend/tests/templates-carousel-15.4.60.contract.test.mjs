@@ -49,11 +49,13 @@ test('l\'anneau est en 3D, tourne au clic et revient à la carte d\'origine apr�
 });
 
 test('la carte de face ouvre l\'aperçu taille réelle (PDF intégré) avec validation du modèle', () => {
-  assert.match(other, /template-modal-embed"><embed src="\.\/assets\/templates\/\$\{type\}-\$\{style\}\.pdf"/);
+  assert.match(other, /template-modal-embed"><iframe src="\.\/assets\/templates\/\$\{type\}-\$\{style\}\.pdf"/);
+  // 15.4.61 — le PDF s'ouvre aussi dans un onglet dédié (repli garanti hors intégration).
+  assert.match(other, /Ouvrir dans un onglet/);
   assert.match(other, /Utiliser ce modèle/);
   assert.match(other, /applyTemplateChoice\(type,style,name\)/);
   assert.match(other, /api\.saveDocumentTemplateChoices\(next\)/);
-  assert.match(css, /\.template-modal-embed embed\{display:block/);
+  assert.match(css, /\.template-modal-embed embed,\.template-modal-embed iframe\{display:block/);
   // Fermetures prévues : croix, bouton Fermer, clic sur le fond, Échap.
   assert.match(other, /if\(ev\.key==='Escape'\)\{back\.remove\(\)/);
   assert.match(other, /if\(ev\.target===back\)back\.remove\(\)/);

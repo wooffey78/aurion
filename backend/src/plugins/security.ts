@@ -8,11 +8,15 @@ import { config } from "../config.js";
 export default fp(async app=>{
   const prod=config.NODE_ENV==="production";
   await app.register(helmet,{
-    // CSP stricte : uniquement des scripts / styles servis par Aurion ; blob: autorisé pour l'aperçu PDF ; jamais intégrable dans un iframe tiers.
+    // CSP stricte : uniquement des scripts / styles servis par Aurion ; blob: autorisé pour l'aperçu PDF.
+    // 15.4.61 — frame-ancestors passe de 'none' à 'self' : l'aperçu « taille réelle » des modèles
+    // (<embed>/<iframe> du PDF dans la fenêtre modale, même origine) était bloqué par 'none'
+    // (« aurion-…onrender.com n'autorise pas la connexion »). 'self' autorise uniquement
+    // l'intégration par Aurion lui-même et continue de bloquer tout iframe tiers.
     contentSecurityPolicy:{useDefaults:false,directives:{
       defaultSrc:["'self'"],scriptSrc:["'self'"],styleSrc:["'self'"],imgSrc:["'self'","data:","blob:"],
       fontSrc:["'self'","data:"],connectSrc:["'self'"],objectSrc:["'self'","blob:"],frameSrc:["'self'","blob:"],
-      frameAncestors:["'none'"],baseUri:["'self'"],formAction:["'self'"],
+      frameAncestors:["'self'"],baseUri:["'self'"],formAction:["'self'"],
       ...(prod?{upgradeInsecureRequests:[]}:{})
     }},
     referrerPolicy:{policy:"no-referrer"},

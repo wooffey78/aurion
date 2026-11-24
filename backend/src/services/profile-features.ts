@@ -23,7 +23,7 @@ export interface ProfileFeatures {
   hidden: Array<{ key: FeatureKey; reason: string }>;
 }
 
-const CORE: FeatureKey[] = ['client_portal', 'chantiers'];
+const CORE: FeatureKey[] = ['client_portal'];
 
 /** Appariement déterministe documenté. Fonction PURE — testée sans base. */
 export function featuresForProfile(profileCode: string): ProfileFeatures {
@@ -34,20 +34,20 @@ export function featuresForProfile(profileCode: string): ProfileFeatures {
   if (!profile || profile.code !== profileCode) {
     // Profil inconnu : comportement sûr — core seul, tout le reste masqué avec raison.
     const features = Object.fromEntries(
-      ['maintenance', 'stock_locations', 'warranty_workflows', 'time_tracking', 'device_tracking'].map(k => [k, false]),
+      ['chantiers', 'maintenance', 'stock_locations', 'warranty_workflows', 'time_tracking', 'device_tracking'].map(k => [k, false]),
     ) as Record<FeatureKey, boolean>;
     features.client_portal = true;
-    features.chantiers = true; // 15.4.59 — capacité core, même pour un profil non reconnu.
-    return { profileCode, profileTitle: '', features, hidden: [] };
+    return { profileCode, profileTitle: '', features, hidden: [{ key: 'chantiers', reason: 'Profil de métier non reconnu : seules les fonctions communes sont proposées.' }] };
   }
   const title = String(profile.title || '').toLowerCase();
   const modules = (profile.modules || []).map((m: string) => String(m).toLowerCase());
   const has = (needle: string) => modules.some(m => m.includes(needle)) || title.includes(needle);
 
-  // 15.4.59 — Chantiers redevient une capacité CORE (demande utilisateur) : la rentabilité
-  // réelle par ouvrage est proposée quel que soit le métier ; elle n'apparaît plus dans la
-  // liste « ce que ce métier n'affiche pas ». (Ancien appariement par mots-clés retiré.)
-  const chantiers = true;
+  // 15.4.61 — retour au fonctionnement d'avant 15.4.59 (demande utilisateur : le masquage par
+  // activité « était finalement une bonne chose »). Chantiers est pertinent dès qu'il y a
+  // déplacement/installation/chantier (matériel, installations, véhicules, projets) — pas
+  // pour une prestation purement de bureau (ex. comptable démo).
+  const chantiers = has('installation') || has('véhicule') || has('materiel') || has('matériel') || has('chantier') || has('projets') || has('dossier') || has('appareil');
   // Maintenance : métiers d'entretien récurrent identifiés par mots-clés du libellé.
   const maintenance = /chauffage|plomberie|clim|cvc|entretien|jardin|piscine|serrure|vitrerie|nettoyage|informatique|domotique|bronch|ramonage/.test(title);
   const stockLocations = has('pièce') || has('piece') || has('matériel') || has('materiel') || has('composant');

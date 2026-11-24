@@ -8,6 +8,14 @@ export async function monthlyAccounting(orgId:string,activityId:string,year?:num
  const params:any[]=[orgId,activityId];if(year)params.push(year);
  const entParams:any[]=[orgId,activityId];if(year)entParams.push(year);
  const [inv,ent,exp]=await Promise.all([query(`
+   -- 15.4.61 — CROISEMENT DES SOURCES D'ENCAISSEMENT : jusqu'ici, seules les lignes de
+   -- invoice_payments alimentaient la comptabilité de trésorerie. Les factures marquées
+   -- payées SANS ligne de paiement (saisie directe, import de données Excel, historique)
+   -- pesaient 0 € : encaissements HT, TVA encaissée, cotisations, kilométrage et nombre de
+   -- factures encaissées restaient vides malgré une activité réelle. La source est désormais
+   -- l'UNION des paiements détaillés et des factures payées sans paiement détaillé
+   -- (montant = amount_paid, date = paid_at puis repli updated_at/created_at) — une facture
+   -- qui a des lignes de paiement n'est jamais comptée deux fois.
    with payment_rows as (
      select p.id payment_id,p.quote_id,p.amount,p.paid_at,q.total_ttc,q.vat_rate,q.part_cost,q.shipping_cost,
             q.mileage_total,q.mileage_mode,q.mileage_internal_rate,q.mileage_km,q.labor_internal_cost_ht,
@@ -18,6 +26,20 @@ export async function monthlyAccounting(orgId:string,activityId:string,year?:num
             case when q.mileage_mode='margin' then case when coalesce(q.mileage_internal_rate,0)>0 then coalesce(q.mileage_km,0)*q.mileage_internal_rate else coalesce(q.mileage_total,0) end else 0 end::numeric internal_mileage
      from invoice_payments p join quotes q on q.id=p.quote_id
      where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice'
+       and lower(coalesce(q.status,'')) not in ('canceled','cancelled','annulé','annule','void','deleted')
+     union all
+     select null::uuid payment_id,q.id quote_id,q.amount_paid amount,
+            coalesce(q.paid_at,q.updated_at,q.created_at) paid_at,q.total_ttc,q.vat_rate,q.part_cost,q.shipping_cost,
+            q.mileage_total,q.mileage_mode,q.mileage_internal_rate,q.mileage_km,q.labor_internal_cost_ht,
+            q.purchase_vat_mode,q.purchase_vat_rate,q.contribution_snapshot,q.urssaf_rate,
+            q.coefficient_basis,q.coefficient_unit,q.coefficient_value,q.part_coefficient_percent,
+            coalesce((select sum(i.quantity) from quote_items i where i.quote_id=q.id),1)::numeric part_quantity,
+            0::numeric paid_before,
+            case when q.mileage_mode='margin' then case when coalesce(q.mileage_internal_rate,0)>0 then coalesce(q.mileage_km,0)*q.mileage_internal_rate else coalesce(q.mileage_total,0) end else 0 end::numeric internal_mileage
+     from quotes q
+     where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice'
+       and q.payment_status in ('paid','partially_paid') and coalesce(q.amount_paid,0)>0
+       and not exists(select 1 from invoice_payments p2 where p2.quote_id=q.id)
        and lower(coalesce(q.status,'')) not in ('canceled','cancelled','annulé','annule','void','deleted')
    ), allocated as (
      select pr.*,

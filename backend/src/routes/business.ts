@@ -413,12 +413,20 @@ function composeClientAddress(nc:any){
   const line=[String(nc?.address||'').trim(),[String(nc?.postalCode||'').trim(),String(nc?.city||'').trim()].filter(Boolean).join(' ')].filter(Boolean);
   return line.join('\n')||null;
 }
-async function createClientForDocument(executor:SqlExecutor,org:string,aid:string,nc:any){
+async function createClientForDocument(executor:SqlExecutor,org:string,aid:string,userId:string,nc:any){
   const id=crypto.randomUUID();
   const address=composeClientAddress(nc);
   await executor.query(
     `insert into clients(id,organization_id,activity_id,name,email,phone,address,intervention_address,siret) values($1,$2,$3,$4,nullif($5,''),nullif($6,''),$7,nullif($8,''),nullif($9,''))`,
     [id,org,aid,String(nc.name).trim(),String(nc.email||'').trim(),String(nc.phone||'').trim(),address,String(nc.interventionAddress||'').trim(),String(nc.siret||'').replace(/\s/g,'')],
+  );
+  // 15.4.61 — le compteur de temps économisé se déclenche DÈS la création de la fiche client,
+  // y compris via la création directe à l'intérieur d'un devis/facture : même démarrage
+  // automatique que POST /clients (session « running » par défaut, bornée par l'index unique
+  // 012 dont les sessions ouvertes sont refermées par l'appelant avant l'écriture).
+  await executor.query(
+    `insert into client_time_sessions(id,organization_id,user_id,client_id,activity_id,manual_minutes,started_at) values($1,$2,$3,$4,$5,coalesce((select c.estimated_minutes from clients c where c.id=$4),0),now())`,
+    [crypto.randomUUID(),org,userId,id,aid],
   );
   return id;
 }
@@ -1518,7 +1526,7 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
       await withTransaction(async clientDb=>{
         if(withNewClient){
           // Bloc 11 : fiche client + document dans la même transaction — jamais de création partielle.
-          b.clientId=await createClientForDocument(clientDb,org,aid,b.newClient);
+          b.clientId=await createClientForDocument(clientDb,org,aid,r.auth!.userId,b.newClient);
         }
         await clientDb.query(`insert into quotes(
           id,organization_id,activity_id,client_id,number,document_type,status,intervention,product,
@@ -2339,24 +2347,34 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
       query(`select coalesce(sum(total_ht),0)::numeric total from quotes where organization_id=$1 and activity_id=$2 and document_type='quote' and lower(coalesce(status,'')) not in ('canceled','cancelled','annulé','annule','rejected','refused','expired','void','deleted')`,[org,aid]),
       query(`select count(*)::int n,min(coalesce(next_reminder_at,due_at,created_at)) first_date from quotes where organization_id=$1 and activity_id=$2 and document_type='invoice' and payment_status<>'paid' and reminder_count=3 and lower(coalesce(status,'')) not in ('canceled','cancelled','annulé','annule','void','deleted')`,[org,aid]),
       query(`
+      -- 15.4.61 — CROISEMENT des sources d'encaissement pour la moyenne historique : les
+      -- factures marquées payées sans ligne de paiement (saisie directe, import Excel)
+      -- pesaient 0 € dans la moyenne, ce qui vidait les projections. Même union que le
+      -- moteur comptable (services/accounting.ts) : paiements détaillés ∪ factures payées.
+      with cash as (
+        select p.paid_at,(p.amount/nullif(1+q.vat_rate/100,0)) ht
+        from invoice_payments p join quotes q on q.id=p.quote_id
+        where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice'
+          and lower(coalesce(q.status,'')) not in ('canceled','cancelled','annulé','annule','void','deleted')
+        union all
+        select coalesce(q.paid_at,q.updated_at,q.created_at),(q.amount_paid/nullif(1+q.vat_rate/100,0)) ht
+        from quotes q
+        where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice'
+          and q.payment_status in ('paid','partially_paid') and coalesce(q.amount_paid,0)>0
+          and not exists(select 1 from invoice_payments p2 where p2.quote_id=q.id)
+          and lower(coalesce(q.status,'')) not in ('canceled','cancelled','annulé','annule','void','deleted')
+      )
       select (
-        coalesce((select sum(p.amount/nullif(1+q.vat_rate/100,0))
-          from invoice_payments p join quotes q on q.id=p.quote_id
-          where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice'
-            and p.paid_at>=now()-($3||' months')::interval),0)
+        coalesce((select sum(ht) from cash where paid_at>=now()-($3||' months')::interval),0)
         + coalesce((select sum(s.amount_ttc/nullif(1+coalesce(q.vat_rate,0)/100,0))
           from sav_cases s join quotes q on q.id=s.invoice_id
           where s.organization_id=$1 and s.activity_id=$2 and s.sav_type='financial'
             and s.created_at>=now()-($3||' months')::interval),0)
       )::numeric total,
-      (select count(distinct date_trunc('month',p.paid_at))::int
-        from invoice_payments p join quotes q on q.id=p.quote_id
-        where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice'
-          and p.paid_at>=now()-($3||' months')::interval) history_months,
-      (select min(p.paid_at)
-        from invoice_payments p join quotes q on q.id=p.quote_id
-        where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice'
-          and p.paid_at>=now()-($3||' months')::interval) first_payment`,[org,aid,historyMonths]),
+      (select count(distinct date_trunc('month',paid_at))::int
+        from cash where paid_at>=now()-($3||' months')::interval) history_months,
+      (select min(paid_at)
+        from cash where paid_at>=now()-($3||' months')::interval) first_payment`,[org,aid,historyMonths]),
       query(`select count(*)::int n,min(ends_at) next_end from warranties where organization_id=$1 and ends_at>now()`,[org]),
       query(`select title,starts_at,client_id from appointments where organization_id=$1 and activity_id=$2 and starts_at>now() order by starts_at asc limit 5`,[org,aid]),
       query('select trial_ends_at,current_period_end from subscriptions where organization_id=$1',[org]),
@@ -2379,12 +2397,16 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     const effectiveHistoryMonths=Math.max(1,monthsSinceFirstPayment||historyMonths);
     const historicalAverage=Number(historical?.total||0)/effectiveHistoryMonths;
     const open=Number(f.rows[0]?.total||0);
-    const nextMonth=open;
     const currentDate=new Date();
     const monthHt=Number(yearAccounting.find(m=>{const d=new Date(m.month);return d.getFullYear()===accountingYear&&d.getMonth()===currentDate.getMonth()})?.revenueHt||0);
     const yearToDateHt=yearAccounting.reduce((sum,m)=>sum+Number(m.revenueHt||0),0);
     const remainingMonths=Math.max(0,11-currentDate.getMonth());
-    const forecast={month:monthHt,monthHt,month1:nextMonth,months3:monthHt+historicalAverage*2+open,months6:monthHt+historicalAverage*5+open,year:yearToDateHt+historicalAverage*remainingMonths+open,monthlyAverage:historicalAverage,historyMonths,effectiveHistoryMonths,method:`Prévision en HT : encaissements historiques HT moyens (moyenne ramenée aux ${effectiveHistoryMonths} mois effectivement historisés${effectiveHistoryMonths<historyMonths?`, et non aux ${historyMonths} mois de la fenêtre`:''}), devis ouverts HT et SAV financiers ramenés en HT. Les devis annulés ou refusés sont exclus. L’année combine le réalisé depuis janvier et les mois restants estimés.`};
+    // 15.4.61 — « 1 mois » : le réalisé du mois en cours + la moyenne historique HT. L'ancien
+    // nextMonth=open ajoutait TOUS les devis ouverts comme signés et facturés le mois suivant :
+    // la prévision de facturation ne faisait pas ce qu'elle est censée faire. Les devis ouverts
+    // restent le potentiel affiché séparément (trésorerie) et alimentent les horizons 3/6 mois/année.
+    const nextMonth=monthHt+historicalAverage;
+    const forecast={month:monthHt,monthHt,month1:nextMonth,months3:monthHt+historicalAverage*2+open,months6:monthHt+historicalAverage*5+open,year:yearToDateHt+historicalAverage*remainingMonths+open,monthlyAverage:historicalAverage,historyMonths,effectiveHistoryMonths,method:`Prévision en HT : encaissements historiques HT moyens (moyenne ramenée aux ${effectiveHistoryMonths} mois effectivement historisés${effectiveHistoryMonths<historyMonths?`, et non aux ${historyMonths} mois de la fenêtre`:''}, paiements détaillés et factures payées croisées), réalisé du mois, et devis ouverts HT pour les horizons 3/6 mois et année — le mois à venir n’ajoute plus l’intégralité des devis ouverts. SAV financiers ramenés en HT ; devis annulés ou refusés exclus. L'année combine le réalisé depuis janvier et les mois restants estimés.`};
     const warr=warrResult.rows[0];
     const appointments=appointmentsResult.rows;
     const sub=subResult.rows[0]||null;
@@ -2427,7 +2449,15 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     const year=Number((r.query as any)?.year)||new Date().getFullYear();const org=r.auth!.organizationId;
     const months=await monthlyAccounting(org,aid!,year);
     const totals=months.reduce((t,m)=>({revenue_ht:t.revenue_ht+m.revenueHt,vat:t.vat+m.vat,purchases:t.purchases+m.purchases,purchase_vat:t.purchase_vat+(m.purchaseVat||0),social:t.social+m.social,mileage_total:t.mileage_total+Number(m.mileage||0)}),{revenue_ht:0,vat:0,purchases:0,purchase_vat:0,social:0,mileage_total:0});
-    const count=Number((await query(`select count(distinct q.id)::int n from quotes q join invoice_payments p on p.quote_id=q.id where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice' and p.paid_at>=make_date($3,1,1) and p.paid_at<make_date($3+1,1,1)`,[org,aid,year])).rows[0]?.n||0);
+    // 15.4.61 — « Factures encaissées » croise les mêmes sources que le moteur comptable :
+    // paiements détaillés ∪ factures payées sans ligne de paiement (saisie directe, import
+    // Excel) — sinon l'encart restait à 0 pour une activité dont les factures sont marquées
+    // payées sans enregistrement de paiement détaillé.
+    const count=Number((await query(`select count(distinct quote_id)::int n from (
+      select q.id quote_id from invoice_payments p join quotes q on q.id=p.quote_id where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice' and p.paid_at>=make_date($3,1,1) and p.paid_at<make_date($3+1,1,1)
+      union
+      select q.id from quotes q where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice' and q.payment_status in ('paid','partially_paid') and coalesce(q.amount_paid,0)>0 and not exists(select 1 from invoice_payments p2 where p2.quote_id=q.id) and coalesce(q.paid_at,q.updated_at,q.created_at)>=make_date($3,1,1) and coalesce(q.paid_at,q.updated_at,q.created_at)<make_date($3+1,1,1)
+    ) u`,[org,aid,year])).rows[0]?.n||0);
     const invoices={...totals,count};
     const expenseReportsHt=months.reduce((t,m)=>t+Number(m.expenseReports||0),0);
     // Bloc 8 — ventilation par catégorie d'activité (tableau de bord comptabilité).
