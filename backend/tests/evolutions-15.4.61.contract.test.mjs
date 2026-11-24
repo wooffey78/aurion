@@ -55,9 +55,9 @@ test('3 — la pièce proposée automatiquement reste modifiable et supprimable'
 });
 
 test('4 — espacement desktop plus conséquent dans l\'anneau 3D', () => {
-  assert.match(other, /const rz=Math\.max\(150,Math\.min\(400,w\*0\.44\)\);/);
-  assert.match(other, /const rx=Math\.max\(70,Math\.min\(280,\(cardW\*1\.05\*mag\/2\)\*1\.35\)\);/);
-  assert.match(other, /espacement desktop plus conséquent/);
+  assert.match(other, /const rz=Math\.max\(150,Math\.min\(560,w\*0\.5\)\);/);
+  assert.match(other, /const rx=Math\.max\(70,Math\.min\(360,\(cardW\*1\.05\*mag\/2\)\*1\.5\)\);/);
+  assert.match(other, /espacement desktop (?:plus conséquent|nettement supérieur)/);
 });
 
 test('5 — l\'aperçu taille réelle est débloqué : CSP frame-ancestors self + iframe + ouverture en onglet', () => {

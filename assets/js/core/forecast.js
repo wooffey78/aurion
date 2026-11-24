@@ -109,8 +109,12 @@ export function deriveAutomaticForecastAssumptions(documents = [], activity = {}
       }
     }
   }
+  // 15.4.62 — le prévisionnel PREND LES DEVIS EN COMPTE : le volume mensuel retient les
+  // factures récentes ET les devis récents (document_type='quote' non annulé), sinon une
+  // activité qui devisse sans encore facturer restait à 0 facture/mois.
+  const projectedCount = recentInvoices.length + quoteSamples.length;
   const normalized = normalizeForecastAssumptions({
-    potentialClientsPerMonth: recentInvoices.length / 6,
+    potentialClientsPerMonth: projectedCount / 6,
     averageTicketTtc: average(ticketValues),
     averageTicketHt: average(ticketHtValues),
     variableCostPerRepair: average(costValues),
@@ -124,9 +128,9 @@ export function deriveAutomaticForecastAssumptions(documents = [], activity = {}
       recentInvoiceCount: recentInvoices.length,
       sampleCount: sample.length,
       sampleSource: fromInvoices ? 'factures récentes' : (quoteSamples.length ? 'devis récents (aucune facture récente)' : 'aucun document récent'),
-      volumeNote: recentInvoices.length
-        ? 'Moyenne des factures créées sur les 6 derniers mois.'
-        : 'Aucune facture récente : Aurion retient 0 facture par mois faute d’historique.',
+      volumeNote: projectedCount
+        ? (recentInvoices.length ? 'Moyenne des factures' : 'Moyenne des devis') + (recentInvoices.length && quoteSamples.length ? ' et devis' : '') + ' créés sur les 6 derniers mois.'
+        : 'Aucun document récent : Aurion retient 0 facture par mois faute d’historique.',
       ticketNote: ticketValues.length
         ? 'Ticket moyen calculé à partir des ' + (fromInvoices ? 'factures' : 'devis récents') + ' disponibles.'
         : 'Aucun montant de document récent exploitable.',

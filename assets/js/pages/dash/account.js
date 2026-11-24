@@ -34,7 +34,10 @@ export async function bind(){
     :s.status==='no_billing'
     ?'<div class="notice"><b>Sans abonnement.</b> La facturation n’est pas configurée sur cette installation : votre accès est complet, sans paiement, sans essai et sans échéance.</div>'
     :`<div class="notice ${s.readOnly?'warn-notice':''}">${s.status==='expired'?expiredNotice:'Statut de votre abonnement.'}</div>`;
-  const avatarMarkup=u.avatarUrl?`<img class="account-avatar-image" id="avatar-preview" alt="Avatar du compte">`:`<div class="avatar-lg" id="avatar-preview">${e((u.fullName||u.email)[0].toUpperCase())}</div>`;
+  // 15.4.62 — avatar jamais vide : les initiales sont TOUJOURS rendues sous l'image ; l'image
+  // téléversée les recouvre quand elle charge réellement, et disparaît (onerror/échec du
+  // chargement) au profit des initiales — plus aucun « rond vide ».
+  const avatarMarkup=`<div class="account-avatar-stack"><div class="avatar-lg" aria-hidden="true">${e((u.fullName||u.email||'A')[0].toUpperCase())}</div>${u.avatarUrl?`<img class="account-avatar-image" id="avatar-preview" alt="Avatar du compte">`:''}</div>`;
   root.innerHTML=`
    <section class="panel stack"><h2>Profil</h2>
     <div class="account-id"><div class="account-avatar">${avatarMarkup}</div><div><b>${e(u.email)}</b><small class="muted">${e(acc.organization?.name||'')} · rôle ${e(acc.role)} · compte créé le ${fdate(u.createdAt)}</small></div></div>
@@ -140,7 +143,10 @@ export async function bind(){
   });
   void loadPasskeys();
   if(avatarObjectUrl){URL.revokeObjectURL(avatarObjectUrl);avatarObjectUrl='';}
-  if(u.avatarUrl){try{const response=await api.accountAvatar();if(response.ok){const blob=await response.blob();avatarObjectUrl=URL.createObjectURL(blob);const img=$('#avatar-preview');if(img)img.src=avatarObjectUrl;}}catch{}}
+  // 15.4.62 — l'image ne s'applique que si elle existe et n'est pas vide (blob de 0 octet =
+  // rond vide garanti) ; sinon les initiales restent affichées.
+  if(u.avatarUrl){try{const response=await api.accountAvatar();if(response.ok){const blob=await response.blob();if(blob&&blob.size>0){avatarObjectUrl=URL.createObjectURL(blob);const img=$('#avatar-preview');if(img){img.onerror=()=>img.remove();img.src=avatarObjectUrl}else{URL.revokeObjectURL(avatarObjectUrl);avatarObjectUrl=''}}}}catch{}}
+  else{const img=$('#avatar-preview');if(img)img.remove();}
   $('#download-all').onclick=()=>api.downloadAll();
   $('#acc-form').onsubmit=async ev=>{ev.preventDefault();try{await api.updateAccount({fullName:$('#fullName').value.trim(),jobTitle:$('#jobTitle').value.trim(),mobilePhone:$('#mobilePhone').value.trim(),fixedPhone:$('#fixedPhone').value.trim()});toast('Profil enregistré','success');await hooks.refresh('account')}catch(x){toast(x.message,'error')}};
   $('#avatar-form').onsubmit=async ev=>{ev.preventDefault();const file=$('#avatar-file').files?.[0];if(!file){toast('Choisissez une image.','error');return}try{

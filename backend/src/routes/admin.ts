@@ -291,4 +291,29 @@ export async function adminRoutes(app:FastifyInstance){
     // BOM UTF-8 : ouverture directe dans un tableur avec les accents corrects.
     return '\uFEFF'+['date;evenement;organisation;activite;metier;confiance;raisons;contenu_propose',...lines].join('\r\n');
   });
+  // 15.4.62 — Administration → Intégrations → Plateformes agréées → Tiime : configuration de la
+  // connexion globale, stockée côté serveur et protégée. Les secrets ne sont jamais renvoyés en
+  // clair (booléens « configuré ») ; la connexion réelle reste « non établie » tant que les
+  // paramètres réels de Tiime n'ont pas été délivrés — aucun état n'est simulé, repli garanti
+  // vers le site officiel depuis l'interface.
+  const tiimeRow=async()=>(await query('select * from platform_tiime_config order by updated_at desc limit 1')).rows[0]||null;
+  const tiimePublic=(row:any|null)=>row?{configured:Boolean(String(row.api_identifier||'')||String(row.api_url||'')),environment:row.environment==='production'?'production':'test',apiIdentifier:String(row.api_identifier||''),apiUrl:String(row.api_url||''),oauthUrl:String(row.oauth_url||''),redirectUri:String(row.redirect_uri||''),scopes:String(row.scopes||''),apiSecretConfigured:Boolean(String(row.api_secret||'')),webhookSecretConfigured:Boolean(String(row.webhook_secret||'')),updatedAt:row.updated_at}:{configured:false,environment:'test',apiIdentifier:'',apiUrl:'',oauthUrl:'',redirectUri:'',scopes:'',apiSecretConfigured:false,webhookSecretConfigured:false,updatedAt:null};
+  app.get('/admin/tiime',async()=>tiimePublic(await tiimeRow()));
+  app.put('/admin/tiime',async(r,reply)=>{
+    const b:any=r.body||{};
+    const field=(k:string,max:number)=>{const v=String(b[k]??'').trim();return v.length>max?null:v};
+    const apiIdentifier=field('apiIdentifier',255);if(apiIdentifier===null)return reply.code(400).send({error:'INVALID_INPUT'});
+    const apiUrl=field('apiUrl',255);if(apiUrl===null)return reply.code(400).send({error:'INVALID_INPUT'});
+    const oauthUrl=field('oauthUrl',255);if(oauthUrl===null)return reply.code(400).send({error:'INVALID_INPUT'});
+    const redirectUri=field('redirectUri',255);if(redirectUri===null)return reply.code(400).send({error:'INVALID_INPUT'});
+    const scopes=field('scopes',255);if(scopes===null)return reply.code(400).send({error:'INVALID_INPUT'});
+    const environment=b.environment==='production'?'production':'test';
+    const existing=await tiimeRow();
+    // Secrets : une valeur vide conserve l'existant (ils ne transitent jamais en retour d'API).
+    const apiSecret=String(b.apiSecret||'').slice(0,512)||String(existing?.api_secret||'');
+    const webhookSecret=String(b.webhookSecret||'').slice(0,512)||String(existing?.webhook_secret||'');
+    await query(`insert into platform_tiime_config(api_identifier,api_secret,api_url,oauth_url,redirect_uri,scopes,webhook_secret,environment) values($1,$2,$3,$4,$5,$6,$7,$8)`,[apiIdentifier,apiSecret,apiUrl,oauthUrl,redirectUri,scopes,webhookSecret,environment]);
+    return tiimePublic(await tiimeRow());
+  });
 }
+

@@ -39,7 +39,9 @@ async function forecastPanelMarkup(prefix,documents=S.quotes,activity=active()){
  ];
  const cards=autoValues.map(([label,value,help])=>'<article class="forecast-auto-value"><span>'+label+'</span><strong>'+value+'</strong><small>'+help+'</small></article>').join('');
  const rows=p.periods.map(period=>'<tr data-forecast-period="'+period.months+'"><th scope="row">'+(period.months===1?'1 mois':period.months+' mois')+'</th><td data-forecast-cell="repairs">'+quantity(period.repairs)+'</td><td data-forecast-cell="entries">'+money(period.entries)+'</td><td data-forecast-cell="outputs">'+money(period.outputs)+'</td><td data-forecast-cell="net">'+money(period.net)+'</td></tr>').join('');
- const historyControl=prefix==='home'?'<div class="button-row forecast-legacy-controls"><label class="field inline"><span>Période de référence</span><select id="forecast-history">'+[['3','3 mois'],['6','6 mois'],['year','Année en cours'],['365','365 jours']].map(([v,l])=>'<option value="'+v+'" '+(String(S.dashboardCounters?.forecast?.historyMonths||6)===v?'selected':'')+'>'+l+'</option>').join('')+'</select></label><button class="link-btn" id="forecast-detail" type="button">Détail</button></div><div id="forecast-more" hidden class="metrics"><article><span>3 mois — projection HT</span><b>'+money(S.dashboardCounters?.forecast?.months3||0)+'</b></article><article><span>6 mois — projection HT</span><b>'+money(S.dashboardCounters?.forecast?.months6||0)+'</b></article><article><span>Année — réalisé HT + projection HT</span><b>'+money(S.dashboardCounters?.forecast?.year||0)+'</b></article></div>':'';
+ // 15.4.62 — plus aucun menu déroulant dans la prévision de facturation : les horizons
+ // 1/3/6/12 mois sont déjà le tableau du scénario ; le « Détail » déplie les projections HT du backend.
+ const historyControl=prefix==='home'?'<div class="button-row forecast-legacy-controls"><button class="link-btn" id="forecast-detail" type="button">Détail</button></div><div id="forecast-more" hidden class="metrics"><article><span>3 mois — projection HT</span><b>'+money(S.dashboardCounters?.forecast?.months3||0)+'</b></article><article><span>6 mois — projection HT</span><b>'+money(S.dashboardCounters?.forecast?.months6||0)+'</b></article><article><span>Année — réalisé HT + projection HT</span><b>'+money(S.dashboardCounters?.forecast?.year||0)+'</b></article></div>':'';
  return '<section class="panel forecast-simulation" data-forecast-panel="'+prefix+'"><div class="section-title forecast-title"><div><span class="eyebrow">SCÉNARIO INDICATIF</span><h2>Prévision de facturation — scénario indicatif</h2>'+historyControl+'<p class="help"><strong>Calcul automatique.</strong> Aurion calcule le volume à partir des factures récentes, le ticket et les coûts directs à partir des documents de l’activité, et la provision sur le CA HT à partir des taux configurés. Le volume et le ticket sont déduits des factures récentes ; les charges fixes peuvent être renseignées séparément.</p></div></div><div class="forecast-input-grid forecast-auto-grid">'+cards+'</div><div class="button-row"><button type="button" class="btn secondary small" data-edit-forecast-fixed-costs>Renseigner les charges fixes</button></div><div class="forecast-table-wrap"><table class="forecast-table"><thead><tr><th>Horizon</th><th>Factures projetées</th><th>Entrées estimées (TTC)</th><th>Sorties estimées (TTC + provision HT)</th><th>Solde estimé (avant TVA à reverser)</th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="help">Calcul : entrées = factures estimées × ticket moyen TTC ; sorties = coûts directs TTC + charges fixes TTC + provision de cotisations calculée sur le CA HT. La TVA collectée n’est pas déduite du solde : elle reste à reverser. Les projections combinent le réalisé du mois et la moyenne HT de la période de référence (paiements détaillés et factures payées croisés) ; les horizons 3/6 mois et année y ajoutent les devis ouverts HT, le mois à venir n’ajoute plus l’intégralité des devis ouverts : elles ne constituent pas un historique ni une promesse d’encaissement. Les créances et devis restent détaillés séparément dans la trésorerie.</p></section>';
 }
 
@@ -104,7 +106,7 @@ document.querySelector('#trial-download')?.addEventListener('click',()=>api.down
   if(caRoot){caRoot.innerHTML=chartToolbar('chart-home-ca',['bar','line','candle'],'bar');render('chart-home-ca',caData,'bar');bindChartToolbar(document,'chart-home-ca',caData,render)}
   const stRoot=document.querySelector('#toolbar-home-status');
   if(stRoot){stRoot.innerHTML=chartToolbar('chart-home-status',['pie','bar'],'pie');render('chart-home-status',statusData,'pie');bindChartToolbar(document,'chart-home-status',statusData,render)}
-}document.querySelectorAll('.journal-read-action').forEach(b=>b.addEventListener('click',async()=>{try{await api.updateJournalEvent(b.dataset.journalId,{isRead:b.dataset.read==='true'});await hooks.refresh('home')}catch(x){toast(x.message||'Mise à jour du journal impossible.','error')}}));document.querySelectorAll('.journal-resolve-action').forEach(b=>b.addEventListener('click',async()=>{try{await api.updateJournalEvent(b.dataset.journalId,{resolved:true});await hooks.refresh('home')}catch(x){toast(x.message||'Mise à jour du journal impossible.','error')}}));const forecastRoot=document.querySelector('#home-forecast-root');if(forecastRoot){try{forecastRoot.innerHTML=await forecastPanelMarkup('home',S.quotes,active());bindForecastFixedCosts(forecastRoot,'home',S.quotes,active())}catch(x){forecastRoot.innerHTML='<section class="panel"><p class="error">'+e(x.message||'Calcul du prévisionnel impossible.')+'</p></section>'}}document.querySelector('#forecast-detail')?.addEventListener('click',()=>{const x=document.querySelector('#forecast-more');if(x)x.hidden=!x.hidden});document.querySelector('#forecast-history')?.addEventListener('change',async ev=>{try{S.forecastMonths=forecastHorizonMonths(ev.target.value);S.dashboardCounters=await api.dashboardSummary(S.forecastMonths);hooks.show('home')}catch(x){toast(x.message,'error')}});document.querySelector('#reset-time-metrics')?.addEventListener('click',async()=>{const current=active()||{};if(!current.id){toast('Sélectionnez d’abord une activité : la remise à zéro ne peut pas porter sur toutes les activités à la fois.','error');return}
+}document.querySelectorAll('.journal-read-action').forEach(b=>b.addEventListener('click',async()=>{try{await api.updateJournalEvent(b.dataset.journalId,{isRead:b.dataset.read==='true'});await hooks.refresh('home')}catch(x){toast(x.message||'Mise à jour du journal impossible.','error')}}));document.querySelectorAll('.journal-resolve-action').forEach(b=>b.addEventListener('click',async()=>{try{await api.updateJournalEvent(b.dataset.journalId,{resolved:true});await hooks.refresh('home')}catch(x){toast(x.message||'Mise à jour du journal impossible.','error')}}));const forecastRoot=document.querySelector('#home-forecast-root');if(forecastRoot){try{forecastRoot.innerHTML=await forecastPanelMarkup('home',S.quotes,active());bindForecastFixedCosts(forecastRoot,'home',S.quotes,active())}catch(x){forecastRoot.innerHTML='<section class="panel"><p class="error">'+e(x.message||'Calcul du prévisionnel impossible.')+'</p></section>'}}document.querySelector('#forecast-detail')?.addEventListener('click',()=>{const x=document.querySelector('#forecast-more');if(x)x.hidden=!x.hidden});document.querySelector('#reset-time-metrics')?.addEventListener('click',async()=>{const current=active()||{};if(!current.id){toast('Sélectionnez d’abord une activité : la remise à zéro ne peut pas porter sur toutes les activités à la fois.','error');return}
     // Portée explicite : SEULES les sessions de l’activité affichée sont supprimées.
     if(!await askConfirm({title:'Remettre à zéro les compteurs ?',message:`Cette action remet à zéro le compteur Temps économisé de l’activité affichée « ${current.name||'activité sélectionnée'} » : les sessions concernées sont exclues du calcul, mais leur historique est conservé pour l’audit, les statistiques et le suivi des chantiers. Les sessions des autres activités sont conservées et restent comptabilisées.`,confirmLabel:'Remettre à zéro cette activité',danger:true}))return;try{await api.resetTimeMetrics(current.id);S.timeMetrics=await api.timeMetrics(current.id);toast(`Compteurs de « ${current.name||'l’activité affichée'} » remis à zéro. L’historique est conservé ; les autres activités sont inchangées.`,'success');await hooks.refresh('home')}catch(x){toast(x.message,'error')}})}};
 
@@ -286,12 +288,13 @@ export const templates={view(){
     const layout=()=>{
       const w=stage.clientWidth||360;
       const cardW=parseFloat(getComputedStyle(cards[0]).width)||210;
-      // 15.4.61 — espacement desktop plus conséquent : l'anneau est plus profond (rz) et les
-      // cartes s'écartent davantage latéralement (rx) sur les grands écrans ; les planchers
-      // préservent la lisibilité mobile (le rayon reste borné par la scène).
-      const rz=Math.max(150,Math.min(400,w*0.44));
+      // 15.4.62 — espacement desktop nettement supérieur (demande utilisateur) : l'anneau est
+      // beaucoup plus profond (rz plafonné à 560px) et les cartes beaucoup plus écartées
+      // latéralement (rx plafonné à 360px, coefficient 1.5) ; la scène est agrandie en
+      // conséquence (hauteur 560px sur grand écran) et les planchers mobiles sont conservés.
+      const rz=Math.max(150,Math.min(560,w*0.5));
       const mag=1600/(1600-(rz+36));
-      const rx=Math.max(70,Math.min(280,(cardW*1.05*mag/2)*1.35));
+      const rx=Math.max(70,Math.min(360,(cardW*1.05*mag/2)*1.5));
       cards.forEach(card=>{
         const i=Number(card.dataset.index);
         const rel=((i*STEP+angle)%360+360)%360; // 0° = face avant.
@@ -363,6 +366,7 @@ const adminLoaders = {
   guests: () => api.adminGuests(),
   billing: () => api.adminBillingPending(),
   deletions: () => api.adminAccountDeletions(),
+  tiime: () => api.adminTiime(),
 };
 function describeAdminError(error) {
   const status = Number(error?.status || error?.statusCode || 0);
@@ -420,11 +424,13 @@ export const admin = {
     const deletionsReady = !!adminCache.values.deletions;
     const delStatus = { pending: 'En attente', processing: 'En cours', processed: 'Traitée', cancelled: 'Annulée', rejected: 'Rejetée' };
     const formatAverage = value => Number(value || 0).toFixed(1);
+    const tiime = adminCache.values.tiime || { configured: false, environment: 'test', apiIdentifier: '', apiUrl: '', oauthUrl: '', redirectUri: '', scopes: '', apiSecretConfigured: false, webhookSecretConfigured: false };
+    const tiimeReady = !!adminCache.values.tiime;
 
     root.innerHTML = `
       <section class="panel" data-admin-section="stats">
         ${adminSectionState('stats')}
-        ${statsReady ? `<div class="metrics">
+        ${statsReady ? `<div class="metrics" id="admin-metrics">
           <article><span>Entreprises / organisations</span><b>${Number(s.organizations || 0)}</b></article>
           <article><span>Comptes utilisateurs</span><b>${Number(s.users || 0)}</b></article>
           <article><span>Accès gratuits (admin / VIP)</span><b>${Number(s.free || 0)}</b><small>${Number(s.freeBreakdown?.adminOnly || 0)} admin · ${Number(s.freeBreakdown?.vipOnly || 0)} VIP · ${Number(s.freeBreakdown?.adminAndVip || 0)} mixtes</small></article>
@@ -442,6 +448,25 @@ export const admin = {
         </div><div class="section-title"><h2>Estimation des créations d’entreprises</h2></div>
         <p>À partir des deux derniers mois complets : <b>${Number(s.predictions?.nextMonth || 0)}</b> créations estimées le mois prochain et <b>${Number(s.predictions?.nextYear || 0)}</b> sur douze mois. Cette estimation est indicative.</p>
         <small class="muted">${e(s.note || '')}</small>` : '<p class="muted">Les indicateurs ne sont pas disponibles.</p>'}
+        <div class="section-title admin-view-switch"><h2>Vue des indicateurs</h2><div class="button-row"><button type="button" class="btn secondary small" id="admin-view-cards" aria-pressed="true">Cartes</button><button type="button" class="btn secondary small" id="admin-view-charts" aria-pressed="false">Diagrammes</button></div></div>
+        <div id="admin-charts" hidden class="admin-charts-grid"><div class="chart-box" id="chart-admin-orgs"></div><div class="chart-box" id="chart-admin-free"></div><div class="chart-box" id="chart-admin-billing"></div><div class="chart-box" id="chart-admin-conversion"></div></div>
+      </section>
+
+      <section class="panel" data-admin-section="tiime">
+        ${adminSectionState('tiime')}
+        <div class="section-title"><div><span class="eyebrow">ADMINISTRATION → INTÉGRATIONS → PLATEFORMES AGRÉÉES</span><h2>Activez votre facturation électronique avec Aurion et Tiime</h2></div><span class="pill" id="tiime-status-pill">${tiimeReady ? (tiime.configured ? `Configuration enregistrée · ${tiime.environment === 'production' ? 'production' : 'test'}` : 'Connexion : non établie') : '—'}</span></div>
+        <p class="help">Souscription (option 1) : créez votre compte chez Tiime via le lien officiel. L'activation directement dans Aurion (option 2) reste désactivée tant que Tiime n'a pas officiellement autorisé l'authentification embarquée, la création de compte partenaire, le rattachement d'entreprise, l'acceptation des conditions, la désignation réglementaire et le retour d'autorisation — aucun partenariat n'est présenté comme signé ; la connexion réelle sera activée avec les paramètres réellement fournis par Tiime, en repli vers le site officiel.</p>
+        ${tiimeReady ? `<div class="button-row"><a class="btn primary" href="https://www.tiime.fr" target="_blank" rel="noopener noreferrer">Créer mon compte Tiime</a><span class="help">Site officiel Tiime.</span></div>
+        <form id="tiime-form" class="stack"><div class="grid-2">
+          <label class="field"><span>Identifiant API</span><input name="apiIdentifier" value="${e(tiime.apiIdentifier || '')}" maxlength="255"></label>
+          <label class="field"><span>Secret API${tiime.apiSecretConfigured ? ' (configuré — laisser vide pour conserver)' : ''}</span><input name="apiSecret" type="password" autocomplete="new-password" maxlength="512"></label>
+          <label class="field"><span>URL API</span><input name="apiUrl" value="${e(tiime.apiUrl || '')}" maxlength="255" placeholder="https://…"></label>
+          <label class="field"><span>URL OAuth</span><input name="oauthUrl" value="${e(tiime.oauthUrl || '')}" maxlength="255" placeholder="https://…"></label>
+          <label class="field"><span>URI de retour</span><input name="redirectUri" value="${e(tiime.redirectUri || '')}" maxlength="255" placeholder="https://…/auth/tiime/retour"></label>
+          <label class="field"><span>Scopes</span><input name="scopes" value="${e(tiime.scopes || '')}" maxlength="255" placeholder="scopes fournis par Tiime"></label>
+          <label class="field"><span>Secret de signature des webhooks${tiime.webhookSecretConfigured ? ' (configuré — laisser vide pour conserver)' : ''}</span><input name="webhookSecret" type="password" autocomplete="new-password" maxlength="512"></label>
+          <label class="field"><span>Environnement</span><select name="environment"><option value="test" ${tiime.environment !== 'production' ? 'selected' : ''}>Test</option><option value="production" ${tiime.environment === 'production' ? 'selected' : ''}>Production</option></select></label>
+        </div><button class="btn primary" type="submit">Enregistrer la configuration</button><p class="help">Les secrets sont stockés côté serveur et protégés : ils ne sont jamais renvoyés en clair à l'interface.</p></form>` : '<p class="muted">La configuration Tiime n’est pas disponible.</p>'}
       </section>
 
       <section class="panel" data-admin-section="tickets">
@@ -488,6 +513,50 @@ export const admin = {
 
     root.querySelectorAll('.admin-section-retry').forEach(button => {
       button.onclick = () => admin.bind(button.dataset.section);
+    });
+    // 15.4.62 — les mêmes indicateurs affichables en CARTES (état actuel) ou en DIAGRAMMES :
+    // répartition des organisations, accès gratuits, abonnements et conversion des essais.
+    const renderAdminCharts = s => {
+      const series = pairs => pairs.filter(([, v]) => Number(v || 0) > 0).map(([label, value]) => ({ label, value: Number(value || 0) }));
+      renderChart('chart-admin-orgs', { title: 'Organisations par catégorie', kind: 'distribution', unit: 'organisations', series: series([['Gratuits', s.free], ['Sans facturation', s.noBilling], ['Essais', s.trial], ['Abonnés', s.subscribed], ['Expirés', s.expired], ['Sans statut classé', s.other]]) }, 'pie');
+      renderChart('chart-admin-free', { title: 'Accès gratuits (admin / VIP)', kind: 'distribution', unit: 'accès', series: series([['Admin seul', s.freeBreakdown?.adminOnly], ['VIP seul', s.freeBreakdown?.vipOnly], ['Mixtes', s.freeBreakdown?.adminAndVip]]) }, 'bar');
+      renderChart('chart-admin-billing', { title: 'Abonnements actifs', kind: 'distribution', unit: 'organisations', series: series([['Mensuels', s.monthly], ['Annuels', s.yearly], ['Résiliations programmées', s.cancelScheduled]]) }, 'bar');
+      const done = Number(s.conversionCohort?.completed || 0), conv = Number(s.conversionCohort?.converted || 0);
+      renderChart('chart-admin-conversion', { title: 'Conversion des essais terminés', kind: 'distribution', unit: 'essais', series: [{ label: 'Converties', value: conv }, { label: 'Non converties', value: Math.max(0, done - conv) }] }, 'pie');
+    };
+    const metricsGrid = root.querySelector('#admin-metrics');
+    const chartsBox = root.querySelector('#admin-charts');
+    const toggleAdminView = mode => {
+      const cards = mode === 'cards';
+      if (metricsGrid) metricsGrid.hidden = !cards;
+      if (chartsBox) chartsBox.hidden = cards;
+      if (!cards && statsReady) renderAdminCharts(s);
+      root.querySelector('#admin-view-cards')?.setAttribute('aria-pressed', String(cards));
+      root.querySelector('#admin-view-charts')?.setAttribute('aria-pressed', String(!cards));
+    };
+    root.querySelector('#admin-view-cards')?.addEventListener('click', () => toggleAdminView('cards'));
+    root.querySelector('#admin-view-charts')?.addEventListener('click', () => toggleAdminView('charts'));
+    // 15.4.62 — configuration serveur de la connexion Tiime (module administrateur) : les
+    // secrets partent en PUT et ne reviennent jamais en clair (masqués côté serveur).
+    const tiimeForm = root.querySelector('#tiime-form');
+    tiimeForm?.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const f = new FormData(tiimeForm);
+      try {
+        const r = await api.saveAdminTiime({
+          apiIdentifier: String(f.get('apiIdentifier') || '').trim(),
+          apiSecret: String(f.get('apiSecret') || ''),
+          apiUrl: String(f.get('apiUrl') || '').trim(),
+          oauthUrl: String(f.get('oauthUrl') || '').trim(),
+          redirectUri: String(f.get('redirectUri') || '').trim(),
+          scopes: String(f.get('scopes') || '').trim(),
+          webhookSecret: String(f.get('webhookSecret') || ''),
+          environment: String(f.get('environment') || 'test') === 'production' ? 'production' : 'test',
+        });
+        adminCache.values.tiime = r;
+        toast('Configuration Tiime enregistrée côté serveur (secrets protégés).', 'success');
+        await admin.bind();
+      } catch (error) { toast(error.message || 'Enregistrement de la configuration Tiime impossible.', 'error'); }
     });
     root.querySelectorAll('.admin-billing-confirm').forEach(button => button.onclick = async () => {
       if (!await askConfirm({ title: 'Confirmer le virement ?', message: 'Confirmer la réception de ce virement et activer l’abonnement ?', confirmLabel: 'Confirmer le paiement' })) return;

@@ -225,6 +225,9 @@ async function clearAvatarCache(){
   try{if('caches'in window){const c=await caches.open(AVATAR_CACHE);await c.delete('/account/avatar')}}catch{}
 }
 async function applyAvatarBlob(blob){
+  // 15.4.62 — un blob vide ou illisible ne masque plus les initiales : l'application échoue
+  // explicitement et le repli (initiale de l'entreprise) reste visible.
+  if(!blob||!blob.size)throw new Error('AVATAR_EMPTY');
   const avatar=document.querySelector('#shell-avatar');
   if(!avatar)return;
   if(shellAvatarObjectUrl)URL.revokeObjectURL(shellAvatarObjectUrl);

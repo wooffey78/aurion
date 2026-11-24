@@ -31,6 +31,9 @@ test('le règlement de facture reste disponible via le workflow de paiement',()=
 test('le moteur de tableau de bord expose la prévision et son historique',()=>{
   const other=read('assets/js/pages/dash/other.js');
   assert.match(other,/Prévision de facturation — scénario indicatif/);
-  assert.match(other,/forecast-history/);
-  assert.match(other,/dashboardSummary/);
+  // 15.4.62 — plus aucun menu déroulant dans la prévision de facturation (le détail reste un bouton).
+  assert.doesNotMatch(other,/forecast-history/);
+  assert.match(other,/id="forecast-detail"/);
+  // 15.4.62 — les compteurs backend (projection HT) restent affichés via S.dashboardCounters.
+  assert.match(other,/S\.dashboardCounters\?\.forecast/);
 });
