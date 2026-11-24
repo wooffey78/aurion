@@ -18,7 +18,45 @@
   const set=(selectors,value)=>{for(const selector of selectors){const n=document.querySelector(selector);if(n){n.textContent=value;return true}}return false};
   const textByLabel=(label,value)=>{const nodes=[...document.querySelectorAll('#view article span,#view .metric span,#view .stat span,#view .kpi span')];const node=nodes.find(n=>n.textContent?.trim().toLowerCase()===label.toLowerCase());const parent=node?.closest('article,.metric,.stat,.kpi');const valueNode=parent?.querySelector('b,strong,.value');if(valueNode)valueNode.textContent=value};
   const euro=n=>Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-  async function refreshFinancialCards(){if(!location.hash.startsWith('#/dashboard')||busy())return;try{const [dashboard,accounting,treasury]=await Promise.all([nativeFetch('/dashboard/summary?forecastMonths=6',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():null),nativeFetch(`/accounting/summary?year=${new Date().getFullYear()}`,{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():null),nativeFetch('/treasury/summary',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():null)]);if(!dashboard)return;const f=dashboard.forecast||{};set(['#home-month-revenue'],euro(f.monthHt??f.month));set(['#home-forecast-3m'],euro(f.months3));set(['#home-forecast-6m'],euro(f.months6));set(['#home-forecast-year'],euro(f.year));set(['#home-forecast-entries'],euro(dashboard.forecastEntries));textByLabel('Mois',euro(f.monthHt??f.month));textByLabel('3 mois',euro(f.months3));textByLabel('6 mois',euro(f.months6));textByLabel('Année en cours',euro(f.year));textByLabel('À venir',euro(dashboard.forecastEntries));if(accounting?.invoices){textByLabel("Chiffre d’affaires HT",euro(accounting.invoices.revenue_ht));textByLabel('Achats',euro(accounting.invoices.purchases));textByLabel('Cotisations',euro(accounting.invoices.social))}if(treasury){textByLabel('Entrées prévues',euro(treasury.forecastEntries));textByLabel('Sorties prévues',euro(treasury.forecastOutputs));textByLabel('Solde prévisionnel',euro(treasury.forecastNet))}}catch{}}
+  // 15.4.56 — remplissage systématique des encarts financiers : mise à jour par identifiants
+  // (encarts réels de chaque écran) avec repli par libellé. L'ancien mappage visait des libellés
+  // qui n'existaient pas dans les pages (« Chiffre d'affaires HT », « Entrées prévues »,
+  // « Solde prévisionnel ») : les encarts restaient vides ou figés. force=true bypass le garde
+  // « formulaire ouvert » (appel après un rendu de vue, jamais pendant une frappe clavier).
+  async function refreshFinancialCards(force=false){
+    if(!location.hash.startsWith('#/dashboard')||(!force&&busy()))return;
+    try{
+      const year=Number(document.querySelector('#acc-year')?.value)||new Date().getFullYear();
+      const [dashboard,accounting,treasury]=await Promise.all([
+        nativeFetch('/dashboard/summary?forecastMonths=6',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():null),
+        nativeFetch(`/accounting/summary?year=${year}`,{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():null),
+        nativeFetch('/treasury/summary',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():null),
+      ]);
+      if(!dashboard)return;
+      const f=dashboard.forecast||{};
+      set(['#home-month-revenue'],euro(f.monthHt??f.month));
+      set(['#home-entries-caption'],`${euro(dashboard.forecastEntries||0)} à venir · TTC, SAV déduits`);
+      set(['#home-tickets-caption'],`${Number(dashboard.tickets||0)} ticket(s) non traité(s)`);
+      textByLabel('Mois',euro(f.monthHt??f.month));textByLabel('3 mois',euro(f.months3));textByLabel('6 mois',euro(f.months6));textByLabel('Année en cours',euro(f.year));textByLabel('À venir',euro(dashboard.forecastEntries));
+      if(accounting?.invoices){
+        set(['#acc-encaissements'],euro(accounting.invoices.revenue_ht));
+        set(['#acc-tva'],euro(accounting.invoices.vat));
+        set(['#acc-cotisations'],euro(accounting.invoices.social));
+        set(['#acc-km'],euro(accounting.invoices.mileage_total));
+        set(['#acc-factures'],String(Number(accounting.invoices.count||0)));
+        textByLabel('Encaissements HT',euro(accounting.invoices.revenue_ht));textByLabel('TVA encaissée',euro(accounting.invoices.vat));textByLabel('Cotisations estimées',euro(accounting.invoices.social));textByLabel('Kilométrage sur factures',euro(accounting.invoices.mileage_total));
+      }
+      if(treasury){
+        set(['#trez-committed-in'],euro(treasury.committedIn||0));
+        set(['#trez-potential-in'],euro(treasury.potentialIn||0));
+        set(['#trez-outputs'],euro(treasury.forecastOutputs||0));
+        set(['#trez-committed-net'],euro(treasury.committedNet||0));
+        set(['#trez-sav'],euro(treasury.savTotal||0));
+        textByLabel('Entrées prévues',euro(treasury.forecastEntries));textByLabel('Sorties prévues',euro(treasury.forecastOutputs));textByLabel('Solde prévisionnel',euro(treasury.forecastNet));
+      }
+    }catch{}
+  }
+  window.aurionRefreshFinancialCards=refreshFinancialCards;
   window.aurionSyncAcknowledge=async()=>{try{const result=await readVersion();if(result.notModified)return;localStorage.setItem(result.key,result.revision)}catch{}};
   const poll=async()=>{
     if(polling||document.visibilityState!=='visible'||!location.hash.startsWith('#/dashboard')||busy())return;

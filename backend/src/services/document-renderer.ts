@@ -43,15 +43,22 @@ export async function documentData(organizationId:string,quoteId:string){
  const isInvoice=x.document_type==='invoice';
  const displayName=await companyDisplayName(organizationId,x.activity_id);
  const effectiveCompanyActivity=x.company_custom_activity||x.activity_description||x.activity_name||x.company_activity||'';
- // 15.4.54 — les trois modèles natifs ont de vraies différences : chaque variante porte sa
+ // 15.4.54 — les modèles natifs ont de vraies différences : chaque variante porte sa
  // structure (encarts, filets, typographie), sa teinte d'accent et son fond foncé propres,
  // pas seulement un radius. Classique : bleu navy · Minimal : monochrome encre, aucun encart ·
  // Signature : serif, bronze chaud, encarts crème et total sur fond accent.
+ // 15.4.56 — cinq nouvelles ambiances : Horizon (émeraude), Orchidée (violet, serif),
+ // Encre (graphite carré), Corail (chaleur), Glacier (bleu clair, minimal).
  let theme:DocModel['theme']={accent:'#0b63ce',dark:'#0b1220',font:'sans',radius:'round',variant:'classic',customized:false};
  const styleRow=(await query('select quote_template_style,invoice_template_style from document_themes where organization_id=$1',[organizationId])).rows[0];
  const selectedStyle=isInvoice?(styleRow?.invoice_template_style||'aurion-classic'):(styleRow?.quote_template_style||'aurion-classic');
  if(selectedStyle==='aurion-minimal') theme={...theme,variant:'minimal',radius:'square',font:'sans',dark:'#111827',accent:'#155e75'};
  if(selectedStyle==='aurion-signature') theme={...theme,variant:'signature',radius:'round',font:'serif',dark:'#2b1f14',accent:'#a16207'};
+ if(selectedStyle==='aurion-horizon') theme={...theme,variant:'classic',radius:'round',font:'sans',dark:'#042f2e',accent:'#0d9488'};
+ if(selectedStyle==='aurion-orchidee') theme={...theme,variant:'signature',radius:'round',font:'serif',dark:'#2e1065',accent:'#a855f7'};
+ if(selectedStyle==='aurion-encre') theme={...theme,variant:'minimal',radius:'square',font:'sans',dark:'#111827',accent:'#374151'};
+ if(selectedStyle==='aurion-corail') theme={...theme,variant:'classic',radius:'square',font:'sans',dark:'#4c0519',accent:'#f43f5e'};
+ if(selectedStyle==='aurion-glacier') theme={...theme,variant:'minimal',radius:'round',font:'sans',dark:'#0c4a6e',accent:'#0369a1'};
  const effectiveLegalForm=x.legal_form||x.organization_legal_form||'';
  const mentions=computeMentions({kind:isInvoice?'invoice':'quote',profileCode:profile.code,company:{name:displayName,siret:x.siret,siren:x.siren},activity:{legal_form:effectiveLegalForm,payment_terms:x.payment_terms,insurance_info:x.insurance_info,mediator_info:x.mediator_info,legal_notes:x.legal_notes,quote_validity_days:x.quote_validity_days,vat_rate:x.vat_rate??x.activity_vat_rate2}});
  const title=isInvoice?'FACTURE':'DEVIS'; const reminderLabel=isInvoice&&Number(x.reminder_count||0)>0?`${title} · ${Number(x.reminder_count)>=4?'4e':Number(x.reminder_count)===3?'3e':Number(x.reminder_count)===2?'2e':'1ère'} relance`:title;
@@ -149,13 +156,18 @@ export async function renderDocument(organizationId:string,quoteId:string,type:'
   }
  }
  // 2) Mise en page native Aurion pour chaque format manquant : chaque format a ses propres styles.
+ // 15.4.56 — le PDF n'est compté comme « issu du modèle personnalisé » que si la conversion a
+ // réellement produit le fichier. Sinon template_id reste null dans generated_documents : la
+ // génération suivante réessaie la conversion — quand LibreOffice devient disponible sur le
+ // serveur, le PDF repasse automatiquement par le modèle téléversé au lieu de rester figé natif.
+ const pdfFromTemplate=!!tpl&&existsSync(pdf);
  if(!existsSync(docx))await fs.writeFile(docx,await buildDocx(data.model));
  if(!existsSync(odt))await fs.writeFile(odt,buildOdt(data.model));
  if(!existsSync(pdf))await fs.writeFile(pdf,await buildPdf(data.model));
  const genId=cryptoRandom();const keys={docx:`private/${organizationId}/${path.basename(docx)}`,odt:`private/${organizationId}/${path.basename(odt)}`,pdf:`private/${organizationId}/${path.basename(pdf)}`};
  await Promise.all([[keys.docx,docx],[keys.odt,odt],[keys.pdf,pdf]].map(async([key,local])=>writePrivateObject(String(key),await fs.readFile(String(local)))));
- await query(`insert into generated_documents(id,organization_id,activity_id,quote_id,document_type,template_id,docx_key,odt_key,pdf_key) values($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[genId,organizationId,data.row.activity_id,quoteId,type,tpl?.id||null,keys.docx,keys.odt,keys.pdf]);
- return {id:genId,keys,row:data.row};
+ await query(`insert into generated_documents(id,organization_id,activity_id,quote_id,document_type,template_id,docx_key,odt_key,pdf_key) values($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[genId,organizationId,data.row.activity_id,quoteId,type,(tpl&&pdfFromTemplate)?tpl.id:null,keys.docx,keys.odt,keys.pdf]);
+ return {id:genId,keys,row:data.row,templateApplied:!!tpl,templatePdf:pdfFromTemplate};
 }
 
 function cryptoRandom(){return crypto.randomUUID()}

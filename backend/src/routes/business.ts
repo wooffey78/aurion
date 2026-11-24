@@ -793,7 +793,12 @@ export async function businessRoutes(app:FastifyInstance){
     await platformAdminQuery('update accountant_invitations set accepted_at=now() where id=$1',[inv.id]);
     return {ok:true,note:'Accès comptable accordé (lecture seule). Reconnectez-vous pour que le rôle soit actif dans votre session.'};
   });
-  app.post('/activities/detect-fiscal',async(r,reply)=>{const b:any=r.body||{};if(!b.legalForm)return reply.code(400).send({error:'INVALID_INPUT'});const p=profileFor(String(b.name||''),String(b.description||''),b.profileCode);const detected=detectFiscalSettings(String(b.legalForm),p.code,String(b.name||''),String(b.description||''),{annualRevenueHt:b.annualRevenueHt??null,vatRegime:b.vatRegime??null,nafCode:b.nafCode??null});return {...detected,cgvText:defaultCgvFor(p.code,p.title,String(b.legalForm||''))};});
+  app.post('/activities/detect-fiscal',async(r,reply)=>{const b:any=r.body||{};
+    // 15.4.56 — la forme juridique n'est plus obligatoire : quand elle est absente (entreprise pas
+    // encore configurée), le service de détection suppose le régime micro-entrepreneur et le signale
+    // (legalFormAssumed + raison affichée). Refuser la requête privait les encarts de Paramètres du
+    // préremplissage des cotisations, exactement quand l'utilisateur a le plus besoin d'aide.
+    const p=profileFor(String(b.name||''),String(b.description||''),b.profileCode);const detected=detectFiscalSettings(String(b.legalForm||''),p.code,String(b.name||''),String(b.description||''),{annualRevenueHt:b.annualRevenueHt??null,vatRegime:b.vatRegime??null,nafCode:b.nafCode??null});return {...detected,cgvText:defaultCgvFor(p.code,p.title,String(b.legalForm||''))};});
   app.post('/activities/detect-legal-form',async(r,reply)=>{const b:any=r.body||{};return detectLegalFormFromProfile(String(b.name||''),String(b.description||''));});
   app.post('/activities/detect-profile',async(r,reply)=>{const b:any=r.body||{};
     // V2 (chantier 2) — moteur de propositions : plusieurs profils classés par pertinence,

@@ -125,6 +125,9 @@ function show(id){
   // Une erreur d'initialisation d'un écran ne doit jamais empêcher la navigation suivante :
   // la coquille et le menu restent utilisables, l'incident est signalé sans bloquer la vue.
   try{VIEWS[id].bind?.()}catch(error){toast(error?.message||'Certaines actions de cet écran n’ont pas pu être initialisées.','error')}
+  // 15.4.56 — après chaque rendu, les encarts financiers sont actualisés immédiatement :
+  // les valeurs affichées suivent les données réelles même si la vue a été rendue avec un état local.
+  if(['home','accounting','treasury'].includes(id))window.aurionRefreshFinancialCards?.(true);
   if(id==='accounting'||id==='treasury')lastRenderedFinancialSnapshot=financialSnapshot();
   if(previous!==id){window.requestAnimationFrame(()=>{window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;const main=document.querySelector('#main');if(main)main.scrollTop=0;const heading=view.querySelector('h1');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}});}
 }
@@ -198,28 +201,58 @@ function paintShell(){
 }
 
 let shellAvatarObjectUrl='';
+// 15.4.56 — avatar de la barre supérieure : affichage immédiat depuis un cache local (Cache API,
+// persiste entre les sessions) puis actualisation réseau avec une nouvelle tentative. Un 401
+// transient au démarrage ou une réponse lente ne fait plus disparaître l'avatar téléversé.
+const AVATAR_CACHE='aurion-avatar-v1';
+async function cachedAvatarUrl(){
+  try{
+    if(!('caches'in window))return '';
+    const c=await caches.open(AVATAR_CACHE);
+    const hit=await c.match('/account/avatar');
+    if(!hit)return '';
+    return URL.createObjectURL(await hit.blob());
+  }catch{return ''}
+}
+async function storeAvatarCache(blob){
+  try{
+    if(!('caches'in window))return;
+    const c=await caches.open(AVATAR_CACHE);
+    await c.put('/account/avatar',new Response(blob,{headers:{'Content-Type':blob.type||'image/png'}}));
+  }catch{}
+}
+async function clearAvatarCache(){
+  try{if('caches'in window){const c=await caches.open(AVATAR_CACHE);await c.delete('/account/avatar')}}catch{}
+}
+async function applyAvatarBlob(blob){
+  const avatar=document.querySelector('#shell-avatar');
+  if(!avatar)return;
+  if(shellAvatarObjectUrl)URL.revokeObjectURL(shellAvatarObjectUrl);
+  shellAvatarObjectUrl=URL.createObjectURL(blob);
+  avatar.textContent='';
+  avatar.style.backgroundImage=`url("${shellAvatarObjectUrl}")`;
+  avatar.style.backgroundSize='cover';
+  avatar.style.backgroundPosition='center';
+}
 async function syncShellAvatar(){
   const avatar=document.querySelector('#shell-avatar');
   if(!avatar)return;
-  try{
-    const account=await api.account();
-    if(!account?.user?.avatarUrl){
-      if(shellAvatarObjectUrl){URL.revokeObjectURL(shellAvatarObjectUrl);shellAvatarObjectUrl='';}
-      avatar.textContent=(S.company.name||'A')[0].toUpperCase();
-      avatar.style.backgroundImage='';
+  const fallback=()=>{avatar.textContent=(S.company.name||'A')[0].toUpperCase();avatar.style.backgroundImage=''};
+  try{const cached=await cachedAvatarUrl();if(cached)await applyAvatarBlob(cached)}catch{}
+  for(let attempt=0;attempt<2;attempt++){
+    try{
+      const info=await api.account();
+      if(!info?.user?.avatarUrl){await clearAvatarCache();if(!shellAvatarObjectUrl)fallback();return}
+      const response=await api.accountAvatar();
+      if(!response.ok)throw new Error('Avatar indisponible');
+      const blob=await response.blob();
+      await applyAvatarBlob(blob);
+      await storeAvatarCache(blob);
       return;
+    }catch{
+      if(attempt===0){await new Promise(r=>setTimeout(r,1200))}
+      else if(!shellAvatarObjectUrl)fallback();
     }
-    const response=await api.accountAvatar();
-    if(!response.ok)throw new Error('Avatar indisponible');
-    const blob=await response.blob();
-    if(shellAvatarObjectUrl)URL.revokeObjectURL(shellAvatarObjectUrl);
-    shellAvatarObjectUrl=URL.createObjectURL(blob);
-    avatar.textContent='';
-    avatar.style.backgroundImage=`url("${shellAvatarObjectUrl}")`;
-    avatar.style.backgroundSize='cover';
-    avatar.style.backgroundPosition='center';
-  }catch{
-    avatar.textContent=(S.company.name||'A')[0].toUpperCase();
   }
 }
 
@@ -346,14 +379,15 @@ export async function renderDashboard(){
         lastDashboardSummaryRefreshAt=Date.now();
       }
       if(viewAtStart==='home'&&S.view==='home'){
-        const cards=[...document.querySelectorAll('#view .quick-grid .action-card')];
-        if(cards.length===2){
-          const ticketCaption=cards[0].querySelector('small');
-          const entriesCaption=cards[1].querySelector('small');
-          if(ticketCaption)ticketCaption.textContent=`${Number(S.dashboardCounters?.tickets||0)} ticket(s) non traité(s)`;
-          if(entriesCaption)entriesCaption.textContent=`${money(S.dashboardCounters?.forecastEntries||0)} à venir · TTC, SAV déduits`;
+        // 15.4.56 — chaque encart d'accueil est mis à jour par son identifiant : plus aucune
+        // dépendance au nombre exact de cartes d'action (le compteur restait figé si la grille
+        // changeait) ni aux libellés trouvés par balayage.
         const homeRevenue=document.querySelector('#home-month-revenue');if(homeRevenue)homeRevenue.textContent=money(S.dashboardCounters?.forecast?.monthHt||0);
-        }
+        const homeClients=document.querySelector('#home-clients');if(homeClients)homeClients.textContent=String(S.clients.length);
+        const homeQuotes=document.querySelector('#home-open-quotes');if(homeQuotes)homeQuotes.textContent=String(S.quotes.filter(q=>q.document_type!=='invoice'&&!['canceled','cancelled','rejected','void','deleted'].includes(String(q.status||'').toLowerCase())).length);
+        const homeRdv=document.querySelector('#home-rdv');if(homeRdv)homeRdv.textContent=String(Number(S.dashboardCounters?.upcomingAppointments??0));
+        const ticketCaption=document.querySelector('#home-tickets-caption');if(ticketCaption)ticketCaption.textContent=`${Number(S.dashboardCounters?.tickets||0)} ticket(s) non traité(s)`;
+        const entriesCaption=document.querySelector('#home-entries-caption');if(entriesCaption)entriesCaption.textContent=`${money(S.dashboardCounters?.forecastEntries||0)} à venir · TTC, SAV déduits`;
         S.timeMetrics=await api.timeMetrics();
         if(S.view==='home'){
           const map={manualMinutes:Number(S.timeMetrics?.manualMinutes||0).toFixed(0),actualMinutes:Number(S.timeMetrics?.actualMinutes||0).toFixed(0),savedMinutes:Number(S.timeMetrics?.savedMinutes||0).toFixed(0),averageSavedMinutes:Number(S.timeMetrics?.averageSavedMinutes||0).toFixed(1)};

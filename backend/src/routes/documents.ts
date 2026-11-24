@@ -186,7 +186,10 @@ export async function documentsRoutes(app:FastifyInstance){
    if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND',message:'Aucun partage actif à révoquer.'});
    return {ok:true,revoked:true};
  });
- const styles=['aurion-minimal','aurion-classic','aurion-signature'];
+ // 15.4.56 — huit modèles natifs : les trois historiques (Minimal, Classique, Signature) et cinq
+ // nouvelles ambiances (Horizon, Orchidée, Encre, Corail, Glacier), toutes construites avec le
+ // même moteur de mise en page (variantes classic/minimal/signature × teintes × typographies).
+ const styles=['aurion-minimal','aurion-classic','aurion-signature','aurion-horizon','aurion-orchidee','aurion-encre','aurion-corail','aurion-glacier'];
  app.get('/document-template-choices',async r=>{const row=(await query('select quote_template_style,invoice_template_style from document_themes where organization_id=$1',[r.auth!.organizationId])).rows[0]||{};return {quote:row.quote_template_style||'aurion-classic',invoice:row.invoice_template_style||'aurion-classic',styles}});
  app.patch('/document-template-choices',async(r,reply)=>{const b:any=r.body||{};if(!styles.includes(b.quote)||!styles.includes(b.invoice))return reply.code(400).send({error:'INVALID_INPUT'});await query(`insert into document_themes(organization_id,accent,dark,font,radius,customized,quote_template_style,invoice_template_style) values($1,'#0b63ce','#0b1220','sans','round',false,$2,$3) on conflict(organization_id) do update set quote_template_style=excluded.quote_template_style,invoice_template_style=excluded.invoice_template_style,updated_at=now()`,[r.auth!.organizationId,b.quote,b.invoice]);return {quote:b.quote,invoice:b.invoice}});
  app.get('/document-templates',async r=>({templates:(await query(`select id,activity_id,document_type,name,mime_type,size_bytes,active,created_at from document_templates where organization_id=$1 order by created_at desc`,[r.auth!.organizationId])).rows}));

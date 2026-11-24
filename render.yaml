@@ -56,7 +56,13 @@ services:
     region: frankfurt
     plan: free
     branch: main
-    buildCommand: npm ci --prefix backend --include=dev --no-audit --no-fund && npm run build
+    # 15.4.56 — LibreOffice est installé à chaque build (best effort) : sans lui, les modèles
+    # DOCX/ODT téléversés par l'utilisateur ne pouvaient jamais être convertis en PDF et les
+    # documents retombaient silencieusement sur la mise en page native Aurion. L'installation
+    # est silencieuse, sans recommandés (paquet libreoffice-writer seul) et ne bloque jamais
+    # le build : en cas d'échec, le comportement historique (PDF natif) est conservé et la
+    # page Modèles de documents l'indique (statut « conversion » du serveur).
+    buildCommand: (apt-get update -qq && apt-get install -y -qq --no-install-recommends libreoffice-writer fonts-dejavu-core) > /tmp/libreoffice-install.log 2>&1 || echo 'LibreOffice indisponible sur ce serveur : modèles téléversés en DOCX/ODT, PDF natif.' ; npm ci --prefix backend --include=dev --no-audit --no-fund && npm run build
     startCommand: npm --prefix backend start
     healthCheckPath: /health/db
     autoDeploy: true

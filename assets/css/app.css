@@ -1150,3 +1150,55 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="
 .confirm-icon.danger{color:var(--red);background:#f6e7e7;border-color:#e5a6a6;box-shadow:none}
 /* Bannière de re-acceptation contractuelle : cohérente avec les .notice. */
 .legal-accept-bar{margin:0 0 16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+/* ===== 15.4.56 — carrousel 3D des modèles de documents (devis et factures) ===== */
+/* Rail de défilement horizontal avec perspective : chaque carte est inclinée et mise en
+   profondeur par le script (rotateY/translateZ selon la distance au centre) — effet coverflow. */
+.template-carousel{position:relative;display:flex;align-items:center;gap:10px}
+.template-track{display:flex;gap:18px;overflow-x:auto;scroll-snap-type:x proximity;padding:28px 12px;perspective:1200px;scrollbar-width:thin;scroll-behavior:smooth}
+.template-track::-webkit-scrollbar{height:8px}
+.template-track::-webkit-scrollbar-thumb{background:rgba(185,196,190,.3);border-radius:8px}
+.template-carousel .template-card{scroll-snap-align:center;flex:0 0 250px;display:flex;flex-direction:column;gap:10px;transform-style:preserve-3d;transition:transform .18s ease,opacity .18s ease,box-shadow .25s ease,border-color .25s ease;will-change:transform}
+.template-carousel-arrow{flex:0 0 auto;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:rgba(201,220,244,.05);color:var(--text);font-size:1.4rem;line-height:1;display:grid;place-items:center}
+.template-carousel-arrow:hover{border-color:rgba(130,178,154,.7);transform:translateY(-2px)}
+.template-carousel .template-actions{display:flex;flex-direction:column;gap:8px}
+.template-carousel .template-actions .btn{width:100%}
+.template-copy{display:grid;gap:4px}
+.template-copy small{color:var(--muted)}
+.template-carousel .template-preview{width:100%}
+/* Aperçus visuels par modèle — mêmes teintes que le moteur PDF de chaque style. */
+.template-preview.aurion-classic{background:#f6f9ff}
+.template-preview.aurion-classic b{color:#0b1220}
+.template-preview.aurion-classic strong{background:#0b63ce;color:#ffffff;border-radius:8px;padding:6px 10px;text-align:right}
+.template-preview.aurion-minimal{background:#fbfcfe}
+.template-preview.aurion-minimal strong{text-align:right;color:#111827}
+.template-preview.aurion-signature{background:#faf5ec}
+.template-preview.aurion-signature b{color:#2b1f14}
+.template-preview.aurion-signature strong{background:#a16207;color:#ffffff;border-radius:18px;padding:6px 12px;text-align:right}
+.template-preview.aurion-horizon{background:#f0fdf9}
+.template-preview.aurion-horizon b{color:#042f2e}
+.template-preview.aurion-horizon i{color:#0d9488}
+.template-preview.aurion-horizon strong{background:#0d9488;color:#ffffff;border-radius:10px;padding:6px 10px;text-align:right}
+.template-preview.aurion-orchidee{background:#faf5ff;font-family:Georgia,serif}
+.template-preview.aurion-orchidee b{color:#2e1065}
+.template-preview.aurion-orchidee i{color:#a855f7}
+.template-preview.aurion-orchidee strong{background:#a855f7;color:#ffffff;border-radius:18px;padding:6px 12px;text-align:right}
+.template-preview.aurion-encre{background:#f9fafb;border-radius:4px}
+.template-preview.aurion-encre b{color:#111827}
+.template-preview.aurion-encre strong{text-align:right;color:#111827}
+.template-preview.aurion-corail{background:#fff1f2}
+.template-preview.aurion-corail b{color:#4c0519}
+.template-preview.aurion-corail i{color:#f43f5e}
+.template-preview.aurion-corail strong{background:#f43f5e;color:#ffffff;border-radius:4px;padding:6px 10px;text-align:right}
+.template-preview.aurion-glacier{background:#f0f9ff;border-radius:14px}
+.template-preview.aurion-glacier b{color:#0c4a6e}
+.template-preview.aurion-glacier i{color:#0369a1}
+.template-preview.aurion-glacier strong{background:#0369a1;color:#ffffff;border-radius:14px;padding:6px 10px;text-align:right}
+/* 15.4.56 — encart « Configuration et paramètres » compact tant que la configuration n'est pas achevée. */
+.onboarding-guide-panel--compact{padding:12px 16px}
+.onboarding-guide-panel--compact .section-title{align-items:center}
+.onboarding-guide-panel--compact h2{font-size:1.02rem;margin:0}
+.onboarding-guide-panel--compact .help{margin:0;font-size:.82rem}
+/* 15.4.56 — récapitulatif du parcours : « Paramètres » cliquable sur chaque ligne. */
+.ob-recap li{display:flex;align-items:center;gap:10px}
+.ob-recap li .ob-recap-goto{white-space:nowrap}
+@media (max-width:640px){.template-carousel{flex-direction:column}.template-carousel-arrow{width:34px;height:34px}.template-carousel .template-card{flex-basis:220px}}

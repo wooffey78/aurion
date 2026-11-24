@@ -293,19 +293,22 @@ function stepCloud(slot){
 // ---------------------------------------------------------------- 8 · Récapitulatif
 function stepRecap(slot){
   const c=state.company,u=state.account.user||{},q=c.configuration_data?.questionnaire||{};
+  // 15.4.56 (consigne éditeur) : chaque ligne du récapitulatif porte un « Paramètres » cliquable
+  // qui renvoie directement à l'étape du parcours concernée — corriger sans refaire tout le tour.
   const items=[
-    ['Vous',Boolean(u.fullName),u.fullName||'Prénom et nom à compléter','account'],
-    ['Votre entreprise',Boolean(c.name&&c.name!=='Mon entreprise'&&(c.siret||c.siren)),[c.name,c.siret||c.siren].filter(Boolean).join(' · ')||'Identité à compléter','settings'],
-    ['Votre activité',Object.values(q).some(Boolean),c.custom_activity||c.activity||'Modules à choisir','settings'],
-    ['Votre logo',Boolean(c.has_logo),c.has_logo?'Logo enregistré':'Facultatif — aucun logo','settings'],
-    ['Votre messagerie',Boolean(state.mail?.configured),state.mail?.configured?'Messagerie connectée':'À configurer plus tard (rappel dans le tableau de bord)','settings'],
-    ['Votre signature',Boolean(state.signature&&state.signature.enabled!==false&&(state.signature.firstName||state.signature.company)),state.signature?.enabled===false?'Désactivée':'Signature enregistrée','settings'],
-    ['Vos documents (cloud)',state.cloud?.status==='connected',state.cloud?.status==='connected'?`Google Drive · ${state.cloud.accountEmail||''}`:'Cloud non connecté','settings'],
+    ['Vous',Boolean(u.fullName),u.fullName||'Prénom et nom à compléter','you'],
+    ['Votre entreprise',Boolean(c.name&&c.name!=='Mon entreprise'&&(c.siret||c.siren)),[c.name,c.siret||c.siren].filter(Boolean).join(' · ')||'Identité à compléter','company'],
+    ['Votre activité',Object.values(q).some(Boolean),c.custom_activity||c.activity||'Modules à choisir','activity'],
+    ['Votre logo',Boolean(c.has_logo),c.has_logo?'Logo enregistré':'Facultatif — aucun logo','logo'],
+    ['Votre messagerie',Boolean(state.mail?.configured),state.mail?.configured?'Messagerie connectée':'À configurer plus tard (rappel dans le tableau de bord)','mail'],
+    ['Votre signature',Boolean(state.signature&&state.signature.enabled!==false&&(state.signature.firstName||state.signature.company)),state.signature?.enabled===false?'Désactivée':'Signature enregistrée','signature'],
+    ['Vos documents (cloud)',state.cloud?.status==='connected',state.cloud?.status==='connected'?`Google Drive · ${state.cloud.accountEmail||''}`:'Cloud non connecté','cloud'],
   ];
   slot.innerHTML=`<form class="stack" novalidate><h2>Récapitulatif</h2>
-    <ul class="ob-recap">${items.map(([t,ok,d,target])=>`<li class="${ok?'ok':'todo'}"><span class="chip ${ok?'ok':'warn'}">${ok?'Configuré':'À compléter'}</span><div><b>${esc(t)}</b><small>${esc(d)}</small></div><small class="muted">${target==='account'?'Mon compte':'Paramètres'}</small></li>`).join('')}</ul>
-    <p class="help">Tout reste modifiable dans <b>Paramètres</b> et <b>Mon compte</b>, qui affichent ces mêmes informations.</p>
+    <ul class="ob-recap">${items.map(([t,ok,d,stepKey])=>`<li class="${ok?'ok':'todo'}"><span class="chip ${ok?'ok':'warn'}">${ok?'Configuré':'À compléter'}</span><div><b>${esc(t)}</b><small>${esc(d)}</small></div><button type="button" class="link-btn ob-recap-goto" data-ob-step="${esc(stepKey)}" aria-label="Aller à l’étape ${esc(t)}">Paramètres</button></li>`).join('')}</ul>
+    <p class="help">Chaque ligne renvoie à son étape via « Paramètres » : corrigez directement ce qui reste à compléter, tout reste aussi modifiable dans <b>Paramètres</b> et <b>Mon compte</b>.</p>
     ${nav({next:'Accéder au tableau de bord'})}</form>`;
+  slot.querySelectorAll('.ob-recap-goto').forEach(b=>b.addEventListener('click',()=>{const idx=STEPS.findIndex(s=>s.key===(b.dataset.obStep||''));if(idx>=0)show(idx)}));
   bindForm(slot,async()=>{
     const p=progress();
     state.company=await api.updateOrganization(orgBody({configurationIncomplete:false},{onboarding:{...p,step:STEPS.length-1,completed:true,completedAt:new Date().toISOString()}}));

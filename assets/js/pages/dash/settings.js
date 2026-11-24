@@ -283,8 +283,11 @@ export function bind(){
     if(legalInput&&!legalInput.value&&orgLegal)legalInput.value=orgLegal;
     const markAuto=(el,value)=>{if(!el||value===null||value===undefined)return;el.value=value;el.dataset.autoValue=String(value);el.dataset.manualEdited='false'};
     const update=async()=>{
-      const lf=(legalInput?.value||orgLegal).trim();if(!lf)return;
-      try{const r=await api.detectFiscal({legalForm:lf,name:v(form,'name'),description:v(form,'description'),profileCode:form.querySelector('#profileCode')?.value||'',nafCode:S.company?.configuration_data?.naf_code||''});if(vatInput&&r.vatRate!==null&&r.vatRate!==undefined&&(!vatInput.value||vatInput.dataset.autoValue===vatInput.value))markAuto(vatInput,r.vatRate);if(socialInput&&(!socialInput.value||socialInput.dataset.autoValue===socialInput.value))markAuto(socialInput,r.socialRate??'');const d=form.querySelector('#fiscal-detection');if(d)d.textContent=`${r.socialRegime} · ${r.vatRegime}${r.vatToConfirm?' · ⚠ régime de TVA à confirmer':''}`;const c=form.querySelector('#fiscal-contributions');if(c)c.innerHTML=renderContributions(r.contributions||[]);form.dataset.autoCgv=r.cgvText||'';}catch(x){toast(x.message,'error')}
+      // 15.4.56 — détection même sans forme juridique : le serveur suppose le régime micro-entrepreneur
+      // et l'indique (legalFormAssumed) ; les taux et cotisations se préremplissent au lieu de rester
+      // vides lorsque l'entreprise n'est pas encore configurée.
+      const lf=(legalInput?.value||orgLegal).trim();
+      try{const r=await api.detectFiscal({legalForm:lf,name:v(form,'name'),description:v(form,'description'),profileCode:form.querySelector('#profileCode')?.value||'',nafCode:S.company?.configuration_data?.naf_code||''});if(vatInput&&r.vatRate!==null&&r.vatRate!==undefined&&(!vatInput.value||vatInput.dataset.autoValue===vatInput.value))markAuto(vatInput,r.vatRate);if(socialInput&&(!socialInput.value||socialInput.dataset.autoValue===socialInput.value))markAuto(socialInput,r.socialRate??'');const d=form.querySelector('#fiscal-detection');if(d)d.textContent=`${r.socialRegime} · ${r.vatRegime}${r.vatToConfirm?' · ⚠ régime de TVA à confirmer':''}${r.legalFormAssumed?' · régime micro supposé (forme juridique à confirmer dans Paramètres → Entreprise)':''}`;const c=form.querySelector('#fiscal-contributions');if(c)c.innerHTML=renderContributions(r.contributions||[]);form.dataset.autoCgv=r.cgvText||'';}catch(x){toast(x.message,'error')}
     };
     form.querySelector('#name')?.addEventListener('input',()=>{clearTimeout(timer);timer=window.setTimeout(update,200)});
     form.querySelector('#description')?.addEventListener('input',()=>{clearTimeout(timer);timer=window.setTimeout(update,250)});
