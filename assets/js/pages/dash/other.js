@@ -240,20 +240,97 @@ const TEMPLATE_STYLES=[
 ];
 export const templates={view(){
  const ch=S.templateChoices||{quote:'aurion-classic',invoice:'aurion-classic'};
- const carousel=type=>`<div class="template-carousel" data-carousel="${type}"><button type="button" class="template-carousel-arrow" data-carousel-dir="-1" aria-label="Modèles précédents">‹</button><div class="template-track">${TEMPLATE_STYLES.map(([id,n,d])=>`<article class="template-card ${ch[type]===id?'selected':''}" data-style="${id}"><span class="template-preview ${id}"><b>AURION</b><i>${type==='invoice'?'FACTURE':'DEVIS'}</i><small>${e(n)} · Client · prestation</small><strong>1 250,00 €</strong></span><span class="template-copy"><b>${n}</b><small>${d}</small></span><span class="template-actions"><button type="button" class="btn ${ch[type]===id?'primary':'secondary'} small template-select" data-template-type="${type}" data-template-style="${id}">${ch[type]===id?'Modèle utilisé':'Utiliser ce modèle'}</button><a class="btn secondary small" href="./assets/templates/${type}-${id}.pdf" target="_blank" rel="noopener">Aperçu PDF</a><a class="btn secondary small" href="./assets/templates/${type}-${id}.pdf" download="aurion-${type}-${id}.pdf">Télécharger</a></span></article>`).join('')}</div><button type="button" class="template-carousel-arrow" data-carousel-dir="1" aria-label="Modèles suivants">›</button></div>`;
- return`<div class="page-head"><div><span class="eyebrow">BIBLIOTHÈQUE</span><h1>Modèles de documents</h1><p>Choisissez parmi les huit modèles natifs Aurion pour les devis et les factures — faites défiler le carrousel, visualisez chaque style, puis ouvrez ou téléchargez son aperçu PDF.</p></div></div>
+ // 15.4.60 — anneau 3D circulaire : chaque carte EST l'aperçu du modèle (face générée depuis le
+ // même PDF que celui servi), plus aucun bouton « Aperçu » sur la carte. L'anneau démarre sur le
+ // modèle actif (data-start) et tourne au clic ; après un tour complet il revient à la carte
+ // d'origine (angle normalisé modulo 360°). Un clic sur la face avant ouvre l'aperçu taille
+ // réelle avec le bouton de validation du modèle.
+ const carousel=type=>{
+  const sel=TEMPLATE_STYLES.findIndex(([id])=>ch[type]===id);
+  return`<div class="template-carousel" data-carousel="${type}" data-start="${sel>0?sel:0}"><button type="button" class="template-carousel-arrow" data-carousel-dir="-1" aria-label="Tourner l'anneau vers le modèle précédent">‹</button><div class="template-stage"><div class="template-ring" role="group" aria-label="Anneau 3D des modèles">${TEMPLATE_STYLES.map(([id,n,d],i)=>`<article class="template-card${ch[type]===id?' selected':''}" data-style="${id}" data-name="${e(n)}" data-desc="${e(d)}" data-index="${i}" style="--i:${i}" tabindex="0" role="button" aria-label="Modèle ${e(n)} — ${e(d)}"><span class="template-face"><img src="./assets/templates/previews/${type}-${id}.png" alt="Aperçu du modèle ${e(n)}" loading="lazy" draggable="false"></span><span class="template-back" aria-hidden="true"><img src="./assets/templates/previews/${type}-${id}.png" alt="" loading="lazy" draggable="false"></span><span class="template-ribbon"><b>${e(n)}</b><i>${ch[type]===id?'Modèle utilisé':''}</i></span></article>`).join('')}</div></div><button type="button" class="template-carousel-arrow" data-carousel-dir="1" aria-label="Tourner l'anneau vers le modèle suivant">›</button><p class="template-hint">Cliquez sur l'anneau ou les flèches pour le faire tourner — les cartes du fond tournent derrière. Cliquez sur la carte de face pour l'aperçu taille réelle et valider le modèle.</p></div>`;
+ };
+ return`<div class="page-head"><div><span class="eyebrow">BIBLIOTHÈQUE</span><h1>Modèles de documents</h1><p>Huit modèles natifs Aurion pour les devis et les factures, présentés en anneau 3D : chaque carte affiche directement l'aperçu du modèle, tourne au clic, revient à son point de départ après un tour complet — et un clic sur la carte de face ouvre l'aperçu taille réelle où le choix se valide.</p></div></div>
  <section class="panel stack"><div class="section-title"><h2>Devis</h2><span class="pill">Choix indépendant</span></div>${carousel('quote')}
  <div class="section-title"><h2>Factures</h2><span class="pill">Choix indépendant</span></div>${carousel('invoice')}<p id="template-choice-status" class="help">Le choix est appliqué aux prochains documents et peut être modifié à tout moment.<span id="template-conversion-status"></span></p></section>
  <section class="panel template-drop stack"><div class="section-title"><h2>Modèles personnels</h2></div><p class="muted">Vous pouvez toujours importer votre propre modèle Word ou ODT si vous souhaitez conserver votre mise en page. Aurion remplacera les champs pris en charge sans télécharger les modèles natifs Aurion.</p><div class="drop-zone" id="template-drop"><strong>Glissez-déposez votre modèle ici</strong><span>ou sélectionnez un fichier .docx / .odt</span><input id="template-file" type="file" accept=".docx,.odt" hidden></div><div class="grid-2"><label class="field"><span>Type</span><select id="template-type"><option value="">Votre choix</option><option value="quote">Devis</option><option value="invoice">Facture</option></select></label><label class="field"><span>Activité</span><select id="template-activity"><option value="">Votre choix</option><option value="__all__">Toutes les activités</option>${S.activities.map(a=>`<option value="${a.id}">${e(a.name)}</option>`).join('')}</select></label></div><div class="template-help"><b>Champs disponibles</b>${(S.tplFields||[]).map(k=>`<code>{{${k}}}</code>`).join('')}</div></section>
  <section class="panel"><div class="section-title"><h2>Modèles personnels actifs</h2></div>${S.templates.map(t=>`<div class="list-row"><div><b>${e(t.name)}</b><small>${t.document_type==='invoice'?'Facture':'Devis'} · ${e(S.activities.find(a=>a.id===t.activity_id)?.name||'Toutes les activités')}</small></div><div class="button-row"><span class="pill">${t.mime_type.includes('word')?'DOCX':'ODT'}</span><button class="btn danger small delete-template" data-id="${t.id}">Supprimer</button></div></div>`).join('')||'<div class="empty">Aucun modèle personnel : la mise en page native Aurion est utilisée.</div>'}</section>`},
  async bind(){
-  $$('.template-select').forEach(b=>b.onclick=async()=>{const type=b.dataset.templateType,style=b.dataset.templateStyle;const next={quote:S.templateChoices?.quote||'aurion-classic',invoice:S.templateChoices?.invoice||'aurion-classic'};next[type]=style;try{S.templateChoices=await api.saveDocumentTemplateChoices(next);toast('Modèle enregistré','success');hooks.show('templates')}catch(x){toast(x.message,'error')}});
-  // Carrousel 3D : chaque carte est inclinée (rotateY) et mise en profondeur (translateZ) selon
-  // sa distance au centre du rail de défilement ; les flèches font défiler d'une carte.
+  // 15.4.60 — anneau 3D circulaire des modèles : les cartes (faces = aperçus réels, même page
+  // que le PDF servi) sont posées sur un cylindre elliptique ; un clic sur une flèche ou sur une
+  // carte du fond fait tourner l'anneau (les cartes tournent visiblement derrière) ; après un
+  // tour complet, l'angle normalisé modulo 360° ramène exactement à la carte d'origine. Un clic
+  // sur la carte de face ouvre l'aperçu taille réelle (PDF intégré) où « Utiliser ce modèle »
+  // valide le choix — aucun bouton d'aperçu sur les cartes elles-mêmes.
   const carousels=[...document.querySelectorAll('[data-carousel]')];
-  const apply3D=carousel=>{const track=carousel.querySelector('.template-track');if(!track)return;const mid=track.scrollLeft+track.clientWidth/2;track.querySelectorAll('.template-card').forEach(card=>{const c=card.offsetLeft+card.offsetWidth/2;const d=Math.max(-1,Math.min(1,(c-mid)/Math.max(1,track.clientWidth)));card.style.transform=`rotateY(${(-d*26).toFixed(2)}deg) translateZ(${((1-Math.abs(d))*64).toFixed(1)}px) scale(${(1-Math.abs(d)*0.08).toFixed(3)})`;card.style.opacity=String(1-Math.abs(d)*0.3)})};
-  carousels.forEach(carousel=>{const track=carousel.querySelector('.template-track');track.addEventListener('scroll',()=>apply3D(carousel),{passive:true});carousel.querySelectorAll('.template-carousel-arrow').forEach(btn=>btn.addEventListener('click',()=>{const card=track.querySelector('.template-card');const step=card?card.offsetWidth+18:280;track.scrollBy({left:step*Number(btn.dataset.carouselDir||1),behavior:'smooth'})}));apply3D(carousel)});
-  const onCarouselResize=()=>carousels.forEach(apply3D);window.addEventListener('resize',onCarouselResize);
+  const applyTemplateChoice=async(type,style,name)=>{
+    const next={quote:S.templateChoices?.quote||'aurion-classic',invoice:S.templateChoices?.invoice||'aurion-classic'};
+    next[type]=style;
+    try{S.templateChoices=await api.saveDocumentTemplateChoices(next);toast(`Modèle « ${name} » enregistré : appliqué aux prochains ${type==='invoice'?'factures':'devis'}.`,'success');hooks.show('templates')}
+    catch(x){toast(x.message,'error')}
+  };
+  const openTemplatePreview=(type,style,name,desc)=>{
+    const back=document.createElement('div');back.className='modal-backdrop';back.id='template-preview-modal';
+    back.insertAdjacentHTML('beforeend',`<div class="modal glass template-modal" role="dialog" aria-modal="true" aria-label="Aperçu taille réelle du modèle ${e(name)}"><div class="section-title"><h2>Modèle ${e(name)}</h2><button type="button" class="icon-btn modal-close" aria-label="Fermer">×</button></div><p class="help">${e(desc||'')}</p><p class="template-modal-embed"><embed src="./assets/templates/${type}-${style}.pdf" type="application/pdf" title="Aperçu PDF du modèle ${e(name)}"></p><div class="button-row"><button type="button" class="btn secondary modal-close">Fermer</button><a class="btn secondary" href="./assets/templates/${type}-${style}.pdf" download="aurion-${type}-${style}.pdf">Télécharger le PDF</a><button type="button" class="btn primary template-modal-validate" data-type="${type}" data-style="${style}">Utiliser ce modèle</button></div></div>`);
+    document.body.appendChild(back);
+    back.querySelectorAll('.modal-close').forEach(x=>x.onclick=()=>back.remove());
+    back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
+    const onKey=ev=>{if(ev.key==='Escape'){back.remove();document.removeEventListener('keydown',onKey)}};
+    document.addEventListener('keydown',onKey);
+    back.querySelector('.template-modal-validate').addEventListener('click',()=>{back.remove();applyTemplateChoice(type,style,name)});
+  };
+  const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const resizers=[];
+  carousels.forEach(carousel=>{
+    const ring=carousel.querySelector('.template-ring'),stage=carousel.querySelector('.template-stage');
+    if(!ring||!stage)return;
+    const cards=[...ring.querySelectorAll('.template-card')],N=cards.length,STEP=360/N;
+    let angle=-Number(carousel.dataset.start||0)*STEP; // le modèle actif démarre face avant.
+    const layout=()=>{
+      const w=stage.clientWidth||360;
+      const cardW=parseFloat(getComputedStyle(cards[0]).width)||210;
+      const rz=Math.max(150,Math.min(300,w*0.36));
+      // rx adaptatif : un peu plus large que la demi-largeur PROJETÉE de la carte de face
+      // (perspective incluse) — les voisines ressortent toujours sur les côtés, quel que soit
+      // l'écran, au lieu de se cacher derrière la carte avant (mobile).
+      const mag=1600/(1600-(rz+36));
+      const rx=Math.max(70,Math.min(200,(cardW*1.05*mag/2)*1.12));
+      cards.forEach(card=>{
+        const i=Number(card.dataset.index);
+        const rel=((i*STEP+angle)%360+360)%360; // 0° = face avant.
+        const front=rel===0;
+        // Chaque carte est posée DIRECTEMENT à son angle monde (i·45° + angle, continu et non
+        // borné : les transitions CSS tournent toujours dans le bon sens) — l'anneau parent ne
+        // tourne pas, donc la carte de face reste exactement centrée même sur une ellipse
+        // (rx≠rz) : un anneau parent tourné décalerait l'avant de ½(rz−rx) sur mobile.
+        const a=i*STEP+angle;
+        const rad=a*Math.PI/180;
+        const boost=front?36:0;
+        const sc=front?1.05:(rel<=45||rel>=315?0.94:(rel<=90||rel>=270?0.88:0.82));
+        card.style.transform=`translate3d(${(rx*Math.sin(rad)).toFixed(1)}px,0,${(rz*Math.cos(rad)+boost).toFixed(1)}px) rotateY(${a.toFixed(2)}deg) scale(${sc})`;
+        card.classList.toggle('is-front',front);
+        card.style.filter=front?'none':`brightness(${(1-Math.min(rel,360-rel)/180*0.5).toFixed(3)})`;
+      });
+      ring.style.transition=reducedMotion?'none':'';
+    };
+    const rotate=dir=>{angle+=dir*STEP;layout()};
+    carousel.querySelectorAll('.template-carousel-arrow').forEach(btn=>btn.addEventListener('click',()=>rotate(Number(btn.dataset.carouselDir||1))));
+    cards.forEach(card=>{
+      const act=()=>{
+        const i=Number(card.dataset.index);
+        const rel=((i*STEP+angle)%360+360)%360;
+        if(rel===0){openTemplatePreview(carousel.dataset.carousel,card.dataset.style,card.dataset.name,card.dataset.desc);return;}
+        // Cartes du fond : un clic les amène à la face avant par le chemin le plus court —
+        // l'anneau tourne, la carte visée passe devant, les autres tournent derrière.
+        let diff=Math.round(rel/STEP);if(diff>N/2)diff-=N;
+        angle-=diff*STEP;layout();
+      };
+      card.addEventListener('click',act);
+      card.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();act()}});
+    });
+    layout();
+    resizers.push(layout);
+  });
+  window.addEventListener('resize',()=>resizers.forEach(f=>f()));
   const input=document.querySelector('#template-file'),drop=document.querySelector('#template-drop');
   const up=async f=>{if(!f)return;try{const selectedActivity=document.querySelector('#template-activity').value||'';const activityId=selectedActivity==='__all__'?'':selectedActivity;const r=await api.uploadTemplate(f,document.querySelector('#template-type').value,activityId||null);toast(`Modèle enregistré : ${r.fields?.length||0} champ(s) détecté(s).`,r.unknown?.length?'info':'success');if(S.tplStatus&&!S.tplStatus.libreOffice)toast('Conversion PDF indisponible sur ce serveur : votre modèle s’appliquera aux formats Word/ODT ; le PDF reste au modèle natif tant que LibreOffice n’est pas installé.','info');await hooks.refresh('templates',{navigation:true})}catch(x){toast(x.message,'error')}};
   input.addEventListener('change',ev=>up(ev.target.files?.[0]));drop.addEventListener('click',ev=>{if(ev.target===input)return;input.click()});drop.addEventListener('dragover',ev=>{ev.preventDefault();drop.classList.add('dragover')});drop.addEventListener('dragleave',()=>drop.classList.remove('dragover'));drop.addEventListener('drop',ev=>{ev.preventDefault();drop.classList.remove('dragover');up(ev.dataTransfer.files?.[0])});
