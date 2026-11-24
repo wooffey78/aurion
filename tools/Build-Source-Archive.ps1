@@ -71,6 +71,7 @@ $files = @(Get-ChildItem -LiteralPath $Root -File -Force -Recurse | Where-Object
 if ($files.Count -eq 0) { throw 'Aucun fichier source admissible à empaqueter.' }
 
 Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 $outDirectory = Split-Path -Parent $Out
 New-Item -ItemType Directory -Force -Path $outDirectory | Out-Null
 $outputStream = $null

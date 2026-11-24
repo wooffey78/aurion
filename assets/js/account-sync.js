@@ -3,6 +3,7 @@
   const storageKey=d=>`aurion.accountSyncRevision:${d?.organizationId||'unknown-org'}:${d?.userId||'unknown-user'}`;
   const busy=()=>document.activeElement?.matches?.('input,textarea,select,[contenteditable="true"]')||document.querySelector('#view form');
   const nativeFetch=window.fetch.bind(window);
+  const activityHeaders=()=>{try{const id=localStorage.getItem('aurion.activeActivityId');return id?{'x-aurion-activity-id':id}:{}}catch{return{}}};
   let lastKey='',etag='';
   const BASE_POLL_MS=1000,MAX_POLL_MS=16000;
   let failureCount=0,pollTimer=0,polling=false;
@@ -28,9 +29,9 @@
     try{
       const year=Number(document.querySelector('#acc-year')?.value)||new Date().getFullYear();
       const [dashboard,accounting,treasury]=await Promise.all([
-        nativeFetch('/dashboard/summary?forecastMonths=6',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():null),
-        nativeFetch(`/accounting/summary?year=${year}`,{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():null),
-        nativeFetch('/treasury/summary',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():null),
+        nativeFetch('/dashboard/summary?forecastMonths=6',{credentials:'include',cache:'no-store',headers:activityHeaders()}).then(r=>r.ok?r.json():null),
+        nativeFetch(`/accounting/summary?year=${year}`,{credentials:'include',cache:'no-store',headers:activityHeaders()}).then(r=>r.ok?r.json():null),
+        nativeFetch('/treasury/summary',{credentials:'include',cache:'no-store',headers:activityHeaders()}).then(r=>r.ok?r.json():null),
       ]);
       if(!dashboard)return;
       const f=dashboard.forecast||{};

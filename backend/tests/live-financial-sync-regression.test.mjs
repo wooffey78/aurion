@@ -10,7 +10,8 @@ test('synchronisation live : 1 seconde, sans rechargement et sans interception g
   assert.ok(!s.includes('location.reload('));
   assert.ok(!s.includes('window.fetch=async'));
   assert.ok(s.includes('aurion:account-sync-changed'));
-  assert.ok(s.includes('home-forecast-3m'));
+  assert.ok(s.includes('#home-month-revenue'));
+  assert.ok(s.includes("textByLabel('3 mois'"));
   assert.ok(s.includes('accounting/summary'));
   assert.ok(s.includes('treasury/summary'));
 });
