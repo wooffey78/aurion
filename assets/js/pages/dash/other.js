@@ -21,7 +21,7 @@ const fdate=d=>new Date(d).toLocaleString('fr-FR');
 const rowBtns=(cls,id,extra='')=>`<div class="button-row">${extra}<button class="btn secondary small edit-${cls}" data-id="${id}">Modifier</button><button class="btn danger small del-${cls}" data-id="${id}">Supprimer</button></div>`;
 
 
-async function forecastPanelMarkup(prefix,documents=S.quotes,activity=active()){
+export async function forecastPanelMarkup(prefix,documents=S.quotes,activity=active()){
  const automatic=deriveAutomaticForecastAssumptions(documents,activity);
  let saved=null,assumptionsReadError=false;
  try{saved=await api.forecastAssumptions()}catch{assumptionsReadError=true}
@@ -41,7 +41,8 @@ async function forecastPanelMarkup(prefix,documents=S.quotes,activity=active()){
  const rows=p.periods.map(period=>'<tr data-forecast-period="'+period.months+'"><th scope="row">'+(period.months===1?'1 mois':period.months+' mois')+'</th><td data-forecast-cell="repairs">'+quantity(period.repairs)+'</td><td data-forecast-cell="entries">'+money(period.entries)+'</td><td data-forecast-cell="outputs">'+money(period.outputs)+'</td><td data-forecast-cell="net">'+money(period.net)+'</td></tr>').join('');
  // 15.4.62 — plus aucun menu déroulant dans la prévision de facturation : les horizons
  // 1/3/6/12 mois sont déjà le tableau du scénario ; le « Détail » déplie les projections HT du backend.
- const historyControl=prefix==='home'?'<div class="button-row forecast-legacy-controls"><button class="link-btn" id="forecast-detail" type="button">Détail</button></div><div id="forecast-more" hidden class="metrics"><article><span>3 mois — projection HT</span><b>'+money(S.dashboardCounters?.forecast?.months3||0)+'</b></article><article><span>6 mois — projection HT</span><b>'+money(S.dashboardCounters?.forecast?.months6||0)+'</b></article><article><span>Année — réalisé HT + projection HT</span><b>'+money(S.dashboardCounters?.forecast?.year||0)+'</b></article></div>':'';
+ const htFor=months=>{const per=(p.periods||[]).find(x=>x.months===months);return per?per.entriesHt:0};
+ const historyControl=prefix==='home'?'<div class="button-row forecast-legacy-controls"><button class="link-btn" id="forecast-detail" type="button">Détail</button></div><div id="forecast-more" hidden class="metrics"><article><span>3 mois — projection HT (scénario)</span><b>'+money(htFor(3))+'</b><small>volume × ticket HT de vos documents</small></article><article><span>6 mois — projection HT (scénario)</span><b>'+money(htFor(6))+'</b></article><article><span>Année — projection HT (scénario)</span><b>'+money(htFor(12))+'</b></article><article><span>Réalisé encaissé</span><b>'+money(S.dashboardCounters?.forecast?.monthHt||0)+' € HT</b><small>mois en cours · paiements réels (Trésorerie)</small></article></div>':'';
  return '<section class="panel forecast-simulation" data-forecast-panel="'+prefix+'"><div class="section-title forecast-title"><div><span class="eyebrow">SCÉNARIO INDICATIF</span><h2>Prévision de facturation — scénario indicatif</h2>'+historyControl+'<p class="help"><strong>Calcul automatique.</strong> Aurion calcule le volume à partir des factures récentes, le ticket et les coûts directs à partir des documents de l’activité, et la provision sur le CA HT à partir des taux configurés. Le volume et le ticket sont déduits des factures récentes ; les charges fixes peuvent être renseignées séparément.</p></div></div><div class="forecast-input-grid forecast-auto-grid">'+cards+'</div><div class="button-row"><button type="button" class="btn secondary small" data-edit-forecast-fixed-costs>Renseigner les charges fixes</button></div><div class="forecast-table-wrap"><table class="forecast-table"><thead><tr><th>Horizon</th><th>Factures projetées</th><th>Entrées estimées (TTC)</th><th>Sorties estimées (TTC + provision HT)</th><th>Solde estimé (avant TVA à reverser)</th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="help">Calcul : entrées = factures estimées × ticket moyen TTC ; sorties = coûts directs TTC + charges fixes TTC + provision de cotisations calculée sur le CA HT. La TVA collectée n’est pas déduite du solde : elle reste à reverser. Les projections combinent le réalisé du mois et la moyenne HT de la période de référence (paiements détaillés et factures payées croisés) ; les horizons 3/6 mois et année y ajoutent les devis ouverts HT, le mois à venir n’ajoute plus l’intégralité des devis ouverts : elles ne constituent pas un historique ni une promesse d’encaissement. Les créances et devis restent détaillés séparément dans la trésorerie.</p></section>';
 }
 
@@ -205,13 +206,36 @@ bind(){
 
 // ------------------------------------------------------------------ comptabilité
 export const accounting={view(){
-  const acc=S.accounting?.invoices||{},savTotal=(S.sav||[]).filter(x=>(x.sav_type||'financial')==='financial').reduce((s,x)=>s+Number(x.amount_ttc||0),0),ca=Number(acc.revenue_ht||0),vat=Number(acc.vat||0),ur=Number(acc.social||0),km=Number(acc.mileage_total||0),invCount=Number(acc.count||0),
   // 15.4.56 (consigne éditeur) : les encarts affichent 0,00 € tant qu'aucune donnée n'est
   // saisie, puis suivent les données réelles dès le premier mouvement — plus jamais de
   // « à renseigner » figé, qui empêchait de voir la valeur évoluer de 0 vers le réel.
-  m0=v=>money(Number(v||0));
+  // 15.4.64 — CORRECTIF : le repli local s'applique AVANT la lecture des encarts (en 15.4.63
+  // il était calculé après la destructuration et n'apparaissait jamais à l'écran).
   const year=S.accountingYear||new Date().getFullYear();
-  return`<div class="page-head"><div><span class="eyebrow">PILOTAGE</span><h1>Comptabilité</h1><p>Les mois ne sont jamais remis à zéro : Aurion conserve l’historique annuel.</p></div></div><div class="metrics"><article><span>Encaissements HT</span><b id="acc-encaissements">${m0(ca)}</b><small>activité active · paiements reçus, SAV déduits</small></article><article><span>TVA encaissée</span><b id="acc-tva">${m0(vat)}</b><small>calculée sur les paiements reçus</small></article><article><span>Cotisations estimées</span><b id="acc-cotisations">${m0(ur)}</b><small>selon vos taux · base encaissements HT</small></article><article><span>Factures encaissées</span><b id="acc-factures">${invCount}</b><small>au moins un paiement reçu sur l’année</small></article><article><span>Kilométrage sur factures</span><b id="acc-km">${m0(km)}</b><small>montant figurant sur les factures</small></article></div>
+  const accServer=S.accounting?.invoices||{};
+  const serverEmpty=!Number(accServer.revenue_ht||0)&&!Number(accServer.vat||0)&&!Number(accServer.count||0);
+  // Repli honnête : si le résumé serveur est vide alors que des factures locales portent un
+  // montant encaissé, les encarts croisent ces documents réels (mêmes règles que le moteur
+  // comptable : TTC/(1+TVA)=HT, cotisations sur le HT, kilométrage facturé au client) —
+  // jamais de zéro trompeur quand les données existent.
+  const localRows=[];
+  for(const q of S.quotes||[]){
+    if(q.document_type!=='invoice')continue;
+    const st=String(q.status||'').toLowerCase();
+    if(['canceled','cancelled','annulé','annule','void','deleted'].includes(st))continue;
+    const paid=Number(q.amount_paid||0);if(!(paid>0))continue;
+    const vatRate=Number(q.vat_rate||0);const ht=paid/(1+vatRate/100);
+    const rates=Array.isArray(q.contribution_snapshot)?q.contribution_snapshot:[];
+    const social=rates.filter(c=>String(c?.basis||'ca_ht').toLowerCase()==='ca_ht').reduce((t,c)=>t+Number(c?.rate||0),0)*ht/100;
+    const kmFact=q.mileage_mode==='client_price'?Number(q.mileage_total||0):0;
+    localRows.push({ht,vat:paid-ht,social,km:kmFact,year:Number(String(q.paid_at||q.updated_at||q.created_at||'').slice(0,4))||year});
+  }
+  const accountingFallback=serverEmpty&&localRows.length>0;
+  const sel=localRows.filter(r=>r.year===year);const sum=f=>sel.reduce((t,r)=>t+f(r),0);
+  const acc=accountingFallback?{...accServer,revenue_ht:sum(r=>r.ht),vat:sum(r=>r.vat),social:sum(r=>r.social),mileage_total:sum(r=>r.km),count:sel.length}:accServer;
+  const savTotal=(S.sav||[]).filter(x=>(x.sav_type||'financial')==='financial').reduce((s,x)=>s+Number(x.amount_ttc||0),0),ca=Number(acc.revenue_ht||0),vat=Number(acc.vat||0),ur=Number(acc.social||0),km=Number(acc.mileage_total||0),invCount=Number(acc.count||0),
+  m0=v=>money(Number(v||0));
+  return`<div class="page-head"><div><span class="eyebrow">PILOTAGE</span><h1>Comptabilité</h1><p>Les mois ne sont jamais remis à zéro : Aurion conserve l’historique annuel.</p></div></div><div class="metrics"><article><span>Encaissements HT</span><b id="acc-encaissements">${m0(ca)}</b><small>activité active · paiements reçus, SAV déduits</small></article><article><span>TVA encaissée</span><b id="acc-tva">${m0(vat)}</b><small>calculée sur les paiements reçus</small></article><article><span>Cotisations estimées</span><b id="acc-cotisations">${m0(ur)}</b><small>selon vos taux · base encaissements HT</small></article><article><span>Factures encaissées</span><b id="acc-factures">${invCount}</b><small>au moins un paiement reçu sur l’année</small></article><article><span>Kilométrage sur factures</span><b id="acc-km">${m0(km)}</b><small>montant figurant sur les factures</small></article></div>${accountingFallback?'<p class="help" data-accounting-fallback>Encarts calculés localement sur vos factures enregistrées (montants encaissés) — les totaux du serveur reprendront dès leur synchronisation.</p>':''}
   <section class="panel accounting-treasury-panel"><div class="section-title"><h2>Trésorerie prévisionnelle</h2><span class="pill">Même activité · calculs synchronisés</span></div><div class="metrics"><article><span>Créances restantes à encaisser (engagé)</span><b id="trez-committed-in">${money(S.treasury?.committedIn||0)}</b><small>factures non soldées : reste dû TTC, majorations comprises, paiements reçus déduits</small></article><article><span>Devis ouverts (potentiel)</span><b id="trez-potential-in">${money(S.treasury?.potentialIn||0)}</b><small>non signés — présentés séparément des encaissements certains</small></article><article><span>Sorties prévues</span><b id="trez-outputs">${money(S.treasury?.forecastOutputs||0)}</b><small>coûts directs des documents ouverts${Number(S.treasury?.committedOut||0)>0?` dont ${money(S.treasury?.committedOut)} de notes de frais à rembourser`:''}</small></article><article><span>Solde engagé (hors potentiel)</span><b id="trez-committed-net">${money(S.treasury?.committedNet||0)}</b><small>créances − sorties prévues ; SAV ${money(S.treasury?.savTotal||0)} compté séparément</small></article></div><div class="section-title"><h3>Prévisionnel par document</h3></div>${(S.treasury?.rows||[]).map(q=>`<div class="list-row"><div><b>${e(q.number)}</b><small>Devis · ${e(q.status||'')} · ${new Date(q.created_at).toLocaleDateString('fr-FR')}</small></div><div><b>${money(q.total_ttc)}</b><small>Sortie matériel : ${money(q.purchase_ht||0)} HT</small></div></div>`).join('')||'<p class="muted">Aucun devis prévisionnel.</p>'}</section>
   ${expensesPanel()}
   <section class="panel"><div class="section-title"><h2>Comptabilité</h2><span class="pill">Calculs liés aux paiements</span></div>${!navigator.onLine?`<p class="notice warn-notice" data-freshness>Données locales affichées — calculs fondés sur la dernière réplication${''} ; ils peuvent être incomplets tant que la connexion est absente. Aucun zéro fictif : ce qui n'est pas connu n'est pas affiché.</p>`:''}<div class="section-title"><h3>Export comptable ${year}</h3><div class="button-row"><label class="field inline"><span>Année</span><select id="acc-year">${[0,1,2,3].map(o=>year-o).map(y=>`<option value="${y}" ${y===year?'selected':''}>${y}</option>`).join('')}</select></label><button class="btn primary" id="acc-csv">Exporter en CSV</button></div></div><p class="muted">Export CSV structuré (encaissements HT, TVA encaissée, cotisations estimées, kilométrage facturé et détail mensuel), à transmettre à votre comptable.</p><div class="section-title"><h3>Historique mensuel</h3></div>${(S.accounting?.months||[]).map(m=>{const hasMovement=Number(m.invoiceCount||0)>0||Number(m.revenueHt||0)!==0||Number(m.purchases||0)!==0||Number(m.social||0)!==0||Number(m.mileage||0)!==0||Number(m.expenseReports||0)!==0;return `<details class="list-row month-history"${hasMovement?'':' data-empty="true"'}><summary><b>${new Date(m.month).toLocaleDateString('fr-FR',{month:'long',year:'numeric'})}</b><strong>${money(m.revenueHt||0)}</strong></summary>${hasMovement?`<div class="stack month-detail"><div class="list-row"><small>Encaissements HT</small><b>${money(m.revenueHt||0)}</b></div><div class="list-row"><small>TVA encaissée</small><b>${money(m.vat||0)}</b></div><div class="list-row"><small>Dépenses et coûts directs HT</small><b>${money(m.purchases||0)}</b></div><div class="list-row"><small>TVA déductible</small><b>${money(m.purchaseVat||0)}</b></div><div class="list-row"><small>Cotisations sociales estimées</small><b>${money(m.social||0)}</b></div><div class="list-row"><small>Kilométrage figurant sur factures</small><b>${money(m.mileage||0)}</b></div>${Number(m.expenseReports||0)>0?`<div class="list-row"><small>Notes de frais</small><b>${money(m.expenseReports)}</b></div>`:''}<div class="list-row"><small>Factures avec au moins un encaissement</small><b>${Number(m.invoiceCount||0)}</b></div><div class="list-row"><small>Solde indicatif (encaissé − coûts et frais − cotisations estimées)</small><b>${money(Math.round((Number(m.revenueHt||0)-Number(m.purchases||0)-Number(m.social||0))*100)/100)}</b></div></div>`:'<p class="muted">Aucun mouvement enregistré ce mois-ci.</p>'}</details>`}).join('')||'<p class="muted">Les données mensuelles apparaîtront ici dès votre première facture.</p>'}</section>`},
@@ -288,13 +312,13 @@ export const templates={view(){
     const layout=()=>{
       const w=stage.clientWidth||360;
       const cardW=parseFloat(getComputedStyle(cards[0]).width)||210;
-      // 15.4.62 — espacement desktop nettement supérieur (demande utilisateur) : l'anneau est
-      // beaucoup plus profond (rz plafonné à 560px) et les cartes beaucoup plus écartées
-      // latéralement (rx plafonné à 360px, coefficient 1.5) ; la scène est agrandie en
-      // conséquence (hauteur 560px sur grand écran) et les planchers mobiles sont conservés.
-      const rz=Math.max(150,Math.min(560,w*0.5));
+      // 15.4.63 — cartes d'aperçu plus petites (anneau rétréci) mais écarts RÉELLEMENT
+      // visibles : rx est calculé pour garantir ≥ ~40px entre la carte de face et ses voisines
+      // à ±45° (demi-largeurs projetées), l'anneau est plus profond (rz ≤ 600px, 54% de la
+      // scène) et les planchers mobiles restent conservés.
+      const rz=Math.max(150,Math.min(600,w*0.54));
       const mag=1600/(1600-(rz+36));
-      const rx=Math.max(70,Math.min(360,(cardW*1.05*mag/2)*1.5));
+      const rx=Math.max(70,Math.min(470,((cardW*1.05+cardW*0.94*0.707)*mag/2+40)/0.707));
       cards.forEach(card=>{
         const i=Number(card.dataset.index);
         const rel=((i*STEP+angle)%360+360)%360; // 0° = face avant.
@@ -448,7 +472,7 @@ export const admin = {
         </div><div class="section-title"><h2>Estimation des créations d’entreprises</h2></div>
         <p>À partir des deux derniers mois complets : <b>${Number(s.predictions?.nextMonth || 0)}</b> créations estimées le mois prochain et <b>${Number(s.predictions?.nextYear || 0)}</b> sur douze mois. Cette estimation est indicative.</p>
         <small class="muted">${e(s.note || '')}</small>` : '<p class="muted">Les indicateurs ne sont pas disponibles.</p>'}
-        <div class="section-title admin-view-switch"><h2>Vue des indicateurs</h2><div class="button-row"><button type="button" class="btn secondary small" id="admin-view-cards" aria-pressed="true">Cartes</button><button type="button" class="btn secondary small" id="admin-view-charts" aria-pressed="false">Diagrammes</button></div></div>
+        <div class="section-title admin-view-switch"><h2>Vue des indicateurs</h2><button type="button" class="btn secondary small" id="admin-view-toggle" aria-pressed="false" title="Basculer entre la vue chiffrée et les diagrammes">Vue diagrammes</button></div>
         <div id="admin-charts" hidden class="admin-charts-grid"><div class="chart-box" id="chart-admin-orgs"></div><div class="chart-box" id="chart-admin-free"></div><div class="chart-box" id="chart-admin-billing"></div><div class="chart-box" id="chart-admin-conversion"></div></div>
       </section>
 
@@ -526,16 +550,21 @@ export const admin = {
     };
     const metricsGrid = root.querySelector('#admin-metrics');
     const chartsBox = root.querySelector('#admin-charts');
-    const toggleAdminView = mode => {
-      const cards = mode === 'cards';
-      if (metricsGrid) metricsGrid.hidden = !cards;
-      if (chartsBox) chartsBox.hidden = cards;
-      if (!cards && statsReady) renderAdminCharts(s);
-      root.querySelector('#admin-view-cards')?.setAttribute('aria-pressed', String(cards));
-      root.querySelector('#admin-view-charts')?.setAttribute('aria-pressed', String(!cards));
+    // 15.4.63 — une seule bascule : un clic affiche les diagrammes, un nouveau clic revient aux
+    // encarts chiffrés ; la vue est exclusive et mémorisée pour l'utilisateur.
+    const ADMIN_VIEW_KEY='aurion-admin-view';
+    const readAdminView=()=>{try{return localStorage.getItem(ADMIN_VIEW_KEY)==='charts'?'charts':'cards'}catch{return 'cards'}};
+    const applyAdminView=mode=>{
+      const charts=mode==='charts';
+      if(metricsGrid)metricsGrid.hidden=charts;
+      if(chartsBox)chartsBox.hidden=!charts;
+      if(charts&&statsReady)renderAdminCharts(s);
+      const btn=root.querySelector('#admin-view-toggle');
+      if(btn){btn.textContent=charts?'Vue chiffrée (encarts)':'Vue diagrammes';btn.setAttribute('aria-pressed',String(charts));}
+      try{localStorage.setItem(ADMIN_VIEW_KEY,mode)}catch{}
     };
-    root.querySelector('#admin-view-cards')?.addEventListener('click', () => toggleAdminView('cards'));
-    root.querySelector('#admin-view-charts')?.addEventListener('click', () => toggleAdminView('charts'));
+    applyAdminView(readAdminView());
+    root.querySelector('#admin-view-toggle')?.addEventListener('click',()=>applyAdminView(readAdminView()==='charts'?'cards':'charts'));
     // 15.4.62 — configuration serveur de la connexion Tiime (module administrateur) : les
     // secrets partent en PUT et ne reviennent jamais en clair (masqués côté serveur).
     const tiimeForm = root.querySelector('#tiime-form');

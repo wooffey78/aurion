@@ -18,6 +18,7 @@ import { integrationRoutes } from "./routes/integrations.js";
 import { mailRoutes } from "./routes/mail.js";
 import { accountRoutes } from "./routes/account.js";
 import { settingsRoutes } from "./routes/settings.js";
+import { calcEngineRoutes } from "./routes/calc-engine.js";
 import { supportRoutes } from "./routes/support.js";
 import { adminRoutes } from "./routes/admin.js";
 import { dashboardJournalRoutes } from "./routes/dashboard-journal.js";
@@ -138,6 +139,7 @@ export async function buildApp() {
   await app.register(mailRoutes);
   await app.register(accountRoutes);
   await app.register(settingsRoutes);
+  await app.register(calcEngineRoutes);
   await app.register(supportRoutes);
   await app.register(adminRoutes);
   // Android/TWA : assetlinks pour l'association d'application (Digital Asset Links).

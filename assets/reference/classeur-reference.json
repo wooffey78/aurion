@@ -1,0 +1,139 @@
+{
+  "version": "15.4.64",
+  "workbook": "assets/reference/AURION-classeur-calculs.xlsx",
+  "mapping": [
+    {
+      "aurion": "computePricing().baseRevenueHt",
+      "excel": "Moteur document!B17",
+      "formule": "TTC ÷ (1 + TVA/100), arrondi au centime (half-up)"
+    },
+    {
+      "aurion": "computePricing().totalHt",
+      "excel": "Moteur document!B21",
+      "formule": "base HT + kilométrage facturé (client_price uniquement)"
+    },
+    {
+      "aurion": "computePricing().directCostsHt",
+      "excel": "Moteur document!B22",
+      "formule": "pièces × qté + livraison + consommables + km interne + main-d’œuvre interne"
+    },
+    {
+      "aurion": "computePricing().grossMargin",
+      "excel": "Moteur document!B23",
+      "formule": "total HT − coûts directs"
+    },
+    {
+      "aurion": "computePricing().contributionsTotal",
+      "excel": "Moteur document!B24",
+      "formule": "Σ taux × base HT (chaque cotisation sur son assiette)"
+    },
+    {
+      "aurion": "computePricing().netResult",
+      "excel": "Moteur document!B25",
+      "formule": "marge brute − cotisations"
+    },
+    {
+      "aurion": "computePricing().totalTtc",
+      "excel": "Moteur document!B26",
+      "formule": "TTC cible + km facturé TTC"
+    },
+    {
+      "aurion": "computePricing().vat",
+      "excel": "Moteur document!B27",
+      "formule": "total TTC − total HT"
+    },
+    {
+      "aurion": "Encaissements HT (comptabilité)",
+      "excel": "Encaissements & TVA!C",
+      "formule": "Σ paiements TTC ÷ (1+TVA), paiements détaillés ∪ factures payées"
+    },
+    {
+      "aurion": "Prévisionnel — volume et projections HT",
+      "excel": "Prévisionnel!A:G",
+      "formule": "volume = (factures + devis récents)/6 ; entrées HT = volume × ticket HT × horizon"
+    }
+  ],
+  "cases": [
+    {
+      "name": "Réparation standard (marge absorbe le km)",
+      "partCost": 120.0,
+      "shippingCost": 15.0,
+      "consumablesCostHt": 0.0,
+      "mileageKm": 30,
+      "mileageInternalRate": 0.35,
+      "mileageClientRate": 0.5,
+      "mileageMode": "margin",
+      "laborInternalCostHt": 25.0,
+      "vatRate": 20,
+      "targetTtc": 400.0,
+      "urssafRate": 22,
+      "expected": {
+        "totalTtc": 400.0,
+        "totalHt": 333.33,
+        "vat": 66.67,
+        "baseRevenueHt": 333.33,
+        "grossMargin": 162.83,
+        "contributionsTotal": 73.33,
+        "netResult": 89.5,
+        "mileageTotal": 10.5,
+        "directCostsHt": 170.5,
+        "laborSellingHt": 187.83,
+        "minimumSellingHt": 145.5
+      }
+    },
+    {
+      "name": "Kilométrage facturé au client",
+      "partCost": 80.0,
+      "shippingCost": 0.0,
+      "consumablesCostHt": 0.0,
+      "mileageKm": 45,
+      "mileageInternalRate": 0.3,
+      "mileageClientRate": 0.6,
+      "mileageMode": "client_price",
+      "laborInternalCostHt": 20.0,
+      "vatRate": 20,
+      "targetTtc": 350.0,
+      "urssafRate": 22,
+      "expected": {
+        "totalTtc": 382.4,
+        "totalHt": 318.67,
+        "vat": 63.73,
+        "baseRevenueHt": 291.67,
+        "grossMargin": 205.17,
+        "contributionsTotal": 64.17,
+        "netResult": 141.0,
+        "mileageTotal": 27.0,
+        "directCostsHt": 113.5,
+        "laborSellingHt": 198.17,
+        "minimumSellingHt": 93.5
+      }
+    },
+    {
+      "name": "Vente à perte détectée (TVA 5,5 %)",
+      "partCost": 400.0,
+      "shippingCost": 25.0,
+      "consumablesCostHt": 12.5,
+      "mileageKm": 10,
+      "mileageInternalRate": 0.4,
+      "mileageClientRate": 0.5,
+      "mileageMode": "margin",
+      "laborInternalCostHt": 40.0,
+      "vatRate": 5.5,
+      "targetTtc": 300.0,
+      "urssafRate": 22,
+      "expected": {
+        "totalTtc": 300.0,
+        "totalHt": 284.36,
+        "vat": 15.64,
+        "baseRevenueHt": 284.36,
+        "grossMargin": -197.14,
+        "contributionsTotal": 62.56,
+        "netResult": -259.7,
+        "mileageTotal": 4.0,
+        "directCostsHt": 481.5,
+        "laborSellingHt": 0.0,
+        "minimumSellingHt": 441.5
+      }
+    }
+  ]
+}

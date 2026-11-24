@@ -160,6 +160,9 @@ export function calculateForecast(value = {}) {
     periods: [1, 3, 6, 12].map(months => ({
       months, repairs: repairsPerMonth * months,
       entries: monthlyEntries * months,
+      // 15.4.63 — projection HT par horizon : le « Détail » affiche les valeurs du scénario
+      // (volume × ticket HT) au lieu des compteurs backend, souvent vides sans paiements.
+      entriesHt: monthlyEntriesHt * months,
       variableCosts: monthlyVariableCosts * months,
       fixedCosts: assumptions.fixedMonthlyCosts * months,
       reserve: monthlyReserve * months,

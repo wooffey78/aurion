@@ -32,7 +32,9 @@ L’abonnement est réglé par Stripe lorsque les identifiants et le compte marc
 
 Pour chaque commande B2C, l’écran récapitulatif doit afficher les caractéristiques essentielles, le prix total à payer, les éventuels frais, la durée, l’absence de renouvellement automatique, les moyens de paiement, le droit de rétractation et le bouton de commande non ambigu. L’Éditeur doit confirmer le contrat sur support durable.
 
-Pour un client professionnel, les factures précisent la date d’échéance et les pénalités légalement requises. En cas de retard, les pénalités et l’indemnité forfaitaire de recouvrement de 40 € s’appliquent dans les conditions du Code de commerce; les frais supplémentaires justifiés sont réservés. Cette clause ne s’applique pas aux consommateurs.
+Pour un client professionnel, les factures précisent la date d’échéance, les conditions d’escompte (**escompte pour paiement anticipé : néant**) et les pénalités légalement requises. En cas de retard, les pénalités et l’indemnité forfaitaire de recouvrement de 40 € s’appliquent dans les conditions du Code de commerce; les frais supplémentaires justifiés sont réservés. Cette clause ne s’applique pas aux consommateurs : l’indemnité forfaitaire de recouvrement vise uniquement les retards de paiement entre professionnels.
+
+Un avoir et un remboursement sont deux événements distincts : l’émission d’un avoir lié à une facture d’origine réduit le solde restant dû sans effacer la facture, tandis que le remboursement est un flux de trésorerie séparé, exécuté et prouvé séparément. L’émission d’un avoir ne prouve pas l’exécution d’un remboursement.
 
 ## 5. Rétractation des consommateurs
 

@@ -94,7 +94,7 @@ const legalTokenLabel: Record<string,string> = {
 };
 /** Initialise les documents juridiques versionnés; une approbation explicite de version est requise pour publication. */
 export async function ensureLegalDocuments() {
-  const publicationApproved = process.env.AURION_LEGAL_PUBLICATION_APPROVAL === '5.0';
+  const publicationApproved = process.env.AURION_LEGAL_PUBLICATION_APPROVAL === '5.1';
   for (const s of LEGAL_SEEDS) {
     const f = path.join(BACKEND_ROOT, '..', 'docs', s.file);
     let body = existsSync(f) ? readFileSync(f, 'utf8') : `# ${s.title}\n\nTexte juridique indisponible.`;
@@ -102,17 +102,17 @@ export async function ensureLegalDocuments() {
     const hasUnresolvedContent = /\{\{[A-Z0-9_]+\}\}|\[(?:À compléter|À confirmer|À valider|À choisir|À désigner|À renseigner)[^\]]*\]|PROJET DE DOCUMENT|PROJET DE PAGE|PROJET À COMPLÉTER|DOSSIER DE PRÉPARATION|NE PAS PUBLIER/i.test(body);
     const isDraft = !publicationApproved || s.requiredEnv.some(key => !String(process.env[key] || '').trim()) || hasUnresolvedContent;
     await query('update legal_documents set is_current=false where kind=$1 and is_current=true',[s.kind]);
-    await query(`insert into legal_documents(kind,version,title,body,is_current,is_draft) values($1,'5.0',$2,$3,true,$4) on conflict(kind,version) do update set title=excluded.title,body=excluded.body,is_current=true,is_draft=excluded.is_draft`, [s.kind, s.title, body, isDraft]);
+    await query(`insert into legal_documents(kind,version,title,body,is_current,is_draft) values($1,'5.1',$2,$3,true,$4) on conflict(kind,version) do update set title=excluded.title,body=excluded.body,is_current=true,is_draft=excluded.is_draft`, [s.kind, s.title, body, isDraft]);
   }
 }
 export async function currentLegalDocs() {
   return (await query('select id,kind,version,title,is_draft,published_at from legal_documents where is_current=true order by kind')).rows;
 }
-// 15.4.54 (PROMPT D2) — version contractuelle 5.0 : cinq catégories (CGV, confidentialité,
+// 15.4.54 (PROMPT D2) puis 15.4.56 (chantier classeur + conformité) — version contractuelle 5.1 : cinq catégories (CGV, confidentialité,
 // mentions légales, cookies, DPA). Les documents en préparation ne bloquent JAMAIS
 // l'inscription (décision éditeur 15.4.40 conservée) : ce contrôle reste informationnel pour
 // l'inscription et exigé par les tests d'intégration de facturation (fixture CI alignée).
-export async function legalDocumentsReadyForContracts(requiredVersion = '5.0') {
+export async function legalDocumentsReadyForContracts(requiredVersion = '5.1') {
   const rows = (await query(`select kind from legal_documents where is_current=true and is_draft=false and version=$1 and kind in ('cgv','privacy','legal-notice','cookies','dpa')`, [requiredVersion])).rows;
   return new Set(rows.map((row: any) => row.kind)).size === 5;
 }

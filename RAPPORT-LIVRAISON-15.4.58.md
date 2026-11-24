@@ -1,8 +1,6 @@
 # RAPPORT DE LIVRAISON — 15.4.58 (révision du moteur « temps économisé »)
 
-Date : 24 novembre 2026 · Précédente publiée : 15.4.57 (cloisonnement d'activité des encarts et montants robustes) · **Publication** : correctif appliqué sur la ligne `main` de `wooffey78/aurion` (layout racine) via patch de publication ; la poussée déclenche le déploiement Render automatiquement (autoDeploy, render.yaml).
-
-> Périmètre publié : le correctif « temps économisé » seul. Le moteur de calcul central sur classeur Excel (livraison locale 15.4.57) n'est pas inclus dans cette publication et reste à publier séparément le cas échéant.
+Date : 24 novembre 2026 · Précédente : 15.4.57 · **Poussée GitHub / déploiement Render : NON exécutés** (règle 13 — demande distincte requise).
 
 ## 1 · Objet
 
@@ -25,21 +23,18 @@ Corriger le compteur « temps économisé » qui ne calculait pas correctement, 
 | `assets/js/pages/dash/other.js` | Message de confirmation : « l'historique est conservé pour l'audit, les statistiques et le suivi des chantiers » (plus de « Action irréversible ») |
 | `backend/tests/time-metrics.contract.test.mjs` · `tests/time-metrics-reset-scope.contract.test.mjs` | Contrats mis à jour et étendus (10 tests) : saisie honorée, exclusion sans suppression, portée bornée, filtres sur toutes les lectures, chantiers non affectés |
 
-## 4 · Vérifications (arbre publié, layout racine)
+## 4 · Vérifications
 
-- Build TypeScript : **OK** avec la commande exacte du build Render (`npm ci --prefix backend --include=dev` puis `node tools/ensure-backend-deps.mjs && npm --prefix backend run build`).
-- Verrou « versions harmonisées » (`merge-15.4.35.contract.test.mjs`) : **16/16 pass** — toutes les références alignées sur 15.4.58 (`VERSION.txt`, `backend/VERSION.txt`, `package.json`, `backend/package.json`, les deux lockfiles avec `packages[""]`, coquille `sw.js` et `index.html`). Ce verrou a permis de rattraper `backend/VERSION.txt`, oublié lors du bump initial.
-- Contrats « temps économisé » : **16/16 pass** (`time-metrics.contract.test.mjs` 6/6, `time-metrics-reset-scope.contract.test.mjs` 4/4 et assertions associées) — dont l'interdiction réaffichée du `hasHistory ? 0 : …` et l'absence totale de `delete from client_time_sessions`.
-- Suite backend complète (751 tests) : 667 pass, 69 skip, 15 échecs **préexistants et indépendants du correctif** — démontré par exécution séquentielle des 11 fichiers concernés dans l'arbre patché ET dans la baseline `origin/main` construite à l'identique : les ensembles de sous-tests en échec sont strictement identiques (tests sensibles à l'environnement sandbox : clés Google, `APP_BASE_URL`, crédentiels S3, seuils datés). **Le correctif n'introduit aucun échec supplémentaire.**
-- Restant : tests d'intégration PostgreSQL (migration 121) à rejouer avec base ; recette manuelle du chronométrage (démarrage avec saisie → arrêt → compteur, puis remise à zéro → historique conservé).
+- Contrats temps : **16/16 pass** (+ 1 skip base absente) — dont l'interdiction réaffichée du `hasHistory ? 0 : …` et l'absence totale de `delete from client_time_sessions`.
+- Non-régression : **62/62 tests purs verts** (pricing, extensions, money, workflow factures/paiements, scénarios dorés, prévisions, mentions, légal 5.1, moteur classeur).
+- Build TypeScript sans erreur.
+- Restant : tests d'intégration PostgreSQL (migrations 057/121) à rejouer en CI avec base ; recette manuelle du chronométrage (démarrage avec saisie → arrêt → compteur, puis remise à zéro → historique conservé).
 
 ## 5 · Fichiers modifiés ou ajoutés
 
 **Ajoutés** : `backend/migrations/121_time_metrics_soft_reset.sql` ; `CHANGELOG-15.4.58.md` ; ce rapport.
-**Modifiés** : `backend/src/routes/business.ts` ; `backend/src/routes/integrations.ts` ; `backend/src/services/clients.ts` ; `assets/js/pages/dash/other.js` ; `backend/tests/time-metrics.contract.test.mjs` ; `backend/tests/time-metrics-reset-scope.contract.test.mjs` ; `package.json`, `backend/package.json`, `package-lock.json`, `backend/package-lock.json`, `VERSION.txt`, `backend/VERSION.txt`, `sw.js`, `index.html`, `assets/js/main.js` (bump 15.4.58 — lockfiles et `backend/VERSION.txt` alignés conformément au verrou « versions harmonisées »).
+**Modifiés** : `backend/src/routes/business.ts` ; `backend/src/routes/integrations.ts` ; `backend/src/services/clients.ts` ; `assets/js/pages/dash/other.js` ; `backend/tests/time-metrics.contract.test.mjs` ; `backend/tests/time-metrics-reset-scope.contract.test.mjs` ; `package.json`, `backend/package.json`, `VERSION.txt`, `sw.js`, `index.html`, `assets/js/main.js` (bump 15.4.58).
 
-## 6 · Déploiement
+## 6 · Déploiement (à la demande)
 
-La poussée de `main` déclenche automatiquement le déploiement Render (autoDeploy, service `aurion`, Francfort). La migration 121 (`excluded_at`) s'applique au démarrage du backend via `node dist/migrate.js` (migrations additives idempotentes, ordre croissant) ; aucun nouveau paramètre d'environnement n'est requis ; aucune donnée n'est détruite.
-
-**Vérifications post-déploiement** : `GET /health/db` → 200 ; page d'accueil portant `v=15.4.58-r1` (`index.html`) et coquille `aurion-shell-v15.4.58-r1` (`sw.js`) ; puis recette fonctionnelle : saisir une estimation au démarrage d'une session → arrêter → le compteur « Temps économisé » reflète manuel − réel ; « Remettre à zéro » → les compteurs retombent à zéro et l'historique des sessions reste consultable (audit/chantiers).
+Aucun push ni déploiement effectués. À l'activation : la migration 121 s'applique au démarrage du backend (migrations idempotentes, ordre croissant) ; aucun paramètre d'environnement nouveau n'est requis.

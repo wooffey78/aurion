@@ -49,15 +49,16 @@ test('3 — la pièce proposée automatiquement reste modifiable et supprimable'
   assert.match(quote, /const syncLinesFromDom=\(\)=>\{document\.querySelectorAll\('\.line-row'\)\.forEach/);
   assert.match(quote, /const drawAll=\(\)=>\{syncLinesFromDom\(\);draw\(\);suggestLines\(\)\};/);
   // Une pièce retirée n'est plus ré-ajoutée automatiquement.
-  assert.match(quote, /const dismissedParts=new Set\(\);/);
-  assert.match(quote, /if\(lines\[idx\]\?\.partId\)dismissedParts\.add\(lines\[idx\]\.partId\);/);
-  assert.match(quote, /if\(dismissedParts\.has\(x\.id\)\)continue;/);
+  // 15.4.63 — exigence utilisateur : plus aucune pièce ajoutée automatiquement (mécanisme
+  // dismissedParts retiré avec le bloc d'ajout automatique lui-même).
+  assert.match(quote, /plus aucun ajout automatique de pièce/);
+  assert.doesNotMatch(quote, /const dismissedParts=new Set\(\);/);
 });
 
-test('4 — espacement desktop plus conséquent dans l\'anneau 3D', () => {
-  assert.match(other, /const rz=Math\.max\(150,Math\.min\(560,w\*0\.5\)\);/);
-  assert.match(other, /const rx=Math\.max\(70,Math\.min\(360,\(cardW\*1\.05\*mag\/2\)\*1\.5\)\);/);
-  assert.match(other, /espacement desktop (?:plus conséquent|nettement supérieur)/);
+test('4 — espacement desktop dans l\'anneau 3D (15.4.63 : écarts réellement visibles)', () => {
+  assert.match(other, /const rz=Math\.max\(150,Math\.min\(600,w\*0\.54\)\);/);
+  assert.match(other, /const rx=Math\.max\(70,Math\.min\(470,/);
+  assert.match(other, /15\.4\.63 — cartes d'aperçu plus petites/);
 });
 
 test('5 — l\'aperçu taille réelle est débloqué : CSP frame-ancestors self + iframe + ouverture en onglet', () => {

@@ -6,11 +6,13 @@ import { renderDocument } from '../services/document-renderer.js';
 import { readFile, unlink } from 'node:fs/promises';
 import { profileFor, defaultCgvFor, listProfiles, PROFILE_CODES } from '../services/profiles.js';
 import { computePricing } from '../services/pricing.js';
+import { pricingWithWorkbookEngine } from '../services/calc-engine/pricing-adapter.js';
 import { AurionError } from '../services/errors.js';
 import { sendOrgMail, mailConfigured } from '../services/mail.js';
 import { loadAppointment, syncAppointment } from '../services/calendar.js';
 import { clientSummary } from '../services/clients.js';
 import { monthlyAccounting } from '../services/accounting.js';
+import { queueOutboxEmail, flushOutbox, outboxCount } from '../services/email-outbox.js';
 import { documentForecastEntries } from '../services/document-forecast.js';
 import { accountingReportCsv } from '../services/accounting-report.js';
 import { signatureForEmail, emailBodyHtml } from '../services/signature.js';
@@ -41,12 +43,14 @@ import { blockingMentionGaps, mentionReminders } from '../services/mention-gate.
 import { canonicalInvoiceContent, sha256Hex, recordDocumentIntegrity } from '../services/integrity-chain.js';
 import { companyDisplayName } from '../services/company.js';
 
-type QuoteItem={label:string;quantity:number;unitCost:number;unitPrice?:number|null;partId:string|null;saleCoefficientPercent?:number|null;activityCategory?:string|null};
+type QuoteItem={label:string;quantity:number;unitCost:number;unitPrice?:number|null;partId:string|null;saleCoefficientPercent?:number|null;activityCategory?:string|null;kind?:'part'|'service'|null};
 type SqlExecutor={query:(text:string,values?:unknown[])=>Promise<any>};
 const numericInput = z.union([z.number().finite(), z.string().max(80), z.null()]).optional();
 const optionalUuid = z.union([z.string().uuid(), z.literal(''), z.null()]).optional();
 const quoteLineInputSchema = z.object({
   label: z.string().max(500).optional(), name: z.string().max(500).optional(),
+  // 15.4.63 — multi-prestations : la ligne peut être une pièce ('part', défaut) ou une prestation complémentaire ('service').
+  kind: z.enum(['part','service']).optional(),
   quantity: numericInput, unitCost: numericInput, unitPrice: numericInput,
   partId: optionalUuid, saleCoefficientPercent: numericInput,
   // Bloc 8 — catégorie d'activité de la ligne (activité mixte) : vide = non renseigné,
@@ -395,7 +399,7 @@ async function saveItems(executor:SqlExecutor,quoteId:string,org:string,activity
       :0;
     const euroCoefficient=coefficientBasis==='purchase'&&coefficientUnit==='euro'?Math.max(0,Number(coefficientValue||0)):0;
     const unitPrice=item.unitPrice!==null&&item.unitPrice!==undefined?Math.max(0,Number(item.unitPrice)):Math.max(0,Number(item.unitCost||0)*(1+coefficient/100)+euroCoefficient);
-    await executor.query('insert into quote_items(quote_id,position,label,quantity,unit_cost,part_id,sale_coefficient_percent,unit_price,photo_key,activity_category) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[quoteId,position,item.label,item.quantity,item.unitCost,item.partId,coefficient,unitPrice,part?.photo_key||null,item.activityCategory?String(item.activityCategory):null]);
+    await executor.query('insert into quote_items(quote_id,position,label,quantity,unit_cost,part_id,sale_coefficient_percent,unit_price,photo_key,activity_category,kind) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',[quoteId,position,item.label,item.quantity,item.unitCost,item.partId,coefficient,unitPrice,part?.photo_key||null,item.activityCategory?String(item.activityCategory):null,item.kind==='service'?'service':'part']);
   }
 }
 async function catalogQuoteTarget(org:string,activityId:string,intervention:string,items:QuoteItem[],vatRate:number,coefficientValue:number,coefficientUnit='percent',coefficientBasis='purchase'){
@@ -515,7 +519,7 @@ async function prepareQuoteCalculation(org:string,activityId:string,body:any,cur
   // Prompt 03 — remise TTC traçable : déduite du prix cible par le moteur (l'instantané du
   // document conserve listPriceTtc et discountTtc via le résultat complet).
   const discountTtc=optionalNumber(effective('discountTtc','discount_ttc'),'Remise TTC',0,1e9)??0;
-  const p=computePricing({
+  const pricingInput={
     partCost:rawPart,
     partQuantity,
     shippingCost,
@@ -537,8 +541,14 @@ async function prepareQuoteCalculation(org:string,activityId:string,body:any,cur
     targetNet:targetNetValue,
     driver:'ttc',
     mileageMode,
-  });
-  return {items,basis,unit,selectedValue,partCoefficient,laborCoefficient,partQuantity,rawPart,shippingCost,mileageKm,mileageInternalRate,mileageClientRate,mileageTotal:p.mileageTotal,mileageMode,laborSellingHt,laborInternalCostHt,vatRate,contributions:contributionRates,targetTtc,catalogPricing,p};
+  };
+  const p=computePricing(pricingInput);
+  // Chantier « classeur Excel central » — Phase C/E : selon AURION_CALC_ENGINE (legacy par
+  // défaut) — dual : double calcul comparé au classeur sans modifier le résultat servi ;
+  // xlsx : résultat du classeur recalculé par LibreOffice, toute erreur remonte explicitement
+  // (jamais de repli silencieux ni de valeur par défaut). Traçabilité : logs [calc-engine].
+  const engineOutcome=await pricingWithWorkbookEngine(pricingInput,p);
+  return {items,basis,unit,selectedValue,partCoefficient,laborCoefficient,partQuantity,rawPart,shippingCost,mileageKm,mileageInternalRate,mileageClientRate,mileageTotal:engineOutcome.result.mileageTotal,mileageMode,laborSellingHt,laborInternalCostHt,vatRate,contributions:contributionRates,targetTtc,catalogPricing,p:engineOutcome.result};
 }
 async function documentContributions(org:string,activityId:string,body:any){
   const rows=(await query(`select c.name,c.rate,c.basis,c.mandatory,c.variable,c.source from activity_contributions c
@@ -624,14 +634,29 @@ async function marginGuard(org:string,activityId:string,purchaseHt:number,totalH
 async function emailDocument(org:string,id:string,type:'quote'|'invoice',number:string,clientId:string):Promise<string>{
   const c=(await query('select email,name from clients where id=$1 and organization_id=$2',[clientId,org])).rows[0];
   if(!c?.email)return 'client_email_missing';
-  if(!(await mailConfigured(org)))return 'mail_not_configured';
+  const label=type==='invoice'?'facture':'devis';
+  const subject=`${type==='invoice'?'Facture':'Devis'} ${number}`;
+  const body=`Bonjour ${c.name||''},\n\nVeuillez trouver votre ${label} ${number} en pièce jointe.`;
+  // 15.4.63 — messagerie absente ou envoi en échec : le document reste validé, l'e-mail passe
+  // en boîte d'envoi (journal de bord + badge dans Devis & factures) et part automatiquement
+  // dès que l'envoi redevient possible. Aucun succès simulé.
+  if(!(await mailConfigured(org))){
+    await queueOutboxEmail(org,id,type,c.email,subject,body);
+    return 'queued';
+  }
   try{
-    const d=await renderDocument(org,id,type);const pdf=await readPrivateObject(d.keys.pdf);const label=type==='invoice'?'facture':'devis';const body=`Bonjour ${c.name||''},\n\nVeuillez trouver votre ${label} ${number} en pièce jointe.`;const sig=await signatureForEmail(org,d.row.activity_id,type);
-    await sendOrgMail(org,{to:c.email,subject:`${type==='invoice'?'Facture':'Devis'} ${number}`,text:body+sig.text,html:emailBodyHtml(body,sig.html),attachments:[...(sig.inlineAttachments||[]),{filename:`${number}.pdf`,content:pdf}]});
+    const d=await renderDocument(org,id,type);const pdf=await readPrivateObject(d.keys.pdf);
+    const sig=await signatureForEmail(org,d.row.activity_id,type);
+    await sendOrgMail(org,{to:c.email,subject,text:body+sig.text,html:emailBodyHtml(body,sig.html),attachments:[...(sig.inlineAttachments||[]),{filename:`${number}.pdf`,content:pdf}]});
     await query('update quotes set sent_at=now(),updated_at=now() where id=$1 and organization_id=$2',[id,org]);
     if(type==='invoice') await createInvoiceWarranty(org,id,d.row as any);
+    await query(`update email_outbox set status='sent',sent_at=now(),updated_at=now() where organization_id=$1 and quote_id=$2 and status='pending'`,[org,id]);
+    await query(`update dashboard_journal_events set resolved_at=coalesce(resolved_at,now()) where organization_id=$1 and dedupe_key=$2`,[org,`email-pending-${type}-${id}`]);
     return 'sent';
-  }catch(e:any){return 'failed:'+String(e?.message||e)}
+  }catch(e:any){
+    await queueOutboxEmail(org,id,type,c.email,subject,body,String(e?.message||e).slice(0,400));
+    return 'queued';
+  }
 }
 
 function activityId(request:any, body?:any){ return body?.activityId || request.headers['x-aurion-activity-id']; }
@@ -1435,11 +1460,11 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
 
   app.post('/pricing/suggestions',async(r,reply)=>{const b:any=r.body||{},org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r,b));if(!aid)return {servicePrice:null,partPrices:{},recommendedPartSignatures:[],relevantParts:[]};const norm=(v:any)=>String(v||'').trim().toLowerCase().replace(/\s+/g,' ');const sig=norm(b.service||b.intervention);const service=(await query(`select price_ttc from document_price_memory where organization_id=$1 and activity_id=$2 and kind='service' and signature=$3 order by use_count desc,last_used_at desc limit 1`,[org,aid,sig])).rows[0];const partPrices:any={};for(const x of Array.isArray(b.parts)?b.parts:[]){const ps=norm([x.name,x.model,x.variant,x.color,x.quality,x.reference].join('|'));const row=(await query(`select price_ttc from document_price_memory where organization_id=$1 and activity_id=$2 and kind='part' and signature=$3 order by use_count desc,last_used_at desc limit 1`,[org,aid,ps])).rows[0];if(row)partPrices[x.id||ps]=Number(row.price_ttc)}const patterns=(await query(`select part_signature from recommendation_patterns where organization_id=$1 and service_signature=$2 and use_count>=2 order by use_count desc,last_used_at desc limit 30`,[org,sig])).rows.map(x=>x.part_signature);const relevantRows=(await query(`select p.*,coalesce((select max(rp.use_count) from recommendation_patterns rp where rp.organization_id=$1 and rp.service_signature=$2 and rp.part_signature=lower(regexp_replace(trim(concat_ws('|',p.name,p.model,p.variant,p.color,p.quality,p.reference)),'\\s+',' ','g'))),0) learned_count from parts p where p.organization_id=$1 and p.activity_id=$3 order by learned_count desc,p.updated_at desc limit 100`,[org,sig,aid])).rows;return {servicePrice:service?Number(service.price_ttc):null,partPrices,recommendedPartSignatures:patterns,relevantParts:relevantRows};});
   app.post('/pricing/learn',async(r,reply)=>{const b:any=r.body||{},org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r,b));if(!aid)return {ok:true};const norm=(v:any)=>String(v||'').trim().toLowerCase().replace(/\s+/g,' ');const service=norm(b.service||b.intervention);if(service&&Number(b.servicePrice)>=0)await query(`insert into document_price_memory(organization_id,activity_id,kind,signature,price_ttc) values($1,$2,'service',$3,$4) on conflict(organization_id,activity_id,kind,signature) do update set price_ttc=excluded.price_ttc,last_used_at=now(),use_count=document_price_memory.use_count+1`,[org,aid,service,Number(b.servicePrice||0)]);for(const x of Array.isArray(b.parts)?b.parts:[]){const ps=norm([x.name,x.model,x.variant,x.color,x.quality,x.reference].join('|'));if(!ps||Number(x.price)<0)continue;await query(`insert into document_price_memory(organization_id,activity_id,kind,signature,price_ttc) values($1,$2,'part',$3,$4) on conflict(organization_id,activity_id,kind,signature) do update set price_ttc=excluded.price_ttc,last_used_at=now(),use_count=document_price_memory.use_count+1`,[org,aid,ps,Number(x.price||0)]);if(service)await query(`insert into recommendation_patterns(organization_id,activity_id,service_signature,part_signature) values($1,$2,$3,$4) on conflict(organization_id,activity_id,service_signature,part_signature) do update set use_count=recommendation_patterns.use_count+1,last_used_at=now()`,[org,aid,service,ps]);}return {ok:true};});
-  app.post('/pricing/calculate',async(r,reply)=>{try{return computePricing((r.body||{}) as any)}catch(e:any){return reply.code(400).send({error:'INVALID_INPUT',message:String(e?.message||e)})}});
+  app.post('/pricing/calculate',async(r,reply)=>{try{const input=(r.body||{}) as any;const legacy=computePricing(input);const outcome=await pricingWithWorkbookEngine(input,legacy);return outcome.result}catch(e:any){return reply.code(400).send({error:'INVALID_INPUT',message:String(e?.message||e)})}});
 
   app.get('/electronic-invoicing/profile',async r=>{const row=(await query('select * from electronic_invoice_profiles where organization_id=$1',[r.auth!.organizationId])).rows[0]||{};return {platformName:row.platform_name||null,platformIdentifier:row.platform_identifier||null,registrationStatus:row.registration_status||'not_registered',routingIdentifier:row.routing_identifier||null,integrationStatus:'not_integrated',transmissionAvailable:false};});
   app.patch('/electronic-invoicing/profile',async(r,reply)=>{const b:any=r.body||{};const status=['not_registered','candidate','registered'].includes(b.registrationStatus)?b.registrationStatus:'not_registered';await query(`insert into electronic_invoice_profiles(organization_id,platform_name,platform_identifier,registration_status,routing_identifier,updated_at) values($1,$2,$3,$4,$5,now()) on conflict(organization_id) do update set platform_name=excluded.platform_name,platform_identifier=excluded.platform_identifier,registration_status=excluded.registration_status,routing_identifier=excluded.routing_identifier,updated_at=now()`,[r.auth!.organizationId,b.platformName||null,b.platformIdentifier||null,status,b.routingIdentifier||null]);return {ok:true,status};});
-  app.get('/quotes',async r=>(await query(`select q.*,q.catalog_pricing as "catalogPricing",q.coefficient_unit as "coefficientUnit",q.coefficient_value as "coefficientValue",coalesce((select sum(ir.penalty_amount) from invoice_reminders ir where ir.quote_id=q.id),0)::numeric total_penalty_amount,coalesce((select json_agg(json_build_object('id',ir.id,'reminderNumber',ir.reminder_number,'penaltyAmount',ir.penalty_amount,'createdAt',ir.sent_at) order by ir.reminder_number) from invoice_reminders ir where ir.quote_id=q.id),'[]'::json) reminders,c.name client_name,c.email client_email,coalesce((select json_agg(json_build_object('id',i.id,'label',i.label,'quantity',i.quantity,'unitCost',i.unit_cost,'unitPrice',i.unit_price,'saleCoefficientPercent',i.sale_coefficient_percent,'photoKey',i.photo_key,'partId',i.part_id,'activityCategory',i.activity_category) order by i.position) from quote_items i where i.quote_id=q.id),'[]'::json) items,coalesce((select json_agg(json_build_object('id',w.id,'scopeType',w.scope_type,'policyName',w.policy_name,'endsAt',w.ends_at,'remainingDays',greatest(0,ceil(extract(epoch from(w.ends_at-now()))/86400.0)::int)) order by w.ends_at) from warranties w where w.quote_id=q.id and w.ends_at>now()),'[]'::json) warranties from quotes q left join clients c on c.id=q.client_id where q.organization_id=$1 and ($2::uuid is null or q.activity_id=$2) order by q.created_at desc`,[r.auth!.organizationId,activityId(r)])).rows);
+  app.get('/quotes',async r=>(await query(`select q.*,q.catalog_pricing as "catalogPricing",q.coefficient_unit as "coefficientUnit",q.coefficient_value as "coefficientValue",coalesce((select sum(ir.penalty_amount) from invoice_reminders ir where ir.quote_id=q.id),0)::numeric total_penalty_amount,coalesce((select json_agg(json_build_object('id',ir.id,'reminderNumber',ir.reminder_number,'penaltyAmount',ir.penalty_amount,'createdAt',ir.sent_at) order by ir.reminder_number) from invoice_reminders ir where ir.quote_id=q.id),'[]'::json) reminders,c.name client_name,c.email client_email,coalesce((select json_agg(json_build_object('id',i.id,'label',i.label,'quantity',i.quantity,'unitCost',i.unit_cost,'unitPrice',i.unit_price,'saleCoefficientPercent',i.sale_coefficient_percent,'photoKey',i.photo_key,'partId',i.part_id,'activityCategory',i.activity_category,'kind',i.kind) order by i.position) from quote_items i where i.quote_id=q.id),'[]'::json) items,coalesce((select json_agg(json_build_object('id',w.id,'scopeType',w.scope_type,'policyName',w.policy_name,'endsAt',w.ends_at,'remainingDays',greatest(0,ceil(extract(epoch from(w.ends_at-now()))/86400.0)::int)) order by w.ends_at) from warranties w where w.quote_id=q.id and w.ends_at>now()),'[]'::json) warranties,exists(select 1 from email_outbox o where o.quote_id=q.id and o.status='pending') email_pending from quotes q left join clients c on c.id=q.client_id where q.organization_id=$1 and ($2::uuid is null or q.activity_id=$2) order by q.created_at desc`,[r.auth!.organizationId,activityId(r)])).rows);
   app.get('/invoices/:id/electronic-data',async(r,reply)=>{const id=String((r.params as any).id),org=r.auth!.organizationId;const q=(await query(`select q.*,c.name client_name,c.email client_email,c.address client_address,o.name company_name,o.siren,o.siret from quotes q left join clients c on c.id=q.client_id join organizations o on o.id=q.organization_id where q.id=$1 and q.organization_id=$2 and q.document_type='invoice'`,[id,org])).rows[0];if(!q)return reply.code(404).send({error:'NOT_FOUND'});const items=(await query('select label,quantity,unit_price from quote_items where quote_id=$1 order by position',[id])).rows;const payload=buildStructuredInvoice(q,items);await query('update quotes set structured_invoice=$1,electronic_status=\'prepared_not_transmitted\' where id=$2 and organization_id=$3',[payload,id,org]);return payload;});
   app.post('/quotes',async(r,reply)=>{
     const parsedBody=quoteCreateInputSchema.safeParse(r.body);
@@ -1609,7 +1634,7 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     }
     if(!b.intervention&&b.intervention!==undefined)return reply.code(400).send({error:'INVALID_INPUT',message:'La prestation est obligatoire.'});
     const currentItems= b.items===undefined
-      ?(await query('select label,quantity,unit_cost as "unitCost",unit_price as "unitPrice",part_id as "partId",sale_coefficient_percent as "saleCoefficientPercent",activity_category as "activityCategory" from quote_items where quote_id=$1 order by position',[id])).rows
+      ?(await query('select label,quantity,unit_cost as "unitCost",unit_price as "unitPrice",part_id as "partId",sale_coefficient_percent as "saleCoefficientPercent",activity_category as "activityCategory",kind from quote_items where quote_id=$1 order by position',[id])).rows
       :undefined;
     const calculationBody={...cur,...b,activityId:cur.activity_id,clientId:b.clientId??cur.client_id,documentType:cur.document_type,catalogPricing:b.catalogPricing??cur.catalog_pricing,currentItems};
     let prepared:any;
@@ -1801,6 +1826,15 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     return { kind: 'invoice' as const, profileCode: profile.code, company: { name: await companyDisplayName(org, a.id), siret: a.siret, siren: a.siren }, activity: a };
   }
 
+  // 15.4.63 — vidage de la boîte d'envoi : envoie les e-mails en attente dès que la messagerie
+  // est opérationnelle (appelé automatiquement à l'enregistrement/test de la messagerie, et
+  // manuellement depuis Devis & factures). Statut honnête : aucun succès simulé.
+  app.post('/communications/email/flush',{preHandler:app.requireAuth},async r=>{
+    const org=r.auth!.organizationId;
+    if(!(await mailConfigured(org)))return {sent:0,failed:0,remaining:await outboxCount(org),mailConfigured:false};
+    const result=await flushOutbox(org);
+    return {...result,mailConfigured:true};
+  });
   app.post('/quotes/:id/invoice',async(r,reply)=>{
     const parsedBody=invoiceConversionInputSchema.safeParse(r.body||{});
     if(!parsedBody.success)return reply.code(400).send({error:'INVALID_INPUT'});
@@ -1879,7 +1913,9 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     // pauseClientTimer de l'enregistrement de document (échec journalisé, émission validée).
     if(converted.clientId&&converted.activityId){try{await resumeClientTimer(org,r.auth!.userId,converted.clientId,converted.activityId)}catch(error){r.log.warn({err:error,documentId:id,clientId:converted.clientId},'client timer resume skipped after conversion')}}
     const emailStatus=b.sendEmail!==false?await emailDocument(org,id,'invoice',converted.number,converted.clientId):'not_requested';
-    if(emailStatus==='sent'&&converted.clientId){try{await stopClientTimer(org,r.auth!.userId,converted.clientId)}catch(error){r.log.warn({err:error,documentId:id,clientId:converted.clientId},'client timer stop skipped after conversion')}}
+    // 15.4.63 — le compteur temps du client s'arrête DÈS la facturation, que l'e-mail parte,
+    // soit mis en file d'attente ou échoue : la prise en charge se termine avec la facture.
+    if(converted.clientId){try{await stopClientTimer(org,r.auth!.userId,converted.clientId)}catch(error){r.log.warn({err:error,documentId:id,clientId:converted.clientId},'client timer stop skipped after conversion')}}
     return {number:converted.number,emailStatus,integrityRecorded};
   });
   app.get('/invoices/:id/installments',async(r,reply)=>{const id=String((r.params as any).id),org=r.auth!.organizationId;const q=(await query("select id,number,total_ttc from quotes where id=$1 and organization_id=$2 and document_type='invoice'",[id,org])).rows[0];if(!q)return reply.code(404).send({error:'NOT_FOUND'});return {invoice:q,installments:(await query('select id,installment_number,due_at,amount_due,amount_paid,status from invoice_installments where quote_id=$1 and organization_id=$2 order by installment_number',[id,org])).rows};});
@@ -2349,7 +2385,7 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
       query(`
       -- 15.4.61 — CROISEMENT des sources d'encaissement pour la moyenne historique : les
       -- factures marquées payées sans ligne de paiement (saisie directe, import Excel)
-      -- pesaient 0 € dans la moyenne, ce qui vidait les projections. Même union que le
+      -- pèsentaient 0 € dans la moyenne, ce qui vidait les projections. Même union que le
       -- moteur comptable (services/accounting.ts) : paiements détaillés ∪ factures payées.
       with cash as (
         select p.paid_at,(p.amount/nullif(1+q.vat_rate/100,0)) ht
@@ -2401,12 +2437,12 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     const monthHt=Number(yearAccounting.find(m=>{const d=new Date(m.month);return d.getFullYear()===accountingYear&&d.getMonth()===currentDate.getMonth()})?.revenueHt||0);
     const yearToDateHt=yearAccounting.reduce((sum,m)=>sum+Number(m.revenueHt||0),0);
     const remainingMonths=Math.max(0,11-currentDate.getMonth());
-    // 15.4.61 — « 1 mois » : le réalisé du mois en cours + la moyenne historique HT. L'ancien
+    // 15.4.61 — « 1 mois » : le réalisé du mois en cours + la moyenne historique HT. L’ancien
     // nextMonth=open ajoutait TOUS les devis ouverts comme signés et facturés le mois suivant :
-    // la prévision de facturation ne faisait pas ce qu'elle est censée faire. Les devis ouverts
+    // la prévision de facturation ne faisait pas ce qu’elle est censée faire. Les devis ouverts
     // restent le potentiel affiché séparément (trésorerie) et alimentent les horizons 3/6 mois/année.
     const nextMonth=monthHt+historicalAverage;
-    const forecast={month:monthHt,monthHt,month1:nextMonth,months3:monthHt+historicalAverage*2+open,months6:monthHt+historicalAverage*5+open,year:yearToDateHt+historicalAverage*remainingMonths+open,monthlyAverage:historicalAverage,historyMonths,effectiveHistoryMonths,method:`Prévision en HT : encaissements historiques HT moyens (moyenne ramenée aux ${effectiveHistoryMonths} mois effectivement historisés${effectiveHistoryMonths<historyMonths?`, et non aux ${historyMonths} mois de la fenêtre`:''}, paiements détaillés et factures payées croisées), réalisé du mois, et devis ouverts HT pour les horizons 3/6 mois et année — le mois à venir n’ajoute plus l’intégralité des devis ouverts. SAV financiers ramenés en HT ; devis annulés ou refusés exclus. L'année combine le réalisé depuis janvier et les mois restants estimés.`};
+    const forecast={month:monthHt,monthHt,month1:nextMonth,months3:monthHt+historicalAverage*2+open,months6:monthHt+historicalAverage*5+open,year:yearToDateHt+historicalAverage*remainingMonths+open,monthlyAverage:historicalAverage,historyMonths,effectiveHistoryMonths,method:`Prévision en HT : encaissements historiques HT moyens (moyenne ramenée aux ${effectiveHistoryMonths} mois effectivement historisés${effectiveHistoryMonths<historyMonths?`, et non aux ${historyMonths} mois de la fenêtre`:''}, paiements détaillés et factures payées croisées), réalisé du mois, et devis ouverts HT pour les horizons 3/6 mois et année — le mois à venir n’ajoute plus l’intégralité des devis ouverts. SAV financiers ramenés en HT ; devis annulés ou refusés exclus. L’année combine le réalisé depuis janvier et les mois restants estimés.`};
     const warr=warrResult.rows[0];
     const appointments=appointmentsResult.rows;
     const sub=subResult.rows[0]||null;

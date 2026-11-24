@@ -86,6 +86,7 @@ export async function downloadAuthed(path,filename){
 
 export function emailToast(status,noun='Document'){
   if(status==='sent')return toast(`${noun} enregistré. Envoi par e-mail confirmé.`,'success');
+  if(status==='queued')return toast(`${noun} enregistré et validé. L'e-mail n'a pas pu partir immédiatement (messagerie non configurée ou indisponible) : il est mis en attente et partira automatiquement dès que l'envoi sera possible — suivi dans le journal de bord et badge « E-mail en attente » sur le document.`,'error');
   if(status==='mail_not_configured')return toast(`${noun} enregistré. Configurez votre messagerie (Paramètres) pour l’envoyer.`,'info');
   if(status==='client_email_missing')return toast(`${noun} enregistré. Le client n’a pas d’adresse e-mail.`,'info');
   if(String(status).startsWith('failed'))return toast(`${noun} enregistré, mais l’e-mail n’a pas pu être envoyé : ${String(status).slice(7)}`,'error');

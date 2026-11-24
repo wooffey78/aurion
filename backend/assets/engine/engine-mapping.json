@@ -1,0 +1,1987 @@
+{
+ "workbookVersion": "1.0.0",
+ "engineRequires": "1.0.0",
+ "updated": "2026-11-24",
+ "sheets": [
+  "00 ACCUEIL",
+  "01 ENTREES",
+  "02 PROFIL ENTREPRISE",
+  "03 PARAMETRES",
+  "04 CATALOGUE",
+  "05 DEVIS",
+  "06 FACTURES",
+  "07 PAIEMENTS",
+  "08 ACHATS ET CHARGES",
+  "09 COTISATIONS",
+  "10 FISCALITE",
+  "11 RENTABILITE",
+  "12 TRESORERIE",
+  "13 RELANCES",
+  "14 SAV",
+  "15 PREVISIONS",
+  "16 RESULTATS",
+  "17 CONTROLES"
+ ],
+ "inputs": {
+  "IN_DOC_TYPE": {
+   "sheet": "01 ENTREES",
+   "cell": "B6",
+   "type": "text",
+   "unit": "",
+   "description": "Type de document (quote | invoice)"
+  },
+  "IN_DOC_VAT_RATE": {
+   "sheet": "01 ENTREES",
+   "cell": "B7",
+   "type": "number",
+   "unit": "",
+   "description": "Taux de TVA du document (%)"
+  },
+  "IN_DOC_DRIVER": {
+   "sheet": "01 ENTREES",
+   "cell": "B8",
+   "type": "text",
+   "unit": "",
+   "description": "Sens de calcul : ttc (prix cible) | net (résultat visé)"
+  },
+  "IN_DOC_TARGET_TTC": {
+   "sheet": "01 ENTREES",
+   "cell": "B9",
+   "type": "number",
+   "unit": "",
+   "description": "Prix TTC cible (€)"
+  },
+  "IN_DOC_TARGET_NET": {
+   "sheet": "01 ENTREES",
+   "cell": "B10",
+   "type": "number",
+   "unit": "",
+   "description": "Résultat net visé (€) — driver net"
+  },
+  "IN_DOC_DISCOUNT_TTC": {
+   "sheet": "01 ENTREES",
+   "cell": "B11",
+   "type": "number",
+   "unit": "",
+   "description": "Remise TTC (€) — driver ttc uniquement"
+  },
+  "IN_DOC_PART_COST": {
+   "sheet": "01 ENTREES",
+   "cell": "B12",
+   "type": "number",
+   "unit": "",
+   "description": "Coût d'achat des pièces HT (€)"
+  },
+  "IN_DOC_SHIPPING_COST": {
+   "sheet": "01 ENTREES",
+   "cell": "B13",
+   "type": "number",
+   "unit": "",
+   "description": "Frais de livraison HT (€)"
+  },
+  "IN_DOC_CONSUMABLES_COST": {
+   "sheet": "01 ENTREES",
+   "cell": "B14",
+   "type": "number",
+   "unit": "",
+   "description": "Consommables HT (€)"
+  },
+  "IN_DOC_PART_QUANTITY": {
+   "sheet": "01 ENTREES",
+   "cell": "B15",
+   "type": "number",
+   "unit": "",
+   "description": "Quantité de pièces (min 1)"
+  },
+  "IN_DOC_LABOR_SELLING": {
+   "sheet": "01 ENTREES",
+   "cell": "B16",
+   "type": "number",
+   "unit": "",
+   "description": "Main-d'œuvre vendue HT (€) — facultatif"
+  },
+  "IN_DOC_LABOR_INTERNAL_COST": {
+   "sheet": "01 ENTREES",
+   "cell": "B17",
+   "type": "number",
+   "unit": "",
+   "description": "Coût interne main-d'œuvre HT (€)"
+  },
+  "IN_DOC_COEFFICIENT_VALUE": {
+   "sheet": "01 ENTREES",
+   "cell": "B18",
+   "type": "number",
+   "unit": "",
+   "description": "Coefficient commercial (valeur)"
+  },
+  "IN_DOC_COEFFICIENT_UNIT": {
+   "sheet": "01 ENTREES",
+   "cell": "B19",
+   "type": "text",
+   "unit": "",
+   "description": "Unité du coefficient (percent | euro)"
+  },
+  "IN_DOC_COEFFICIENT_BASIS": {
+   "sheet": "01 ENTREES",
+   "cell": "B20",
+   "type": "text",
+   "unit": "",
+   "description": "Assiette du coefficient (purchase | margin)"
+  },
+  "IN_DOC_MILEAGE_KM": {
+   "sheet": "01 ENTREES",
+   "cell": "B21",
+   "type": "number",
+   "unit": "",
+   "description": "Kilomètres à parcourir (km)"
+  },
+  "IN_DOC_MILEAGE_LEGACY_RATE": {
+   "sheet": "01 ENTREES",
+   "cell": "B22",
+   "type": "number",
+   "unit": "",
+   "description": "Tarif kilométrique historique (€/km)"
+  },
+  "IN_DOC_MILEAGE_INTERNAL_RATE": {
+   "sheet": "01 ENTREES",
+   "cell": "B23",
+   "type": "number",
+   "unit": "",
+   "description": "Coût kilométrique interne (€/km) — facultatif"
+  },
+  "IN_DOC_MILEAGE_CLIENT_RATE": {
+   "sheet": "01 ENTREES",
+   "cell": "B24",
+   "type": "number",
+   "unit": "",
+   "description": "Tarif kilométrique client (€/km) — facultatif"
+  },
+  "IN_DOC_MILEAGE_MODE": {
+   "sheet": "01 ENTREES",
+   "cell": "B25",
+   "type": "text",
+   "unit": "",
+   "description": "Mode kilométrique (margin | client_price)"
+  },
+  "IN_DOC_URSSAF_RATE": {
+   "sheet": "01 ENTREES",
+   "cell": "B26",
+   "type": "number",
+   "unit": "",
+   "description": "Taux URSSAF agrégé (%) — repli si aucune cotisation détaillée"
+  },
+  "IN_CONTRIBUTION_1_NAME": {
+   "sheet": "01 ENTREES",
+   "cell": "B44",
+   "type": "text",
+   "unit": "",
+   "description": "Libellé de la cotisation 1"
+  },
+  "IN_CONTRIBUTION_1_RATE": {
+   "sheet": "01 ENTREES",
+   "cell": "B45",
+   "type": "number",
+   "unit": "%",
+   "description": "Taux de la cotisation 1 (%) — vide = non fournie"
+  },
+  "IN_CONTRIBUTION_1_BASIS": {
+   "sheet": "01 ENTREES",
+   "cell": "B46",
+   "type": "text",
+   "unit": "",
+   "description": "Assiette de la cotisation 1 (ca_ht | gross_margin | profit)"
+  },
+  "IN_CONTRIBUTION_2_NAME": {
+   "sheet": "01 ENTREES",
+   "cell": "B47",
+   "type": "text",
+   "unit": "",
+   "description": "Libellé de la cotisation 2"
+  },
+  "IN_CONTRIBUTION_2_RATE": {
+   "sheet": "01 ENTREES",
+   "cell": "B48",
+   "type": "number",
+   "unit": "%",
+   "description": "Taux de la cotisation 2 (%) — vide = non fournie"
+  },
+  "IN_CONTRIBUTION_2_BASIS": {
+   "sheet": "01 ENTREES",
+   "cell": "B49",
+   "type": "text",
+   "unit": "",
+   "description": "Assiette de la cotisation 2 (ca_ht | gross_margin | profit)"
+  },
+  "IN_CONTRIBUTION_3_NAME": {
+   "sheet": "01 ENTREES",
+   "cell": "B50",
+   "type": "text",
+   "unit": "",
+   "description": "Libellé de la cotisation 3"
+  },
+  "IN_CONTRIBUTION_3_RATE": {
+   "sheet": "01 ENTREES",
+   "cell": "B51",
+   "type": "number",
+   "unit": "%",
+   "description": "Taux de la cotisation 3 (%) — vide = non fournie"
+  },
+  "IN_CONTRIBUTION_3_BASIS": {
+   "sheet": "01 ENTREES",
+   "cell": "B52",
+   "type": "text",
+   "unit": "",
+   "description": "Assiette de la cotisation 3 (ca_ht | gross_margin | profit)"
+  },
+  "IN_CONTRIBUTION_4_NAME": {
+   "sheet": "01 ENTREES",
+   "cell": "B53",
+   "type": "text",
+   "unit": "",
+   "description": "Libellé de la cotisation 4"
+  },
+  "IN_CONTRIBUTION_4_RATE": {
+   "sheet": "01 ENTREES",
+   "cell": "B54",
+   "type": "number",
+   "unit": "%",
+   "description": "Taux de la cotisation 4 (%) — vide = non fournie"
+  },
+  "IN_CONTRIBUTION_4_BASIS": {
+   "sheet": "01 ENTREES",
+   "cell": "B55",
+   "type": "text",
+   "unit": "",
+   "description": "Assiette de la cotisation 4 (ca_ht | gross_margin | profit)"
+  },
+  "IN_CONTRIBUTION_5_NAME": {
+   "sheet": "01 ENTREES",
+   "cell": "B56",
+   "type": "text",
+   "unit": "",
+   "description": "Libellé de la cotisation 5"
+  },
+  "IN_CONTRIBUTION_5_RATE": {
+   "sheet": "01 ENTREES",
+   "cell": "B57",
+   "type": "number",
+   "unit": "%",
+   "description": "Taux de la cotisation 5 (%) — vide = non fournie"
+  },
+  "IN_CONTRIBUTION_5_BASIS": {
+   "sheet": "01 ENTREES",
+   "cell": "B58",
+   "type": "text",
+   "unit": "",
+   "description": "Assiette de la cotisation 5 (ca_ht | gross_margin | profit)"
+  },
+  "IN_PROFILE_LEGAL_FORM": {
+   "sheet": "02 PROFIL ENTREPRISE",
+   "cell": "B6",
+   "type": "text",
+   "unit": "",
+   "description": "Forme juridique (EI, EURL, SARL, SASU…)"
+  },
+  "IN_PROFILE_MICRO": {
+   "sheet": "02 PROFIL ENTREPRISE",
+   "cell": "B7",
+   "type": "number",
+   "unit": "",
+   "description": "Régime micro (1 = oui, 0 = non)"
+  },
+  "IN_PROFILE_ACTIVITY_CATEGORY": {
+   "sheet": "02 PROFIL ENTREPRISE",
+   "cell": "B8",
+   "type": "text",
+   "unit": "",
+   "description": "Catégorie micro (vente_bic | services_bic | services_bnc | services_bnc_cipav | specific)"
+  },
+  "IN_PROFILE_VAT_OPTION": {
+   "sheet": "02 PROFIL ENTREPRISE",
+   "cell": "B9",
+   "type": "text",
+   "unit": "",
+   "description": "Option TVA déclarée (franchise | assujetti | assujetti_option | inconnu)"
+  },
+  "IN_PROFILE_VL_OPTION": {
+   "sheet": "02 PROFIL ENTREPRISE",
+   "cell": "B10",
+   "type": "text",
+   "unit": "",
+   "description": "Versement libératoire déclaré (oui | non | inconnu)"
+  },
+  "IN_PROFILE_URSSAF_PERIODICITY": {
+   "sheet": "02 PROFIL ENTREPRISE",
+   "cell": "B11",
+   "type": "text",
+   "unit": "",
+   "description": "Périodicité URSSAF (mensuelle | trimestrielle | vide)"
+  },
+  "IN_PROFILE_PREVIOUS_YEAR_HT": {
+   "sheet": "02 PROFIL ENTREPRISE",
+   "cell": "B12",
+   "type": "number",
+   "unit": "",
+   "description": "CA HT de l'année précédente (€) — facultatif"
+  },
+  "IN_PROFILE_CURRENT_YEAR_HT": {
+   "sheet": "02 PROFIL ENTREPRISE",
+   "cell": "B13",
+   "type": "number",
+   "unit": "",
+   "description": "CA HT de l'année en cours (€) — facultatif"
+  },
+  "IN_CATALOG_PRICING_MODE": {
+   "sheet": "04 CATALOGUE",
+   "cell": "B6",
+   "type": "text",
+   "unit": "",
+   "description": "Mode (fixe | calcule)"
+  },
+  "IN_CATALOG_FIXED_PRICE_TTC": {
+   "sheet": "04 CATALOGUE",
+   "cell": "B7",
+   "type": "number",
+   "unit": "",
+   "description": "Prix fixe TTC saisi (€)"
+  },
+  "IN_CATALOG_PARTS_COST": {
+   "sheet": "04 CATALOGUE",
+   "cell": "B8",
+   "type": "number",
+   "unit": "",
+   "description": "Pièces / matériaux HT (€)"
+  },
+  "IN_CATALOG_SHIPPING_COST": {
+   "sheet": "04 CATALOGUE",
+   "cell": "B9",
+   "type": "number",
+   "unit": "",
+   "description": "Livraison HT (€)"
+  },
+  "IN_CATALOG_LABOR_HOURS": {
+   "sheet": "04 CATALOGUE",
+   "cell": "B10",
+   "type": "number",
+   "unit": "",
+   "description": "Heures de main-d'œuvre"
+  },
+  "IN_CATALOG_LABOR_RATE_TTC": {
+   "sheet": "04 CATALOGUE",
+   "cell": "B11",
+   "type": "number",
+   "unit": "",
+   "description": "Taux horaire TTC (€)"
+  },
+  "IN_CATALOG_MILEAGE_KM": {
+   "sheet": "04 CATALOGUE",
+   "cell": "B12",
+   "type": "number",
+   "unit": "",
+   "description": "Kilomètres inclus (km)"
+  },
+  "IN_CATALOG_MILEAGE_RATE": {
+   "sheet": "04 CATALOGUE",
+   "cell": "B13",
+   "type": "number",
+   "unit": "",
+   "description": "Tarif/km (€)"
+  },
+  "IN_CATALOG_VAT_RATE": {
+   "sheet": "04 CATALOGUE",
+   "cell": "B14",
+   "type": "number",
+   "unit": "",
+   "description": "TVA (%)"
+  },
+  "IN_PAYMENT_INVOICE_TOTAL_TTC": {
+   "sheet": "07 PAIEMENTS",
+   "cell": "B6",
+   "type": "number",
+   "unit": "",
+   "description": "TTC de la facture (€)"
+  },
+  "IN_PAYMENT_PENALTIES": {
+   "sheet": "07 PAIEMENTS",
+   "cell": "B7",
+   "type": "number",
+   "unit": "",
+   "description": "Majorations cumulées (€)"
+  },
+  "IN_PAYMENT_PAID_BEFORE": {
+   "sheet": "07 PAIEMENTS",
+   "cell": "B8",
+   "type": "number",
+   "unit": "",
+   "description": "Déjà payé validé (€)"
+  },
+  "IN_PAYMENT_AMOUNT": {
+   "sheet": "07 PAIEMENTS",
+   "cell": "B9",
+   "type": "number",
+   "unit": "",
+   "description": "Montant du paiement (€)"
+  },
+  "IN_INSTALLMENT_TOTAL": {
+   "sheet": "07 PAIEMENTS",
+   "cell": "B23",
+   "type": "number",
+   "unit": "",
+   "description": "Total TTC à répartir (€)"
+  },
+  "IN_INSTALLMENT_COUNT": {
+   "sheet": "07 PAIEMENTS",
+   "cell": "B24",
+   "type": "number",
+   "unit": "",
+   "description": "Nombre d'échéances (1-12)"
+  },
+  "IN_STOCK_PHYSICAL": {
+   "sheet": "08 ACHATS ET CHARGES",
+   "cell": "B58",
+   "type": "number",
+   "unit": "",
+   "description": "Stock physique"
+  },
+  "IN_STOCK_RESERVATIONS": {
+   "sheet": "08 ACHATS ET CHARGES",
+   "cell": "B59",
+   "type": "number",
+   "unit": "",
+   "description": "Réservations actives"
+  },
+  "IN_STOCK_THRESHOLD": {
+   "sheet": "08 ACHATS ET CHARGES",
+   "cell": "B60",
+   "type": "number",
+   "unit": "",
+   "description": "Seuil d'alerte"
+  },
+  "IN_MICRO_DOC_CATEGORY": {
+   "sheet": "09 COTISATIONS",
+   "cell": "B3",
+   "type": "text",
+   "unit": "",
+   "description": "Catégorie du document (repli pour les lignes sans catégorie)"
+  },
+  "IN_FISC_ACTIVITY_CATEGORY": {
+   "sheet": "10 FISCALITE",
+   "cell": "B6",
+   "type": "text",
+   "unit": "",
+   "description": "vente | services"
+  },
+  "IN_FISC_PREVIOUS_YEAR_HT": {
+   "sheet": "10 FISCALITE",
+   "cell": "B7",
+   "type": "number",
+   "unit": "",
+   "description": "CA HT N-1 (€) — facultatif"
+  },
+  "IN_FISC_VAT_USER_OPTION": {
+   "sheet": "10 FISCALITE",
+   "cell": "B8",
+   "type": "text",
+   "unit": "",
+   "description": "franchise | assujetti | assujetti_option | inconnu"
+  },
+  "IN_FISC_CURRENT_YEAR_HT": {
+   "sheet": "10 FISCALITE",
+   "cell": "B9",
+   "type": "number",
+   "unit": "",
+   "description": "CA HT année en cours (€) — facultatif"
+  },
+  "IN_FISC_MICRO_CATEGORY": {
+   "sheet": "10 FISCALITE",
+   "cell": "B10",
+   "type": "text",
+   "unit": "",
+   "description": "Catégorie micro (pour taux VL)"
+  },
+  "IN_FISC_TAXABLE_CA_HT": {
+   "sheet": "10 FISCALITE",
+   "cell": "B11",
+   "type": "number",
+   "unit": "",
+   "description": "CA HT de la période (€) — base VL"
+  },
+  "IN_CFE_AMOUNT": {
+   "sheet": "10 FISCALITE",
+   "cell": "B12",
+   "type": "number",
+   "unit": "",
+   "description": "CFE saisie par l'utilisateur (€) — facultatif"
+  },
+  "IN_CHANTIER_QUOTE_TTC": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B13",
+   "type": "number",
+   "unit": "",
+   "description": "Devis accepté TTC (€)"
+  },
+  "IN_CHANTIER_INVOICED_TTC": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B14",
+   "type": "number",
+   "unit": "",
+   "description": "Facturé TTC (€)"
+  },
+  "IN_CHANTIER_PAID_TTC": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B15",
+   "type": "number",
+   "unit": "",
+   "description": "Encaissé validé TTC (€)"
+  },
+  "IN_CHANTIER_EXPENSES_TTC": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B16",
+   "type": "number",
+   "unit": "",
+   "description": "Dépenses TTC (€)"
+  },
+  "IN_CHANTIER_SAV_TTC": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B17",
+   "type": "number",
+   "unit": "",
+   "description": "SAV TTC (€, négatif possible)"
+  },
+  "IN_CHANTIER_MINUTES": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B18",
+   "type": "number",
+   "unit": "",
+   "description": "Temps passé (minutes)"
+  },
+  "IN_CHANTIER_HOURLY_RATE_TTC": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B19",
+   "type": "number",
+   "unit": "",
+   "description": "Taux horaire interne TTC (€)"
+  },
+  "IN_CHANTIER_VAT_RATE": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B20",
+   "type": "number",
+   "unit": "",
+   "description": "TVA (%)"
+  },
+  "IN_TREASURY_SAV_TTC": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B39",
+   "type": "number",
+   "unit": "",
+   "description": "Σ TTC des SAV financiers (négatif) — déduit les entrées prévisionnelles"
+  },
+  "IN_TREASURY_EXPENSES_TO_REIMBURSE": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B40",
+   "type": "number",
+   "unit": "",
+   "description": "Notes de frais à rembourser (€)"
+  },
+  "IN_FORECAST_REPAIRS_PER_MONTH": {
+   "sheet": "15 PREVISIONS",
+   "cell": "B6",
+   "type": "number",
+   "unit": "",
+   "description": "Interventions moyennes / mois"
+  },
+  "IN_FORECAST_TICKET_TTC": {
+   "sheet": "15 PREVISIONS",
+   "cell": "B7",
+   "type": "number",
+   "unit": "",
+   "description": "Ticket moyen TTC (€)"
+  },
+  "IN_FORECAST_TICKET_HT": {
+   "sheet": "15 PREVISIONS",
+   "cell": "B8",
+   "type": "number",
+   "unit": "",
+   "description": "Base moyenne HT (€)"
+  },
+  "IN_FORECAST_VARIABLE_COST_PER_JOB": {
+   "sheet": "15 PREVISIONS",
+   "cell": "B9",
+   "type": "number",
+   "unit": "",
+   "description": "Coût direct moyen / intervention (€)"
+  },
+  "IN_FORECAST_RESERVE_PERCENT": {
+   "sheet": "15 PREVISIONS",
+   "cell": "B10",
+   "type": "number",
+   "unit": "",
+   "description": "Taux de provision (Σ taux ca_ht, %)"
+  },
+  "IN_FORECAST_FIXED_COSTS_MONTHLY": {
+   "sheet": "15 PREVISIONS",
+   "cell": "B11",
+   "type": "number",
+   "unit": "",
+   "description": "Charges fixes mensuelles (€) — 0 si non renseignées"
+  },
+  "IN_FORECAST_QUOTES_OPEN_TTC": {
+   "sheet": "15 PREVISIONS",
+   "cell": "B12",
+   "type": "number",
+   "unit": "",
+   "description": "Σ TTC des devis ouverts (€)"
+  },
+  "IN_FORECAST_SAV_TTC": {
+   "sheet": "15 PREVISIONS",
+   "cell": "B13",
+   "type": "number",
+   "unit": "",
+   "description": "Σ TTC SAV financiers (€, négatif)"
+  },
+  "WORKBOOK_VERSION_EXPECTED": {
+   "sheet": "17 CONTROLES",
+   "cell": "B25",
+   "type": "text",
+   "unit": "",
+   "description": "Version attendue par le moteur — le moteur l'écrit avant recalcul (détection d'incompatibilité)"
+  }
+ },
+ "outputs": {
+  "OUT_WORKBOOK_VERSION": {
+   "sheet": "00 ACCUEIL",
+   "cell": "B4",
+   "type": "text",
+   "unit": "",
+   "description": "Version du classeur moteur"
+  },
+  "OUT_ENGINE_REQUIRES": {
+   "sheet": "00 ACCUEIL",
+   "cell": "B5",
+   "type": "text",
+   "unit": "",
+   "description": "Version de moteur requise"
+  },
+  "OUT_UPDATED": {
+   "sheet": "00 ACCUEIL",
+   "cell": "B6",
+   "type": "text",
+   "unit": "",
+   "description": "Date de mise à jour du référentiel"
+  },
+  "OUT_FORECAST_1M_NET": {
+   "sheet": "15 PREVISIONS",
+   "cell": "I21",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Net prévisionnel 1M"
+  },
+  "OUT_FORECAST_1M_ENTRIES": {
+   "sheet": "15 PREVISIONS",
+   "cell": "D21",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Entrées prévisionnelles 1M"
+  },
+  "OUT_FORECAST_1M_OUTPUTS": {
+   "sheet": "15 PREVISIONS",
+   "cell": "H21",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Sorties prévisionnelles 1M"
+  },
+  "OUT_FORECAST_3M_NET": {
+   "sheet": "15 PREVISIONS",
+   "cell": "I22",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Net prévisionnel 3M"
+  },
+  "OUT_FORECAST_3M_ENTRIES": {
+   "sheet": "15 PREVISIONS",
+   "cell": "D22",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Entrées prévisionnelles 3M"
+  },
+  "OUT_FORECAST_3M_OUTPUTS": {
+   "sheet": "15 PREVISIONS",
+   "cell": "H22",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Sorties prévisionnelles 3M"
+  },
+  "OUT_FORECAST_6M_NET": {
+   "sheet": "15 PREVISIONS",
+   "cell": "I23",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Net prévisionnel 6M"
+  },
+  "OUT_FORECAST_6M_ENTRIES": {
+   "sheet": "15 PREVISIONS",
+   "cell": "D23",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Entrées prévisionnelles 6M"
+  },
+  "OUT_FORECAST_6M_OUTPUTS": {
+   "sheet": "15 PREVISIONS",
+   "cell": "H23",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Sorties prévisionnelles 6M"
+  },
+  "OUT_FORECAST_12M_NET": {
+   "sheet": "15 PREVISIONS",
+   "cell": "I24",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Net prévisionnel 12M"
+  },
+  "OUT_FORECAST_12M_ENTRIES": {
+   "sheet": "15 PREVISIONS",
+   "cell": "D24",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Entrées prévisionnelles 12M"
+  },
+  "OUT_FORECAST_12M_OUTPUTS": {
+   "sheet": "15 PREVISIONS",
+   "cell": "H24",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Sorties prévisionnelles 12M"
+  },
+  "OUT_CONTROLS_FAILED": {
+   "sheet": "17 CONTROLES",
+   "cell": "C22",
+   "type": "number",
+   "unit": "N",
+   "description": "Nombre de contrôles en échec"
+  },
+  "OUT_CATALOG_COMPOSED_TTC": {
+   "sheet": "04 CATALOGUE",
+   "cell": "B14",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Prix de vente du forfait : prix fixe saisi, ou somme visible des composants (jamais recalculée par un supplément caché)"
+  },
+  "OUT_CATALOG_HIDDEN_ADJUSTMENT": {
+   "sheet": "04 CATALOGUE",
+   "cell": "B15",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Ajustement caché : toujours 0 (règle impérative — aucun +1 € automatique). Un contrôle le vérifie."
+  },
+  "OUT_QUOTE_PURCHASE_HT": {
+   "sheet": "05 DEVIS",
+   "cell": "B70",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Coût d'achat pièces HT"
+  },
+  "OUT_QUOTE_COEFFICIENT_MARKUP_HT": {
+   "sheet": "05 DEVIS",
+   "cell": "B71",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Majoration coefficient HT"
+  },
+  "OUT_QUOTE_SHIPPING_HT": {
+   "sheet": "05 DEVIS",
+   "cell": "B72",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Livraison HT"
+  },
+  "OUT_QUOTE_DIRECT_COSTS_HT": {
+   "sheet": "05 DEVIS",
+   "cell": "B73",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Coûts directs HT"
+  },
+  "OUT_QUOTE_CONSUMABLES_COST_HT": {
+   "sheet": "05 DEVIS",
+   "cell": "B74",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Consommables HT"
+  },
+  "OUT_QUOTE_INTERNAL_LABOR_COST_HT": {
+   "sheet": "05 DEVIS",
+   "cell": "B75",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Coût interne main-d'œuvre HT"
+  },
+  "OUT_QUOTE_MILEAGE_KM": {
+   "sheet": "05 DEVIS",
+   "cell": "B76",
+   "type": "number",
+   "unit": "KM",
+   "description": "Kilométrage"
+  },
+  "OUT_QUOTE_MILEAGE_INTERNAL_TOTAL": {
+   "sheet": "05 DEVIS",
+   "cell": "B77",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Coût kilométrique interne total"
+  },
+  "OUT_QUOTE_MILEAGE_CLIENT_TOTAL": {
+   "sheet": "05 DEVIS",
+   "cell": "B78",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Kilométrage client total"
+  },
+  "OUT_QUOTE_MILEAGE_TOTAL": {
+   "sheet": "05 DEVIS",
+   "cell": "B79",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Kilométrage retenu (selon mode)"
+  },
+  "OUT_QUOTE_BILLED_MILEAGE_HT": {
+   "sheet": "05 DEVIS",
+   "cell": "B80",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Kilométrage facturé HT (client_price seulement)"
+  },
+  "OUT_QUOTE_MILEAGE_BILLED_TTC": {
+   "sheet": "05 DEVIS",
+   "cell": "B81",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Kilométrage facturé TTC"
+  },
+  "OUT_QUOTE_TOTAL_HT": {
+   "sheet": "05 DEVIS",
+   "cell": "B82",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Total HT du document"
+  },
+  "OUT_QUOTE_VAT": {
+   "sheet": "05 DEVIS",
+   "cell": "B83",
+   "type": "number",
+   "unit": "EUR",
+   "description": "TVA"
+  },
+  "OUT_QUOTE_TOTAL_TTC": {
+   "sheet": "05 DEVIS",
+   "cell": "B84",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Total TTC"
+  },
+  "OUT_QUOTE_LIST_PRICE_TTC": {
+   "sheet": "05 DEVIS",
+   "cell": "B85",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Prix TTC avant remise"
+  },
+  "OUT_QUOTE_DISCOUNT_TTC": {
+   "sheet": "05 DEVIS",
+   "cell": "B86",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Remise TTC"
+  },
+  "OUT_QUOTE_BASE_TTC": {
+   "sheet": "05 DEVIS",
+   "cell": "B87",
+   "type": "number",
+   "unit": "EUR",
+   "description": "TTC de base (hors km facturé)"
+  },
+  "OUT_QUOTE_BASE_REVENUE_HT": {
+   "sheet": "05 DEVIS",
+   "cell": "B88",
+   "type": "number",
+   "unit": "EUR",
+   "description": "CA HT de base"
+  },
+  "OUT_QUOTE_LABOR_SELLING_HT": {
+   "sheet": "05 DEVIS",
+   "cell": "B89",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Main-d'œuvre vendue HT"
+  },
+  "OUT_QUOTE_GROSS_MARGIN": {
+   "sheet": "05 DEVIS",
+   "cell": "B90",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Marge brute"
+  },
+  "OUT_QUOTE_GROSS_MARGIN_RATE": {
+   "sheet": "05 DEVIS",
+   "cell": "B91",
+   "type": "number",
+   "unit": "PCT",
+   "description": "Taux de marge"
+  },
+  "OUT_QUOTE_MARKUP_RATE": {
+   "sheet": "05 DEVIS",
+   "cell": "B92",
+   "type": "number",
+   "unit": "PCT",
+   "description": "Taux de marque"
+  },
+  "OUT_QUOTE_CONTRIBUTIONS_TOTAL": {
+   "sheet": "05 DEVIS",
+   "cell": "B93",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Total cotisations"
+  },
+  "OUT_QUOTE_CONTRIBUTION_1_AMOUNT": {
+   "sheet": "05 DEVIS",
+   "cell": "B94",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Cotisation 1"
+  },
+  "OUT_QUOTE_CONTRIBUTION_2_AMOUNT": {
+   "sheet": "05 DEVIS",
+   "cell": "B95",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Cotisation 2"
+  },
+  "OUT_QUOTE_CONTRIBUTION_3_AMOUNT": {
+   "sheet": "05 DEVIS",
+   "cell": "B96",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Cotisation 3"
+  },
+  "OUT_QUOTE_CONTRIBUTION_4_AMOUNT": {
+   "sheet": "05 DEVIS",
+   "cell": "B97",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Cotisation 4"
+  },
+  "OUT_QUOTE_CONTRIBUTION_5_AMOUNT": {
+   "sheet": "05 DEVIS",
+   "cell": "B98",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Cotisation 5"
+  },
+  "OUT_QUOTE_CONTRIBUTION_1_RATE": {
+   "sheet": "05 DEVIS",
+   "cell": "B99",
+   "type": "number",
+   "unit": "PCT",
+   "description": "Taux de la cotisation 1 (%)"
+  },
+  "OUT_QUOTE_CONTRIBUTION_2_RATE": {
+   "sheet": "05 DEVIS",
+   "cell": "B100",
+   "type": "number",
+   "unit": "PCT",
+   "description": "Taux de la cotisation 2 (%)"
+  },
+  "OUT_QUOTE_CONTRIBUTION_3_RATE": {
+   "sheet": "05 DEVIS",
+   "cell": "B101",
+   "type": "number",
+   "unit": "PCT",
+   "description": "Taux de la cotisation 3 (%)"
+  },
+  "OUT_QUOTE_CONTRIBUTION_4_RATE": {
+   "sheet": "05 DEVIS",
+   "cell": "B102",
+   "type": "number",
+   "unit": "PCT",
+   "description": "Taux de la cotisation 4 (%)"
+  },
+  "OUT_QUOTE_CONTRIBUTION_5_RATE": {
+   "sheet": "05 DEVIS",
+   "cell": "B103",
+   "type": "number",
+   "unit": "PCT",
+   "description": "Taux de la cotisation 5 (%)"
+  },
+  "OUT_QUOTE_CONTRIBUTION_1_BASIS": {
+   "sheet": "05 DEVIS",
+   "cell": "B104",
+   "type": "text",
+   "unit": "TEXT",
+   "description": "Assiette de la cotisation 1 (gm|pr|ca)"
+  },
+  "OUT_QUOTE_CONTRIBUTION_2_BASIS": {
+   "sheet": "05 DEVIS",
+   "cell": "B105",
+   "type": "text",
+   "unit": "TEXT",
+   "description": "Assiette de la cotisation 2"
+  },
+  "OUT_QUOTE_CONTRIBUTION_3_BASIS": {
+   "sheet": "05 DEVIS",
+   "cell": "B106",
+   "type": "text",
+   "unit": "TEXT",
+   "description": "Assiette de la cotisation 3"
+  },
+  "OUT_QUOTE_CONTRIBUTION_4_BASIS": {
+   "sheet": "05 DEVIS",
+   "cell": "B107",
+   "type": "text",
+   "unit": "TEXT",
+   "description": "Assiette de la cotisation 4"
+  },
+  "OUT_QUOTE_CONTRIBUTION_5_BASIS": {
+   "sheet": "05 DEVIS",
+   "cell": "B108",
+   "type": "text",
+   "unit": "TEXT",
+   "description": "Assiette de la cotisation 5"
+  },
+  "OUT_QUOTE_URSSAF_ESTIMATE": {
+   "sheet": "05 DEVIS",
+   "cell": "B109",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Estimation URSSAF (1re cotisation)"
+  },
+  "OUT_QUOTE_NET_MARGIN": {
+   "sheet": "05 DEVIS",
+   "cell": "B110",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Marge nette"
+  },
+  "OUT_QUOTE_NET_RESULT": {
+   "sheet": "05 DEVIS",
+   "cell": "B111",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Résultat net"
+  },
+  "OUT_QUOTE_MARGIN_RATE": {
+   "sheet": "05 DEVIS",
+   "cell": "B112",
+   "type": "number",
+   "unit": "PCT",
+   "description": "Taux de résultat"
+  },
+  "OUT_QUOTE_NET_RESULT_RATE": {
+   "sheet": "05 DEVIS",
+   "cell": "B113",
+   "type": "number",
+   "unit": "PCT",
+   "description": "Taux de résultat net"
+  },
+  "OUT_QUOTE_MINIMUM_SELLING_HT": {
+   "sheet": "05 DEVIS",
+   "cell": "B114",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Prix plancher HT"
+  },
+  "OUT_QUOTE_BELOW_MINIMUM_PRICE": {
+   "sheet": "05 DEVIS",
+   "cell": "B115",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Alerte sous le prix plancher (1/0)"
+  },
+  "OUT_QUOTE_LOSS": {
+   "sheet": "05 DEVIS",
+   "cell": "B116",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Alerte perte (1/0)"
+  },
+  "OUT_QUOTE_DRIVER": {
+   "sheet": "05 DEVIS",
+   "cell": "B117",
+   "type": "text",
+   "unit": "TEXT",
+   "description": "Driver appliqué"
+  },
+  "OUT_QUOTE_MILEAGE_MODE": {
+   "sheet": "05 DEVIS",
+   "cell": "B118",
+   "type": "text",
+   "unit": "TEXT",
+   "description": "Mode kilométrique appliqué"
+  },
+  "OUT_INVOICES_UNPAID_TOTAL": {
+   "sheet": "06 FACTURES",
+   "cell": "B36",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Créances restantes à encaisser (engagé) = Σ max(0, TTC+majorations−payé) des factures non soldées"
+  },
+  "OUT_INVOICES_OPEN_COUNT": {
+   "sheet": "06 FACTURES",
+   "cell": "B37",
+   "type": "number",
+   "unit": "N",
+   "description": "Nombre de factures ouvertes (non soldées)"
+  },
+  "OUT_INVOICES_PAID_TOTAL": {
+   "sheet": "06 FACTURES",
+   "cell": "B38",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Somme des paiements validés des lignes fournies"
+  },
+  "OUT_INVOICES_ROWS_CONSISTENT": {
+   "sheet": "06 FACTURES",
+   "cell": "B39",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "1 si chaque ligne vérifie encaissé + reste dû = total exigible"
+  },
+  "OUT_PAYMENT_DUE_TOTAL": {
+   "sheet": "07 PAIEMENTS",
+   "cell": "B10",
+   "type": "number",
+   "unit": "EUR",
+   "description": ""
+  },
+  "OUT_PAYMENT_PAID_BEFORE": {
+   "sheet": "07 PAIEMENTS",
+   "cell": "B11",
+   "type": "number",
+   "unit": "EUR",
+   "description": ""
+  },
+  "OUT_PAYMENT_AMOUNT": {
+   "sheet": "07 PAIEMENTS",
+   "cell": "B12",
+   "type": "number",
+   "unit": "EUR",
+   "description": ""
+  },
+  "OUT_PAYMENT_REMAINING_BEFORE": {
+   "sheet": "07 PAIEMENTS",
+   "cell": "B14",
+   "type": "number",
+   "unit": "EUR",
+   "description": ""
+  },
+  "OUT_PAYMENT_PAID_AMOUNT": {
+   "sheet": "07 PAIEMENTS",
+   "cell": "B17",
+   "type": "number",
+   "unit": "EUR",
+   "description": ""
+  },
+  "OUT_PAYMENT_REMAINING_AFTER": {
+   "sheet": "07 PAIEMENTS",
+   "cell": "B18",
+   "type": "number",
+   "unit": "EUR",
+   "description": ""
+  },
+  "OUT_PAYMENT_STATUS": {
+   "sheet": "07 PAIEMENTS",
+   "cell": "B19",
+   "type": "text",
+   "unit": "TEXT",
+   "description": ""
+  },
+  "OUT_PAYMENT_REJECTION": {
+   "sheet": "07 PAIEMENTS",
+   "cell": "B20",
+   "type": "text",
+   "unit": "TEXT",
+   "description": ""
+  },
+  "OUT_INSTALLMENTS_SUM": {
+   "sheet": "07 PAIEMENTS",
+   "cell": "B39",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Somme de l'échéancier"
+  },
+  "OUT_INSTALLMENTS_MATCH": {
+   "sheet": "07 PAIEMENTS",
+   "cell": "B40",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "1 si la somme de l'échéancier égale exactement le total"
+  },
+  "OUT_EXPENSES_HT_TOTAL": {
+   "sheet": "08 ACHATS ET CHARGES",
+   "cell": "B26",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Total HT des notes de frais"
+  },
+  "OUT_EXPENSES_VAT_TOTAL": {
+   "sheet": "08 ACHATS ET CHARGES",
+   "cell": "B27",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Total TVA des notes de frais (déductible selon régime)"
+  },
+  "OUT_EXPENSES_TO_REIMBURSE_TOTAL": {
+   "sheet": "08 ACHATS ET CHARGES",
+   "cell": "B28",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Notes de frais à rembourser"
+  },
+  "OUT_PURCHASE_ORDER_TOTAL": {
+   "sheet": "08 ACHATS ET CHARGES",
+   "cell": "B54",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Montant total de la commande"
+  },
+  "OUT_STOCK_AVAILABLE": {
+   "sheet": "08 ACHATS ET CHARGES",
+   "cell": "B62",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Stock disponible = physique − réservations"
+  },
+  "OUT_STOCK_LOW": {
+   "sheet": "08 ACHATS ET CHARGES",
+   "cell": "B63",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Alerte de seuil (1/0)"
+  },
+  "OUT_MICRO_CA_HT": {
+   "sheet": "09 COTISATIONS",
+   "cell": "B27",
+   "type": "number",
+   "unit": "EUR",
+   "description": "CA HT total"
+  },
+  "OUT_MICRO_SOCIAL_TOTAL": {
+   "sheet": "09 COTISATIONS",
+   "cell": "B28",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Cotisations sociales totales"
+  },
+  "OUT_MICRO_CFP_TOTAL": {
+   "sheet": "09 COTISATIONS",
+   "cell": "B29",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Contribution formation professionnelle"
+  },
+  "OUT_MICRO_CONTRIBUTIONS_TOTAL": {
+   "sheet": "09 COTISATIONS",
+   "cell": "B30",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Cotisations sociales + CFP"
+  },
+  "OUT_MICRO_TAX_TOTAL": {
+   "sheet": "09 COTISATIONS",
+   "cell": "B31",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Versement libératoire estimé (impôt — distinct)"
+  },
+  "OUT_MICRO_UNASSIGNED_HT": {
+   "sheet": "09 COTISATIONS",
+   "cell": "B32",
+   "type": "number",
+   "unit": "EUR",
+   "description": "CA HT non rattaché à une catégorie (signalé, jamais affecté)"
+  },
+  "OUT_VAT_REGIME": {
+   "sheet": "10 FISCALITE",
+   "cell": "B14",
+   "type": "text",
+   "unit": "TEXT",
+   "description": "Régime de TVA"
+  },
+  "OUT_VAT_RATE": {
+   "sheet": "10 FISCALITE",
+   "cell": "B15",
+   "type": "number",
+   "unit": "PCT",
+   "description": "Taux de TVA (%)"
+  },
+  "OUT_VAT_FRANCHISE": {
+   "sheet": "10 FISCALITE",
+   "cell": "B16",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Franchise en base (1/0)"
+  },
+  "OUT_VAT_TO_CONFIRM": {
+   "sheet": "10 FISCALITE",
+   "cell": "B17",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "À confirmer (1/0)"
+  },
+  "OUT_TAX_PROVISION": {
+   "sheet": "10 FISCALITE",
+   "cell": "B19",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Provision VL (impôt, €)"
+  },
+  "OUT_MICRO_THRESHOLD_CROSSED": {
+   "sheet": "10 FISCALITE",
+   "cell": "B20",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Seuil micro franchi (1/0)"
+  },
+  "OUT_CFE_AMOUNT": {
+   "sheet": "10 FISCALITE",
+   "cell": "B21",
+   "type": "number",
+   "unit": "EUR",
+   "description": "CFE retenue (€)"
+  },
+  "OUT_MARGIN_GROSS": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B5",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Marge brute du document"
+  },
+  "OUT_MARGIN_NET": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B6",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Marge nette (après cotisations)"
+  },
+  "OUT_MARGIN_RATE": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B7",
+   "type": "number",
+   "unit": "PCT",
+   "description": "Taux de marge (%)"
+  },
+  "OUT_MARKUP_RATE": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B8",
+   "type": "number",
+   "unit": "PCT",
+   "description": "Taux de marque (%)"
+  },
+  "OUT_COST_PRICE": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B9",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Coût de revient direct HT"
+  },
+  "OUT_CHANTIER_LABOR_COST_TTC": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B21",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Coût du temps TTC (€)"
+  },
+  "OUT_CHANTIER_COSTS_TTC": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B22",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Coûts TTC totaux (€)"
+  },
+  "OUT_CHANTIER_REVENUE_TTC": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B23",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Revenu TTC (€)"
+  },
+  "OUT_CHANTIER_MARGIN_TTC": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B24",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Marge TTC (€)"
+  },
+  "OUT_CHANTIER_MARGIN_PCT": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B25",
+   "type": "number",
+   "unit": "PCT",
+   "description": "Marge (%)"
+  },
+  "OUT_CHANTIER_DRIFT_PCT": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B26",
+   "type": "number",
+   "unit": "PCT",
+   "description": "Dérive vs devis (%)"
+  },
+  "OUT_CHANTIER_DRIFT_ALERT": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B27",
+   "type": "text",
+   "unit": "TEXT",
+   "description": "Alerte dérive"
+  },
+  "OUT_CHANTIER_REST_TO_INVOICE": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B28",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Reste à facturer (€)"
+  },
+  "OUT_CHANTIER_COLLECTION_PCT": {
+   "sheet": "11 RENTABILITE",
+   "cell": "B29",
+   "type": "number",
+   "unit": "PCT",
+   "description": "Encaissement (%)"
+  },
+  "OUT_TREASURY_FORECAST_OUTPUTS": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B36",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Sorties prévisionnelles totales"
+  },
+  "OUT_TREASURY_COMMITTED_IN": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B37",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Créances engagées (factures non soldées, majorations comprises)"
+  },
+  "OUT_TREASURY_POTENTIAL_IN": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B38",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Potentiel (devis ouverts) — séparé de l'engagé"
+  },
+  "OUT_TREASURY_SAV_TOTAL": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B42",
+   "type": "number",
+   "unit": "EUR",
+   "description": "SAV TTC total (négatif)"
+  },
+  "OUT_TREASURY_FORECAST_ENTRIES": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B43",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Entrées prévisionnelles documentaires = devis ouverts + SAV (négatif)"
+  },
+  "OUT_TREASURY_EXPENSES_TO_REIMBURSE": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B44",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Frais à rembourser"
+  },
+  "OUT_TREASURY_COMMITTED_NET": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B45",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Solde engagé (hors potentiel)"
+  },
+  "OUT_TREASURY_FORECAST_NET": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B46",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Net prévisionnel documentaire"
+  },
+  "OUT_ACCOUNTING_REVENUE_HT": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B141",
+   "type": "number",
+   "unit": "N",
+   "description": "Revenu HT de l'année (paiements + SAV)"
+  },
+  "OUT_ACCOUNTING_VAT": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B142",
+   "type": "number",
+   "unit": "N",
+   "description": "TVA encaissée"
+  },
+  "OUT_ACCOUNTING_PURCHASES": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B143",
+   "type": "number",
+   "unit": "N",
+   "description": "Achats (coûts directs au prorata + écritures)"
+  },
+  "OUT_ACCOUNTING_PURCHASE_VAT": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B144",
+   "type": "number",
+   "unit": "N",
+   "description": "TVA d'achat déductible"
+  },
+  "OUT_ACCOUNTING_SOCIAL": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B145",
+   "type": "number",
+   "unit": "N",
+   "description": "Cotisations estimées"
+  },
+  "OUT_ACCOUNTING_MILEAGE": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B146",
+   "type": "number",
+   "unit": "N",
+   "description": "Kilométrage facturé"
+  },
+  "OUT_ACCOUNTING_INVOICE_COUNT": {
+   "sheet": "12 TRESORERIE",
+   "cell": "B147",
+   "type": "number",
+   "unit": "N",
+   "description": "Factures distinctes encaissées"
+  },
+  "OUT_REMINDER_PENALTY": {
+   "sheet": "13 RELANCES",
+   "cell": "B16",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Majoration de la première relance fournie"
+  },
+  "OUT_REMINDER_TOTAL": {
+   "sheet": "13 RELANCES",
+   "cell": "B17",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Total dû après la relance"
+  },
+  "OUT_REMINDERS_LAST_TOTAL": {
+   "sheet": "13 RELANCES",
+   "cell": "B18",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Total dû après la dernière relance renseignée"
+  },
+  "OUT_SAV_TOTAL_TTC": {
+   "sheet": "14 SAV",
+   "cell": "B27",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Σ TTC SAV (négatif ou 0)"
+  },
+  "OUT_SAV_FINANCIAL_TOTAL": {
+   "sheet": "14 SAV",
+   "cell": "B28",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Σ SAV financiers"
+  },
+  "OUT_SAV_FREE_COUNT": {
+   "sheet": "14 SAV",
+   "cell": "B29",
+   "type": "number",
+   "unit": "N",
+   "description": "Interventions gratuites (sans flux financier)"
+  },
+  "OUT_FORECAST_MONTHLY_ENTRIES": {
+   "sheet": "15 PREVISIONS",
+   "cell": "B15",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Entrées mensuelles TTC"
+  },
+  "OUT_FORECAST_MONTHLY_RESERVE": {
+   "sheet": "15 PREVISIONS",
+   "cell": "B16",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Provision mensuelle (base HT × taux)"
+  },
+  "OUT_FORECAST_MONTHLY_OUTPUTS": {
+   "sheet": "15 PREVISIONS",
+   "cell": "B17",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Sorties mensuelles (coûts variables + fixes + provision)"
+  },
+  "OUT_FORECAST_ENTRIES_DOCUMENTS": {
+   "sheet": "15 PREVISIONS",
+   "cell": "B26",
+   "type": "number",
+   "unit": "EUR",
+   "description": "Entrées documentaires = devis ouverts + SAV TTC (négatif) — source unique partagée avec la trésorerie"
+  },
+  "OUT_CONTROLS_STATUS": {
+   "sheet": "17 CONTROLES",
+   "cell": "C23",
+   "type": "text",
+   "unit": "TEXT",
+   "description": "Statut global du calcul : OK si tous les contrôles passent"
+  }
+ },
+ "params": {
+  "P_MICRO_RATE_TABLE": {
+   "sheet": "03 PARAMETRES",
+   "firstRow": 20,
+   "lastRow": 24,
+   "columns": {
+    "code": "B",
+    "social": "C",
+    "cfp": "D",
+    "vl": "E"
+   },
+   "description": "Taux micro-sociaux/CFP/VL par catégorie (feuille 03)"
+  },
+  "P_MICRO_THRESHOLD_SALES": {
+   "sheet": "03 PARAMETRES",
+   "cell": "B6",
+   "type": "number",
+   "unit": "€",
+   "description": "Vente de marchandises et logement (seuil annuel)"
+  },
+  "P_MICRO_THRESHOLD_SERVICES": {
+   "sheet": "03 PARAMETRES",
+   "cell": "B7",
+   "type": "number",
+   "unit": "€",
+   "description": "Prestations de services et libérales (seuil annuel)"
+  },
+  "P_VAT_FRANCHISE_SALES_BASE": {
+   "sheet": "03 PARAMETRES",
+   "cell": "B8",
+   "type": "number",
+   "unit": "€",
+   "description": "Franchise TVA vente — seuil de base (N-1)"
+  },
+  "P_VAT_FRANCHISE_SALES_MAJOR": {
+   "sheet": "03 PARAMETRES",
+   "cell": "B9",
+   "type": "number",
+   "unit": "€",
+   "description": "Franchise TVA vente — seuil majoré (année en cours)"
+  },
+  "P_VAT_FRANCHISE_SERVICES_BASE": {
+   "sheet": "03 PARAMETRES",
+   "cell": "B10",
+   "type": "number",
+   "unit": "€",
+   "description": "Franchise TVA services — seuil de base (N-1)"
+  },
+  "P_VAT_FRANCHISE_SERVICES_MAJOR": {
+   "sheet": "03 PARAMETRES",
+   "cell": "B11",
+   "type": "number",
+   "unit": "€",
+   "description": "Franchise TVA services — seuil majoré (année en cours)"
+  },
+  "P_RECOVERY_INDEMNITY_B2B": {
+   "sheet": "03 PARAMETRES",
+   "cell": "B12",
+   "type": "number",
+   "unit": "€",
+   "description": "Indemnité forfaitaire de recouvrement — clients professionnels uniquement"
+  },
+  "P_LEGAL_PENALTY_MULTIPLIER": {
+   "sheet": "03 PARAMETRES",
+   "cell": "B13",
+   "type": "number",
+   "unit": "×",
+   "description": "Pénalités de retard : multiple du taux d'intérêt légal (mention par défaut)"
+  },
+  "P_PAYMENT_TOLERANCE": {
+   "sheet": "03 PARAMETRES",
+   "cell": "B14",
+   "type": "number",
+   "unit": "€",
+   "description": "Tolérance d'arrondi des paiements (demi-centime)"
+  },
+  "P_MAX_SAFE_CENTS": {
+   "sheet": "03 PARAMETRES",
+   "cell": "B15",
+   "type": "number",
+   "unit": "centimes",
+   "description": "Borne de représentabilité entière du calcul (2^53 ≈ 9,0×10^15)"
+  },
+  "P_BILLING_VAT_RATE_BPS": {
+   "sheet": "03 PARAMETRES",
+   "cell": "B16",
+   "type": "number",
+   "unit": "bps",
+   "description": "TVA de facturation plateforme (0 par défaut)"
+  },
+  "CHK_QUOTE_HT_TVA_TTC": {
+   "sheet": "17 CONTROLES",
+   "cell": "C5",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Invariants HT + TVA = TTC"
+  },
+  "CHK_QUOTE_DISCOUNT_LIMIT": {
+   "sheet": "17 CONTROLES",
+   "cell": "C6",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "La remise ne dépasse pas le prix listé"
+  },
+  "CHK_QUOTE_NO_DISCOUNT_ON_NET": {
+   "sheet": "17 CONTROLES",
+   "cell": "C7",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Driver net : aucune remise TTC"
+  },
+  "CHK_CONTRIB_RATE_SUM": {
+   "sheet": "17 CONTROLES",
+   "cell": "C8",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Cumul des taux < 100 % (calcul inverse)"
+  },
+  "CHK_SOLVER_GUARD": {
+   "sheet": "17 CONTROLES",
+   "cell": "C9",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Solveur : borne de représentabilité respectée"
+  },
+  "CHK_MILEAGE_BOUND": {
+   "sheet": "17 CONTROLES",
+   "cell": "C10",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Kilométrage interne dans la borne entière"
+  },
+  "CHK_COEFFICIENT_BOUND": {
+   "sheet": "17 CONTROLES",
+   "cell": "C11",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Coefficient dans la borne entière"
+  },
+  "CHK_CONTRIB_RATE_MAX": {
+   "sheet": "17 CONTROLES",
+   "cell": "C12",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Taux de cotisation ≤ 99,99 %"
+  },
+  "CHK_INPUTS_NON_NEGATIVE": {
+   "sheet": "17 CONTROLES",
+   "cell": "C13",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Entrées monétaires non négatives"
+  },
+  "CHK_INVOICES_ROWS": {
+   "sheet": "17 CONTROLES",
+   "cell": "C14",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Chaque facture : encaissé + reste dû = total exigible"
+  },
+  "CHK_PAYMENT_VALID": {
+   "sheet": "17 CONTROLES",
+   "cell": "C15",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Paiement : aucun refus actif"
+  },
+  "CHK_INSTALLMENTS_MATCH": {
+   "sheet": "17 CONTROLES",
+   "cell": "C16",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Σ échéancier = total strict"
+  },
+  "CHK_NO_HIDDEN_ADJUSTMENT": {
+   "sheet": "17 CONTROLES",
+   "cell": "C17",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Aucun ajout caché au prix (règle d'or)"
+  },
+  "CHK_STOCK_NON_NEGATIVE": {
+   "sheet": "17 CONTROLES",
+   "cell": "C18",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Stock disponible ≥ 0"
+  },
+  "CHK_SAV_NON_POSITIVE": {
+   "sheet": "17 CONTROLES",
+   "cell": "C19",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Σ SAV ≤ 0 (négatif ou nul)"
+  },
+  "CHK_MICRO_UNASSIGNED_VISIBLE": {
+   "sheet": "17 CONTROLES",
+   "cell": "C20",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "CA non affecté : visible (contrôle d'alerte)"
+  },
+  "CHK_VERSION": {
+   "sheet": "17 CONTROLES",
+   "cell": "C21",
+   "type": "number",
+   "unit": "BOOL",
+   "description": "Version du classeur conforme au moteur"
+  }
+ },
+ "tables": [
+  {
+   "key": "invoices",
+   "sheet": "06 FACTURES",
+   "firstRow": 5,
+   "lastRow": 34,
+   "columns": {
+    "ttc": "B",
+    "penalties": "C",
+    "paid": "D",
+    "open": "E"
+   },
+   "description": "Lignes factures : TTC, majorations cumulées, paiements validés, ouverte (1) — triées par numéro"
+  },
+  {
+   "key": "installments",
+   "sheet": "07 PAIEMENTS",
+   "firstRow": 26,
+   "lastRow": 37,
+   "columns": {
+    "amount": "C"
+   },
+   "description": "Échéancier : montants par échéance (12 lignes fixes)"
+  },
+  {
+   "key": "expense_reports",
+   "sheet": "08 ACHATS ET CHARGES",
+   "firstRow": 5,
+   "lastRow": 24,
+   "columns": {
+    "ttc": "B",
+    "vat": "C",
+    "to_reimburse": "D"
+   },
+   "description": "Notes de frais : TTC, TVA, à rembourser (1)"
+  },
+  {
+   "key": "purchase_order",
+   "sheet": "08 ACHATS ET CHARGES",
+   "firstRow": 33,
+   "lastRow": 52,
+   "columns": {
+    "quantity": "B",
+    "unit_price": "C"
+   },
+   "description": "Lignes de commande fournisseur"
+  },
+  {
+   "key": "micro_lines",
+   "sheet": "09 COTISATIONS",
+   "firstRow": 5,
+   "lastRow": 24,
+   "columns": {
+    "amount_ht": "B",
+    "category": "C"
+   },
+   "description": "Lignes de CA HT ventilées par catégorie"
+  },
+  {
+   "key": "treasury_docs",
+   "sheet": "12 TRESORERIE",
+   "firstRow": 5,
+   "lastRow": 34,
+   "columns": {
+    "type": "B",
+    "ttc": "C",
+    "penalties": "D",
+    "paid": "E",
+    "part_cost": "F",
+    "shipping_cost": "G",
+    "labor_internal": "H",
+    "mileage_km": "I",
+    "mileage_internal_rate": "J",
+    "mileage_total": "K",
+    "mileage_mode": "L",
+    "vat_rate": "M",
+    "contribution_rate_ca_ht": "N",
+    "purchase_vat_mode": "O",
+    "purchase_vat_rate": "P"
+   },
+   "description": "Lignes documentaires trésorerie : devis ouverts + factures non soldées"
+  },
+  {
+   "key": "accounting_payments",
+   "sheet": "12 TRESORERIE",
+   "firstRow": 50,
+   "lastRow": 109,
+   "columns": {
+    "invoice_ref": "B",
+    "ttc": "C",
+    "vat_rate": "D",
+    "part_cost": "E",
+    "shipping_cost": "F",
+    "labor_internal": "G",
+    "mileage_km": "H",
+    "mileage_internal_rate": "I",
+    "mileage_total": "J",
+    "mileage_mode": "K",
+    "purchase_vat_mode": "L",
+    "purchase_vat_rate": "M",
+    "contribution_rate_ca_ht": "N",
+    "month": "O",
+    "amount": "P"
+   },
+   "description": "Paiements comptabilité : instantané du document + montant + mois d'encaissement (triés par facture, puis date)"
+  },
+  {
+   "key": "accounting_entries",
+   "sheet": "12 TRESORERIE",
+   "firstRow": 113,
+   "lastRow": 124,
+   "columns": {
+    "month": "B",
+    "purchase": "C",
+    "social": "D",
+    "sav": "E"
+   },
+   "description": "Écritures comptables par mois"
+  },
+  {
+   "key": "reminders",
+   "sheet": "13 RELANCES",
+   "firstRow": 5,
+   "lastRow": 14,
+   "columns": {
+    "base_ttc": "B",
+    "previous_penalties": "C",
+    "mode": "D",
+    "value": "E"
+   },
+   "description": "Relances successives : base TTC, cumul précédent, mode, valeur"
+  },
+  {
+   "key": "sav_items",
+   "sheet": "14 SAV",
+   "firstRow": 5,
+   "lastRow": 24,
+   "columns": {
+    "type": "B",
+    "quantity": "C",
+    "unit_price": "D"
+   },
+   "description": "Lignes SAV : type (financial | free_intervention), quantité, prix unitaire TTC"
+  }
+ ]
+}

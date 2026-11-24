@@ -5,7 +5,7 @@ Version **4.0**, révision du 20 novembre 2026 pour Aurion 15.4.35 (mise à jour
 ## Éditeur du service
 
 - Nom et prénom : **Coulibaly Damien**
-- Statut : **entrepreneur individuel — régime micro-entreprise**
+- Statut : **Entrepreneur individuel (EI) — régimes fiscal et social micro** (« micro-entreprise » désigne un régime, jamais une forme juridique)
 - Nom commercial : **Easyweb-dev**
 - Adresse : **5 Rue Jacques Prevert, 85300 Challans, France**
 - SIRET : **88848569500033**

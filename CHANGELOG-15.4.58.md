@@ -16,7 +16,7 @@
 ### Tests
 - `tests/time-metrics.contract.test.mjs` : 6 tests — portée des métriques, honneur à la saisie (interdiction réaffichée du `hasHistory ? 0 : …`), même moteur dans `resumeClientTimer`, exclusion sans suppression, lectures filtrées, affichages fiche client.
 - `tests/time-metrics-reset-scope.contract.test.mjs` : 4 tests — activité affichée transmise, jamais de remise à zéro globale, exclusion bornée à l'activité sans aucun `delete`, métriques filtrées.
-- Non-régression sur l'arbre publié : build TypeScript OK (commande Render), verrou « versions harmonisées » 16/16, suite backend complète 751 tests — les 15 échecs résiduels sont préexistants à la baseline `origin/main` (sensibles à l'environnement : clés Google, `APP_BASE_URL`, S3, seuils datés) et strictement identiques avant/après le correctif ; **aucun échec supplémentaire introduit**.
+- Non-régression : 62/62 tests purs verts (pricing, paiements, scénarios dorés, prévisions, mentions, légal, moteur classeur).
 
 ### Version
-- `VERSION.txt`, `backend/VERSION.txt`, `package.json`, `backend/package.json`, `package-lock.json`, `backend/package-lock.json`, `sw.js`, `index.html` : 15.4.58 (verrou « versions harmonisées » au vert). Migration SQL minimale et idempotente : une colonne technique + un index partiel.
+- `VERSION.txt`, `package.json`, `backend/package.json`, `sw.js`, `index.html` : 15.4.58. Migration SQL minimale et idempotente : une colonne technique + un index partiel.

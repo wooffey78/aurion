@@ -41,14 +41,15 @@ test('3 — la prévision de facturation ne propose plus de menu déroulant', ()
 });
 
 test('4 — carrousel : espacement PC nettement supérieur (anneau profond, cartes écartées, scène agrandie)', () => {
-  assert.match(other, /const rz=Math\.max\(150,Math\.min\(560,w\*0\.5\)\);/);
-  assert.match(other, /const rx=Math\.max\(70,Math\.min\(360,\(cardW\*1\.05\*mag\/2\)\*1\.5\)\);/);
+  assert.match(other, /const rz=Math\.max\(150,Math\.min\(600,w\*0\.54\)\);/);
+  assert.match(other, /const rx=Math\.max\(70,Math\.min\(470,/);
   assert.match(css, /height:clamp\(300px,44vw,560px\)/);
 });
 
 test('5 — la mention du développeur figure dans le pied de page (contact réel, rien d\u2019inventé)', () => {
+  // 15.4.63 — la mention affiche désormais EasyWeb-dev (choix utilisateur).
   assert.match(index, /Développement &amp; support&nbsp;:/);
-  assert.match(index, /easyfixit\.reparation@gmail\.com/);
+  assert.match(index, /EasyWeb-dev/);
   assert.match(css, /\.app-footer-dev\{color:var\(--muted\)\}/);
 });
 
@@ -78,16 +79,17 @@ test('7 — Administration → Intégrations → Plateformes agréées → Tiime
   assert.match(migration, /create table if not exists platform_tiime_config\(/);
   assert.match(migration, /webhook_secret text not null default ''/);
   assert.match(migration, /environment varchar\(20\) not null default 'test'/);
-  assert.match(apijs, /adminTiime:\(\)=>request\('\/admin\/tiime'\),saveAdminTiime:b=>request\('\/admin\/tiime',\{method:'PUT',body:JSON\.stringify\(b\)\}\)/);
+  assert.match(apijs, /adminTiime:\(\)=>request\('\/admin\/tiime'\),flushEmails:\(\)=>request\('\/communications\/email\/flush',\{method:'POST'\}\),saveAdminTiime:b=>request\('\/admin\/tiime',\{method:'PUT',body:JSON\.stringify\(b\)\}\)/);
 });
 
 test('8 — Administration : les indicateurs s\u2019affichent aussi en diagrammes (mêmes données)', () => {
-  assert.match(other, /id="admin-view-cards"/);
-  assert.match(other, /id="admin-view-charts"/);
+  // 15.4.63 — la bascule est devenue un bouton unique exclusif et persistant.
+  assert.match(other, /id="admin-view-toggle"/);
+  assert.match(other, /aurion-admin-view/);
   assert.match(other, /renderChart\('chart-admin-orgs'/);
   assert.match(other, /renderChart\('chart-admin-free'/);
   assert.match(other, /renderChart\('chart-admin-billing'/);
   assert.match(other, /renderChart\('chart-admin-conversion'/);
-  assert.match(other, /const toggleAdminView = mode =>/);
+  assert.match(other, /const applyAdminView=mode=>/);
   assert.match(css, /\.admin-charts-grid\{display:grid/);
 });

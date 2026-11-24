@@ -151,7 +151,7 @@ test('cotisations : détection par catégorie micro avec micro-social + CFP pour
 
 test('validation des devis/factures par un dialogue Aurion (aucune alerte native)', () => {
   assert.match(quoteJs, /Valider \$\{editing\?`les modifications de ce \$\{docLabel\}`:`la création de ce \$\{docLabel\}`\} \?/);
-  assert.match(quoteJs, /Total HT : \$\{money\(r\.totalHt\)\}/);
+  assert.match(quoteJs, /Total HT : \$\{money\(r\.totalHt\+extrasSave/);
   // Aucun appel natif alert/confirm/prompt dans le CODE (les commentaires sont ignorés).
   const stripComments = t => t.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
   for (const [file, text] of [['quote', quoteJs], ['other', otherJs], ['account', accountJs]]) {

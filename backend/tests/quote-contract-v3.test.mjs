@@ -52,5 +52,6 @@ test('édition partielle — les lignes déjà enregistrées sont rechargées av
   // Bloc 8 (15.4.7) : les lignes rechargées portent aussi leur catégorie d'activité (alias camelCase).
   // Bloc 16 : alias camelCase QUOTÉS — l'ancien contrat (alias non quotés, mis en minuscules par
 // PostgreSQL) écrasait silencieusement les prix enregistrés lors d'une édition partielle.
-assert.match(route,/select label,quantity,unit_cost as "unitCost",unit_price as "unitPrice",part_id as "partId",sale_coefficient_percent as "saleCoefficientPercent",activity_category as "activityCategory" from quote_items/);
+// 15.4.63 — les lignes rechargées portent aussi leur kind (partie/prestation complémentaire).
+assert.match(route,/select label,quantity,unit_cost as "unitCost",unit_price as "unitPrice",part_id as "partId",sale_coefficient_percent as "saleCoefficientPercent",activity_category as "activityCategory",kind from quote_items/);
 });

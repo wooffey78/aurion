@@ -113,6 +113,13 @@ function show(id){
   const profileModules=Array.isArray(S.profile?.modules)?S.profile.modules.map(x=>String(x).toLowerCase()):[];
   if(hiddenViews(q,profileModules).has(id))id='home';
   S.view=id;hooks.closeMenu?.();
+  // 15.4.63 — fin de prise en charge client : quitter la fiche client arrête automatiquement le
+  // compteur temps du client (la facturation l'arrête aussi côté serveur ; le badge de la fiche
+  // reste disponible pour la mise en pause manuelle).
+  if(previous==='clients'&&id!=='clients'&&S.timeMetrics?.active?.id){
+    const sid=S.timeMetrics.active.id,clientName=S.timeMetrics.active.client_name||'';
+    api.stopTimeSession(sid).then(()=>{S.timeMetrics.active=null;toast(`Compteur temps arrêté automatiquement${clientName?` (${clientName})`:''} : vous avez quitté la fiche client.`,'info')}).catch(()=>{});
+  }
   const nav=navigationItems({questionnaire:q,modules:profileModules,isAdmin:S.isPlatformAdmin,features:cachedFlags()}).map(item=>`<button type="button" data-view="${item.id}" class="${item.id===id?'active':''}" aria-current="${item.id===id?'page':'false'}" title="${item.label}"><i aria-hidden="true">${item.icon}</i>${item.label}</button>`).join('');
   const navRoot=document.querySelector('.nav');
   navRoot.innerHTML=nav;
@@ -193,11 +200,14 @@ hooks.refresh=refresh;hooks.show=show;
 
 function paintShell(){
   const a=active();
-  document.querySelector('#shell-company').textContent=`ENTREPRISE · ${S.company.name}`;
+  // 15.4.63 — barre supérieure jamais bloquée par une donnée absente : chaque champ tolère
+  // l'absence de société/activité, et la bulle avatar garde TOUJOURS une initiale visible
+  // tant qu'aucune image d'avatar n'est réellement affichée.
+  document.querySelector('#shell-company').textContent=`ENTREPRISE · ${S.company?.name||'Entreprise'}`;
   document.querySelector('#shell-activity').textContent=a?.name||'Activité';
   document.querySelector('#shell-pill').textContent=prof().title||a?.name||'';
   const avatar=document.querySelector('#shell-avatar');
-  if(avatar&&!avatar.style.backgroundImage) avatar.textContent=(S.company.name||'A')[0].toUpperCase();
+  if(avatar&&!avatar.style.backgroundImage&&!avatar.textContent.trim()) avatar.textContent=(S.company?.name||'A').trim()[0].toUpperCase()||'A';
 }
 
 let shellAvatarObjectUrl='';
@@ -305,7 +315,7 @@ export async function renderDashboard(){
   await load([...(EXTRAS[initialView]||[])],initialView);
   if(initialView==='accounting'||initialView==='treasury')lastFinancialRefreshAt=Date.now();
   lastBackgroundRefreshAt=Date.now();installBackgroundRefresh();installDataGoDelegation();
-  document.querySelector('#app').innerHTML=`<div class="dashboard-shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#/dashboard" aria-label="Aurion — retour au tableau de bord" title="Retour au tableau de bord">${appLogo('42')}<span>AURION<small>PRO</small></span></a><button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar"><span></span><span></span><span></span></button><nav class="nav" aria-label="Navigation principale"></nav><div class="sidebar-bottom"><button id="logout" class="nav-logout">Quitter</button><div class="status-dot"><i></i> Système opérationnel</div></div></aside><section class="workspace"><header class="dashboard-top"><div class="activity-switch"><span class="eyebrow" id="shell-company"></span><button id="activity-picker" class="activity-picker"><span>ACTIVITÉ ACTIVE</span><strong id="shell-activity"></strong><small>▾</small></button></div><div class="top-actions"><span class="pill shell-clock" id="local-clock" aria-label="Heure locale" title="Heure locale de votre appareil"></span><span class="pill" id="shell-pill"></span><button class="btn secondary small" id="fs-toggle" type="button" title="Activer le plein écran" aria-label="Activer le plein écran" aria-pressed="false"><span class="fs-icon" aria-hidden="true">⛶</span><span class="fs-label">Plein écran</span></button><button class="avatar" id="shell-avatar" title="Mon compte" aria-label="Mon compte"></button></div></header><main id="main" class="content"><div id="view"></div></main></section></div><div id="activity-modal-root"></div>`;
+  document.querySelector('#app').innerHTML=`<div class="dashboard-shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#/dashboard" aria-label="Aurion — retour au tableau de bord" title="Retour au tableau de bord">${appLogo('42')}<span>AURION<small>PRO</small></span></a><button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar"><span></span><span></span><span></span></button><nav class="nav" aria-label="Navigation principale"></nav><div class="sidebar-bottom"><button id="logout" class="nav-logout">Quitter</button><div class="status-dot"><i></i> Système opérationnel</div></div></aside><section class="workspace"><header class="dashboard-top"><div class="activity-switch"><span class="eyebrow" id="shell-company"></span><button id="activity-picker" class="activity-picker"><span>ACTIVITÉ ACTIVE</span><strong id="shell-activity"></strong><small>▾</small></button></div><div class="top-actions"><span class="pill shell-clock" id="local-clock" aria-label="Heure locale" title="Heure locale de votre appareil"></span><span class="pill" id="shell-pill"></span><button class="btn secondary small" id="fs-toggle" type="button" title="Activer le plein écran" aria-label="Activer le plein écran" aria-pressed="false"><span class="fs-icon" aria-hidden="true">⛶</span><span class="fs-label">Plein écran</span></button><button class="avatar" id="shell-avatar" title="Mon compte" aria-label="Mon compte">A</button></div></header><main id="main" class="content"><div id="view"></div></main></section></div><div id="activity-modal-root"></div>`;
   await syncShellAvatar();
   // Horloge unique de la coquille : visible sur toute la navigation, jamais dupliquée par vue.
   startLocalClock(document.getElementById('local-clock'));

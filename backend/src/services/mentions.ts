@@ -11,7 +11,7 @@ export interface Mention { key: string; text: string; source: MentionSource; not
 const GOODS = ['smartphone-repair', 'computer-repair', 'plumbing', 'electrical', 'auto', 'building'];
 const WORKS = ['plumbing', 'electrical', 'building', 'auto'];
 const CONSUMER = ['smartphone-repair', 'computer-repair', 'plumbing', 'electrical', 'auto', 'building', 'beauty', 'cleaning'];
-export const DEFAULT_PAYMENT_TERMS = 'Paiement à réception de facture. En cas de retard de paiement : pénalités au taux de trois fois le taux d’intérêt légal et indemnité forfaitaire de recouvrement de 40 € (clients professionnels).';
+export const DEFAULT_PAYMENT_TERMS = 'Paiement à réception de facture. Escompte pour paiement anticipé : néant. En cas de retard : pénalités au taux de trois fois le taux d’intérêt légal. Indemnité forfaitaire de recouvrement de 40 € : applicable uniquement aux retards de paiement entre professionnels (clients professionnels).';
 
 export interface MentionCtx {
   kind: 'quote' | 'invoice'; profileCode: string;
@@ -26,8 +26,17 @@ export function computeMentions(c: MentionCtx): Mention[] {
   const t = c.existingText;
   const push = (key: string, text: string, source: MentionSource, note?: string, presentRe?: RegExp) => out.push({ key, text, source: presentRe && has(t, presentRe) ? 'detected' : source, note });
 
+  // Référentiel conformité §08-1 (Service Public F31808) : les conditions d'escompte figurent
+  // obligatoirement sur la facture — « néant » lorsqu'aucun escompte n'est pratiqué.
+  if (c.kind === 'invoice') push('escompte', 'Escompte pour paiement anticipé : néant.', 'auto', undefined, /escompte/i);
   const ident = [c.activity.legal_form, c.company.name, c.company.siren ? `SIREN ${c.company.siren}` : '', c.company.siret ? `SIRET ${c.company.siret}` : ''].filter(Boolean).join(' · ');
-  if (c.company.siret || c.company.siren) push('identity', ident, 'provided', undefined, /SIRE[NT]/i);
+  // Référentiel conformité §08-1 : pour un entrepreneur individuel, l'identité porte la mention
+  // « Entrepreneur individuel (EI) » ; « micro-entreprise » est un régime, jamais une forme juridique.
+  const EI_FORM = /^(ei|ei solo|micro-entrepreneur|micro entrepreneur|auto-entrepreneur|auto entrepreneur|entrepreneur individuel)$/i;
+  const identityText = c.activity.legal_form && EI_FORM.test(c.activity.legal_form)
+    ? `Entrepreneur individuel (EI) · ${c.company.name}${c.company.siren ? ` · SIREN ${c.company.siren}` : ''}${c.company.siret ? ` · SIRET ${c.company.siret}` : ''}`
+    : ident;
+  if (c.company.siret || c.company.siren) push('identity', identityText, 'provided', undefined, /SIRE[NT]/i);
   else out.push({ key: 'identity', text: '', source: 'needs_confirmation', note: 'SIRET / SIREN non renseigné : à saisir dans Paramètres → Identité légale.' });
 
   const rate = Number(c.activity.vat_rate ?? 20);
