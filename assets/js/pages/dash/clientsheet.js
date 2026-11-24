@@ -35,11 +35,30 @@ export async function openClientSheet(id,{onEdit,onQuote,onDelete}={}){
    </div>
    <section class="sheet-block" id="sheet-reliability"><h3>Fiabilité de paiement</h3><p class="muted" id="reliability-loading">Calcul en cours…</p><div id="reliability-body" hidden></div></section>
    <section class="sheet-block" id="sheet-portal"><h3>Portail client</h3><p class="help">Accès invité sans compte : le client consulte et accepte ses devis par lien sécurisé, révocable à tout moment.</p><div id="portal-body"><p class="muted">Chargement…</p></div></section>
-   <div class="button-row sheet-actions"><span class="help" id="sh-time">⏱ Compteur automatique</span><button class="btn primary" id="sh-quote">+ Nouveau devis</button><button class="btn secondary" id="sh-pdf">Fiche PDF</button><button class="btn secondary" id="sh-edit">Modifier</button><button class="btn danger" id="sh-del">Supprimer</button></div>`;
+   <div class="button-row sheet-actions"><button type="button" class="link-btn" id="sh-time" title="Mettre en pause ou relancer le compteur de ce client">⏱ Compteur automatique</button><button class="btn primary" id="sh-quote">+ Nouveau devis</button><button class="btn secondary" id="sh-pdf">Fiche PDF</button><button class="btn secondary" id="sh-edit">Modifier</button><button class="btn danger" id="sh-del">Supprimer</button></div>`;
   const q=s=>root.querySelector(s);
   q('.modal-close').onclick=close;
-  const syncTimer=async()=>{try{const m=await api.timeMetrics();q('#sh-time').textContent=m.active?.client_id===c.id?'⏱ Compteur en cours':'⏸ Compteur en pause';}catch{}};
+  // 15.4.59 — le badge de compteur devient une COMMANDE : il reflète l'état réel du chrono
+  // (en cours / en pause) et permet de le mettre en pause, puis de le relancer, sans quitter
+  // la fiche. Le compteur démarre toujours automatiquement à la création de la fiche.
+  const syncTimer=async()=>{try{const m=await api.timeMetrics();q('#sh-time').textContent=m.active?.client_id===c.id?'⏱ Compteur en cours — cliquer pour mettre en pause':'⏸ Compteur en pause — cliquer pour relancer';return m;}catch{return null}};
   await syncTimer();
+  q('#sh-time').onclick=async()=>{
+    const m=await syncTimer();
+    if(!m)return toast('État du compteur indisponible : réessayez dans un instant.','error');
+    try{
+      if(m.active&&m.active.client_id===c.id){
+        await api.pauseTimeSession(m.active.id);
+        toast('Compteur mis en pause. Cliquez à nouveau sur le badge pour le relancer.','success');
+      }else if(m.active){
+        return toast(`Le compteur tourne déjà pour « ${m.active.client_name||'un autre client'} » : mettez-le en pause depuis sa fiche avant de relancer celui-ci.`,'info');
+      }else{
+        await api.startTimeSession({clientId:c.id,manualMinutes:Number(c.estimated_minutes)>0?Number(c.estimated_minutes):undefined});
+        toast('Compteur relancé pour ce client : il se met en pause à la facturation, ou via ce badge.','success');
+      }
+      await syncTimer();
+    }catch(x){toast(x.message||'Action impossible sur le compteur.','error')}
+  };
   q('#sh-quote').onclick=()=>{close();onQuote?.(c)};
   q('#sh-edit').onclick=()=>{close();onEdit?.(c)};
   q('#sh-del').onclick=()=>{close();onDelete?.(c)};

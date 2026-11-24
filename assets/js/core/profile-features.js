@@ -25,11 +25,12 @@ export async function loadProfileFeatures(force = false) {
       if (!res.ok) throw new Error(String(res.status));
       CACHE = await res.json();
     } catch {
-      // Repli conservateur documenté : core uniquement, rien de métier-spécifique n'est proposé.
+      // Repli conservateur documenté : rien de métier-spécifique n'est poussé hors connexion ;
+      // les capacités cœur (portail client, chantiers 15.4.59) restent visibles.
       CACHE = CACHE || {
         profileCode: '', profileTitle: '',
-        features: { chantiers: false, maintenance: false, stock_locations: false, client_portal: true, warranty_workflows: false, time_tracking: false, device_tracking: false },
-        hidden: [{ key: 'chantiers', reason: 'Fonctionnalités métier indisponibles hors connexion pour cette activité : elles réapparaîtront à la reconnexion.' }],
+        features: { chantiers: true, maintenance: false, stock_locations: false, client_portal: true, warranty_workflows: false, time_tracking: false, device_tracking: false },
+        hidden: [],
       };
     } finally { INFLIGHT = null; }
     return CACHE;

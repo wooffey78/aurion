@@ -568,6 +568,11 @@ async function pauseClientTimer(org:string,userId:string,clientId:string){
   await query(`update client_time_sessions set accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),paused_at=now(),status='paused',ended_at=null where organization_id=$1 and user_id=$2 and client_id=$3 and excluded_at is null and ended_at is null and status='running'`,[org,userId,clientId]);
 }
 async function resumeClientTimer(org:string,userId:string,clientId:string,activityId:string,manualMinutes?:unknown){
+  // 15.4.59 — cicatrisation + reprise de contrôle avant toute relecture : une session
+  // ouverte mais exclue, ou une session d'un autre client encore ouverte, bloquerait sinon
+  // la reprise (index unique 012 → 23505). Aucune durée n'est perdue (fermetures à l'arrêt).
+  await closeOpenExcludedSessions(org,userId);
+  await takeoverOtherClientSessions(org,userId,clientId);
   const paused=await query("select id from client_time_sessions where organization_id=$1 and user_id=$2 and client_id=$3 and excluded_at is null and ended_at is null and status='paused' order by created_at desc limit 1",[org,userId,clientId]);
   if(paused.rowCount){await query("update client_time_sessions set started_at=now(),paused_at=null,status='running' where id=$1",[paused.rows[0].id]);return paused.rows[0].id;}
   const active=await query("select id from client_time_sessions where organization_id=$1 and user_id=$2 and excluded_at is null and ended_at is null and status='running' limit 1",[org,userId]);
@@ -585,6 +590,26 @@ async function resumeClientTimer(org:string,userId:string,clientId:string,activi
 async function stopClientTimer(org:string,userId:string,clientId:string){
   await query(`update client_time_sessions set duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),ended_at=now(),status='completed',paused_at=null where organization_id=$1 and user_id=$2 and client_id=$3 and excluded_at is null and ended_at is null and status='running'`,[org,userId,clientId]);
   await query(`update client_time_sessions set ended_at=now(),status='completed' where organization_id=$1 and user_id=$2 and client_id=$3 and excluded_at is null and ended_at is null and status='paused'`,[org,userId,clientId]);
+}
+// 15.4.59 — cicatrisation de l'état « ouverte mais exclue » : une remise à zéro antérieure
+// (15.4.58, excluded_at) a pu toucher une session encore ouverte (ended_at null). Celle-ci
+// reste invisible du compteur (les lectures filtrent excluded_at is null) mais occupe
+// toujours l'index unique idx_client_time_active_user (012) et bloquait alors toute
+// nouvelle session : création de fiche client ou démarrage de chrono → 23505 → 500
+// « La requête a échoué. » pendant que la fiche, écrite en autocommit, restait créée.
+// Elle est refermée ici avec la sémantique exacte de l'arrêt (running → durée accumulée ;
+// paused → clôture simple) : exclue, elle ne redevient jamais comptabilisée.
+async function closeOpenExcludedSessions(org:string,userId:string){
+  await query(`update client_time_sessions set duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),ended_at=now(),status='completed',paused_at=null where organization_id=$1 and user_id=$2 and excluded_at is not null and ended_at is null and status='running'`,[org,userId]);
+  await query(`update client_time_sessions set ended_at=now(),status='completed' where organization_id=$1 and user_id=$2 and excluded_at is not null and ended_at is null and status='paused'`,[org,userId]);
+}
+// 15.4.59 — reprise de contrôle : le moteur garantit « une session ouverte par utilisateur »
+// (index 012). Démarrer ou relancer le compteur d'un client alors qu'une session d'un AUTRE
+// client est encore ouverte referme d'abord celle-ci (mêmes sémantiques d'arrêt) : la durée
+// accumulée est préservée et comptabilisée — aucune perte, aucune erreur 23505.
+async function takeoverOtherClientSessions(org:string,userId:string,clientId:string){
+  await query(`update client_time_sessions set duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),ended_at=now(),status='completed',paused_at=null where organization_id=$1 and user_id=$2 and client_id<>$3 and excluded_at is null and ended_at is null and status='running'`,[org,userId,clientId]);
+  await query(`update client_time_sessions set ended_at=now(),status='completed' where organization_id=$1 and user_id=$2 and client_id<>$3 and excluded_at is null and ended_at is null and status='paused'`,[org,userId,clientId]);
 }
 
 async function marginGuard(org:string,activityId:string,purchaseHt:number,totalHt:number,requestedCoefficient:unknown){const a=(await query('select margin_min_percent from activities where id=$1 and organization_id=$2',[activityId,org])).rows[0];const min=Math.max(0,Number(a?.margin_min_percent??0));const coefficient=Number(requestedCoefficient??min);if(purchaseHt>0&&(!Number.isFinite(coefficient)||coefficient<min))throw new AurionError('INVALID_INPUT','Coefficient de marge inférieur au minimum métier.');const safeCoefficient=Number.isFinite(coefficient)?coefficient:min;const requiredHt=purchaseHt*(1+safeCoefficient/100);return {coefficient:safeCoefficient,min,requiredHt,ok:purchaseHt<=0||totalHt>=requiredHt}}
@@ -988,6 +1013,14 @@ export async function businessRoutes(app:FastifyInstance){
     // simple) — aucun autre comportement du chronomètre n'est modifié.
     await query(`update client_time_sessions set duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),ended_at=now(),status='completed',paused_at=null where organization_id=$1 and user_id=$2 and excluded_at is null and ended_at is null and status='running'`,[org,r.auth!.userId]);
     await query(`update client_time_sessions set ended_at=now(),status='completed' where organization_id=$1 and user_id=$2 and excluded_at is null and ended_at is null and status='paused'`,[org,r.auth!.userId]);
+    // 15.4.59 — cicatrisation : une session restée ouverte mais déjà EXCLUE (remise à zéro
+    // 15.4.58 sur une session en cours) échappait aux deux fermetures ci-dessus (filtre
+    // excluded_at is null) tout en occupant l'index unique 012 → la création d'une nouvelle
+    // fiche échouait en 23505 → 500 « La requête a échoué. » alors que la fiche, écrite en
+    // autocommit, restait créée (symptôme : la fiche n'apparaissait qu'après un changement
+    // de section). Les sessions exclues ouvertes sont refermées ici — exclues, elles ne
+    // redeviennent jamais comptabilisées.
+    await closeOpenExcludedSessions(org,r.auth!.userId);
     await query('insert into clients(id,organization_id,activity_id,name,email,phone,address,intervention_address,siret,estimated_minutes,buyer_category,country_code,vat_number) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',[id,org,aid,b.name.trim(),b.email||null,b.phone||null,b.address||null,b.interventionAddress||null,(String(b.siret||'').replace(/\D/g,'')||null),manual,buyerCategoryInput(b.buyerCategory),countryCodeInput(b.countryCode),vatNumberInput(b.vatNumber)]);
     if(String(b.interventionAddress||'').trim())await query(`insert into client_intervention_addresses(id,organization_id,client_id,label,address,is_default) values($1,$2,$3,$4,$5,true)`,[crypto.randomUUID(),org,id,'Adresse principale',String(b.interventionAddress).trim()]);
     await query('insert into client_time_sessions(id,organization_id,user_id,client_id,activity_id,manual_minutes,started_at) values($1,$2,$3,$4,$5,$6,now())',[crypto.randomUUID(),org,r.auth!.userId,id,aid,manual]);
@@ -1832,9 +1865,13 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
       integrityRecorded=false;
       r.log.error({err:String(e?.message||e),documentId:id},'integrity chain record failed after emission');
     }
-    if(converted.clientId&&converted.activityId)await resumeClientTimer(org,r.auth!.userId,converted.clientId,converted.activityId);
+    // 15.4.59 — le relais du chrono après conversion ne peut plus faire échouer la réponse
+    // ALORS QUE la facture est déjà committée (symptôme « La requête a échoué. » avec la
+    // facture visible seulement après un changement de section) : même politique que le
+    // pauseClientTimer de l'enregistrement de document (échec journalisé, émission validée).
+    if(converted.clientId&&converted.activityId){try{await resumeClientTimer(org,r.auth!.userId,converted.clientId,converted.activityId)}catch(error){r.log.warn({err:error,documentId:id,clientId:converted.clientId},'client timer resume skipped after conversion')}}
     const emailStatus=b.sendEmail!==false?await emailDocument(org,id,'invoice',converted.number,converted.clientId):'not_requested';
-    if(emailStatus==='sent'&&converted.clientId)await stopClientTimer(org,r.auth!.userId,converted.clientId);
+    if(emailStatus==='sent'&&converted.clientId){try{await stopClientTimer(org,r.auth!.userId,converted.clientId)}catch(error){r.log.warn({err:error,documentId:id,clientId:converted.clientId},'client timer stop skipped after conversion')}}
     return {number:converted.number,emailStatus,integrityRecorded};
   });
   app.get('/invoices/:id/installments',async(r,reply)=>{const id=String((r.params as any).id),org=r.auth!.organizationId;const q=(await query("select id,number,total_ttc from quotes where id=$1 and organization_id=$2 and document_type='invoice'",[id,org])).rows[0];if(!q)return reply.code(404).send({error:'NOT_FOUND'});return {invoice:q,installments:(await query('select id,installment_number,due_at,amount_due,amount_paid,status from invoice_installments where quote_id=$1 and organization_id=$2 order by installment_number',[id,org])).rows};});
@@ -2057,10 +2094,19 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     // 15.4.58 — la remise à zéro EXCLUT les sessions du compteur (excluded_at) sans les
     // supprimer : référentiel documentaire §07-6 — l'historique reste disponible pour les
     // statistiques, les chantiers et l'audit. Les sessions déjà exclues gardent leur date.
+    // 15.4.59 — les sessions encore OUVERTES de la portée visée (running/paused, ended_at
+    // null) sont refermées AVANT l'exclusion, avec la sémantique exacte de l'arrêt : sinon
+    // elles restaient « ouvertes mais exclues » — invisibles du compteur — tout en occupant
+    // l'index unique idx_client_time_active_user (012), ce qui bloquait ensuite toute
+    // création de fiche client ou démarrage de chrono (23505 → 500 « La requête a échoué. »).
     if(aid){
+      await query(`update client_time_sessions set duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),ended_at=now(),status='completed',paused_at=null where organization_id=$1 and activity_id=$2 and ended_at is null and status='running'`,[org,aid]);
+      await query(`update client_time_sessions set ended_at=now(),status='completed' where organization_id=$1 and activity_id=$2 and ended_at is null and status='paused'`,[org,aid]);
       const x=await query('update client_time_sessions set excluded_at=coalesce(excluded_at,now()) where organization_id=$1 and activity_id=$2 and excluded_at is null returning id',[org,aid]);
       return {ok:true,activityId:aid,excludedSessions:x.rowCount||0};
     }
+    await query(`update client_time_sessions set duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),ended_at=now(),status='completed',paused_at=null where organization_id=$1 and ended_at is null and status='running'`,[org]);
+    await query(`update client_time_sessions set ended_at=now(),status='completed' where organization_id=$1 and ended_at is null and status='paused'`,[org]);
     const x=await query('update client_time_sessions set excluded_at=coalesce(excluded_at,now()) where organization_id=$1 and excluded_at is null returning id',[org]);
     return {ok:true,activityId:aid,excludedSessions:x.rowCount||0};
   });
@@ -2100,6 +2146,17 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     const hasHistory=Number((await query('select 1 from client_time_sessions where client_id=$1 and organization_id=$2 and excluded_at is null limit 1',[clientId,org])).rowCount||0)>0;
     const manual=providedManual!=null?providedManual:(hasHistory?0:Number((await query('select estimated_minutes from clients where id=$1 and organization_id=$2',[clientId,org])).rows[0]?.estimated_minutes||0));
     if(!clientId||!Number.isFinite(manual)||manual<0||manual>100000)return reply.code(400).send({error:'INVALID_INPUT'});
+    // 15.4.59 — un démarrage de chrono ne peut plus heurter l'index unique 012 : les sessions
+    // restées ouvertes mais exclues (cicatrice d'une remise à zéro) sont refermées, et une
+    // session d'un AUTRE client encore ouverte lui cède la place (durée accumulée préservée
+    // et comptabilisée). Une session déjà en cours pour CE client est retournée telle
+    // quelle (idempotent) au lieu de provoquer un 23505 → 500.
+    if(/^[0-9a-f-]{36}$/i.test(clientId)){
+      await closeOpenExcludedSessions(org,r.auth!.userId);
+      await takeoverOtherClientSessions(org,r.auth!.userId,clientId);
+      const own=(await query("select id from client_time_sessions where client_id=$1 and organization_id=$2 and user_id=$3 and excluded_at is null and ended_at is null and status='running' order by created_at desc limit 1",[clientId,org,r.auth!.userId])).rows[0];
+      if(own)return {id:own.id,resumed:false,alreadyRunning:true};
+    }
     const aid=await ensureActivity(r,activityId(r,b));if(!aid)return reply.code(400).send({error:'INVALID_INPUT'});
     const c=await query('select id from clients where id=$1 and organization_id=$2 and activity_id=$3',[clientId,org,aid]);if(!c.rowCount)return reply.code(400).send({error:'INVALID_INPUT'});
     const id=crypto.randomUUID();await query('insert into client_time_sessions(id,organization_id,user_id,client_id,activity_id,manual_minutes,started_at) values($1,$2,$3,$4,$5,$6,now())',[id,org,r.auth!.userId,clientId,aid,manual]);return reply.code(201).send({id});
@@ -2109,6 +2166,16 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     const x=await query(`update client_time_sessions set ended_at=now(),duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),status='completed',paused_at=null where id=$1 and organization_id=$2 and user_id=$3 and ended_at is null and status='running' returning *`,[id,org,r.auth!.userId]);
     if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
     return x.rows[0];
+  });
+  // 15.4.59 — pause explicite du compteur (fiche client : badge cliquable) — même sémantique
+  // que pauseClientTimer : temps écoulé accumulé, status='paused', ended_at reste null (la
+  // session demeure « ouverte » au sens de l'index 012 et peut être relancée). Seule une
+  // session RUNNING de l'utilisateur peut être mise en pause.
+  app.post('/time-sessions/:id/pause',async(r,reply)=>{
+    const org=r.auth!.organizationId,id=String((r.params as any).id);
+    const x=await query(`update client_time_sessions set accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),paused_at=now(),status='paused',ended_at=null where id=$1 and organization_id=$2 and user_id=$3 and ended_at is null and status='running' returning id`,[id,org,r.auth!.userId]);
+    if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
+    return {ok:true,id,paused:true};
   });
   app.post('/time-sessions/:id/abandon',async(r,reply)=>{
     const org=r.auth!.organizationId,id=String((r.params as any).id);
@@ -2281,7 +2348,15 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
           from sav_cases s join quotes q on q.id=s.invoice_id
           where s.organization_id=$1 and s.activity_id=$2 and s.sav_type='financial'
             and s.created_at>=now()-($3||' months')::interval),0)
-      )::numeric total`,[org,aid,historyMonths]),
+      )::numeric total,
+      (select count(distinct date_trunc('month',p.paid_at))::int
+        from invoice_payments p join quotes q on q.id=p.quote_id
+        where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice'
+          and p.paid_at>=now()-($3||' months')::interval) history_months,
+      (select min(p.paid_at)
+        from invoice_payments p join quotes q on q.id=p.quote_id
+        where q.organization_id=$1 and q.activity_id=$2 and q.document_type='invoice'
+          and p.paid_at>=now()-($3||' months')::interval) first_payment`,[org,aid,historyMonths]),
       query(`select count(*)::int n,min(ends_at) next_end from warranties where organization_id=$1 and ends_at>now()`,[org]),
       query(`select title,starts_at,client_id from appointments where organization_id=$1 and activity_id=$2 and starts_at>now() order by starts_at asc limit 5`,[org,aid]),
       query('select trial_ends_at,current_period_end from subscriptions where organization_id=$1',[org]),
@@ -2293,14 +2368,23 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
       query(`select count(*)::int n from appointments where organization_id=$1 and activity_id=$2 and starts_at>now() and lower(coalesce(status,''))<>'canceled'`,[org,aid])
     ]);
     const historical=historicalResult.rows[0];
-    const historicalAverage=Number(historical?.total||0)/Math.max(1,historyMonths);
+    // 15.4.59 — pertinence du prévisionnel : la moyenne historique n'est plus diluée par la
+    // fenêtre demandée quand l'historique réel est plus court qu'elle. Le diviseur est le
+    // nombre de mois effectivement historisés depuis le premier encaissement de la fenêtre
+    // (borné par la fenêtre, minimum 1). Sans cela, un compte d'un mois d'âge voyait sa
+    // moyenne divisée par 6 : prévision systématiquement sous-estimée, encarts « 3/6 mois »
+    // et « année » quasi vides malgré une activité réelle.
+    const firstPayment=historical?.first_payment?new Date(historical.first_payment):null;
+    const monthsSinceFirstPayment=firstPayment?Math.max(1,Math.min(historyMonths,Math.ceil((Date.now()-firstPayment.getTime())/(30.4375*86400000)))):0;
+    const effectiveHistoryMonths=Math.max(1,monthsSinceFirstPayment||historyMonths);
+    const historicalAverage=Number(historical?.total||0)/effectiveHistoryMonths;
     const open=Number(f.rows[0]?.total||0);
     const nextMonth=open;
     const currentDate=new Date();
     const monthHt=Number(yearAccounting.find(m=>{const d=new Date(m.month);return d.getFullYear()===accountingYear&&d.getMonth()===currentDate.getMonth()})?.revenueHt||0);
     const yearToDateHt=yearAccounting.reduce((sum,m)=>sum+Number(m.revenueHt||0),0);
     const remainingMonths=Math.max(0,11-currentDate.getMonth());
-    const forecast={month:monthHt,monthHt,month1:nextMonth,months3:monthHt+historicalAverage*2+open,months6:monthHt+historicalAverage*5+open,year:yearToDateHt+historicalAverage*remainingMonths+open,monthlyAverage:historicalAverage,historyMonths,method:`Prévision en HT : encaissements historiques HT moyens, devis ouverts HT et SAV financiers ramenés en HT. Les devis annulés ou refusés sont exclus. L’année combine le réalisé depuis janvier et les mois restants estimés.`};
+    const forecast={month:monthHt,monthHt,month1:nextMonth,months3:monthHt+historicalAverage*2+open,months6:monthHt+historicalAverage*5+open,year:yearToDateHt+historicalAverage*remainingMonths+open,monthlyAverage:historicalAverage,historyMonths,effectiveHistoryMonths,method:`Prévision en HT : encaissements historiques HT moyens (moyenne ramenée aux ${effectiveHistoryMonths} mois effectivement historisés${effectiveHistoryMonths<historyMonths?`, et non aux ${historyMonths} mois de la fenêtre`:''}), devis ouverts HT et SAV financiers ramenés en HT. Les devis annulés ou refusés sont exclus. L’année combine le réalisé depuis janvier et les mois restants estimés.`};
     const warr=warrResult.rows[0];
     const appointments=appointmentsResult.rows;
     const sub=subResult.rows[0]||null;
