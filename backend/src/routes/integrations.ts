@@ -30,8 +30,8 @@ export async function integrationRoutes(app:FastifyInstance){
     await query('update quotes set sent_at=now(),updated_at=now() where id=$1 and organization_id=$2',[b.documentId,org]);
     if(type==='invoice') await createInvoiceWarranty(org,b.documentId,d.row as any);
     if(type==='invoice' && d.row.client_id){
-      await query(`update client_time_sessions set duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),ended_at=now(),paused_at=null,status='completed' where organization_id=$1 and user_id=$2 and client_id=$3 and ended_at is null and status='running'`,[org,r.auth!.userId,d.row.client_id]);
-      await query(`update client_time_sessions set ended_at=now(),paused_at=null,status='completed' where organization_id=$1 and user_id=$2 and client_id=$3 and ended_at is null and status='paused'`,[org,r.auth!.userId,d.row.client_id]);
+      await query(`update client_time_sessions set duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),ended_at=now(),paused_at=null,status='completed' where organization_id=$1 and user_id=$2 and client_id=$3 and excluded_at is null and ended_at is null and status='running'`,[org,r.auth!.userId,d.row.client_id]);
+      await query(`update client_time_sessions set ended_at=now(),paused_at=null,status='completed' where organization_id=$1 and user_id=$2 and client_id=$3 and excluded_at is null and ended_at is null and status='paused'`,[org,r.auth!.userId,d.row.client_id]);
     }
     return {ok:true};
   });

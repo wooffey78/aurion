@@ -565,20 +565,26 @@ async function nextNumber(org:string,prefix:string,executor:SqlExecutor={query})
   return `${prefix}-${year}-${String(r.rows[0].last_value).padStart(4,'0')}`;
 }
 async function pauseClientTimer(org:string,userId:string,clientId:string){
-  await query(`update client_time_sessions set accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),paused_at=now(),status='paused',ended_at=null where organization_id=$1 and user_id=$2 and client_id=$3 and ended_at is null and status='running'`,[org,userId,clientId]);
+  await query(`update client_time_sessions set accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),paused_at=now(),status='paused',ended_at=null where organization_id=$1 and user_id=$2 and client_id=$3 and excluded_at is null and ended_at is null and status='running'`,[org,userId,clientId]);
 }
-async function resumeClientTimer(org:string,userId:string,clientId:string,activityId:string){
-  const paused=await query("select id from client_time_sessions where organization_id=$1 and user_id=$2 and client_id=$3 and ended_at is null and status='paused' order by created_at desc limit 1",[org,userId,clientId]);
+async function resumeClientTimer(org:string,userId:string,clientId:string,activityId:string,manualMinutes?:unknown){
+  const paused=await query("select id from client_time_sessions where organization_id=$1 and user_id=$2 and client_id=$3 and excluded_at is null and ended_at is null and status='paused' order by created_at desc limit 1",[org,userId,clientId]);
   if(paused.rowCount){await query("update client_time_sessions set started_at=now(),paused_at=null,status='running' where id=$1",[paused.rows[0].id]);return paused.rows[0].id;}
-  const active=await query("select id from client_time_sessions where organization_id=$1 and user_id=$2 and ended_at is null and status='running' limit 1",[org,userId]);
+  const active=await query("select id from client_time_sessions where organization_id=$1 and user_id=$2 and excluded_at is null and ended_at is null and status='running' limit 1",[org,userId]);
   if(active.rowCount) return active.rows[0].id;
   const id=crypto.randomUUID();
-  await query('insert into client_time_sessions(id,organization_id,user_id,client_id,activity_id,manual_minutes,started_at,accumulated_seconds) values($1,$2,$3,$4,$5,0,now(),0)',[id,org,userId,clientId,activityId]);
+  // Même moteur que /time-sessions/start : estimation explicite > estimation de la fiche à la
+  // première session comptabilisée > 0 (jamais d'estimation inventée, jamais de saisie écrasée).
+  const provided=Number.isFinite(Number(manualMinutes))?Math.max(0,Number(manualMinutes)):null;
+  const hasHistory=Number((await query('select 1 from client_time_sessions where client_id=$1 and organization_id=$2 and excluded_at is null limit 1',[clientId,org])).rowCount||0)>0;
+  const estimated=Number((await query('select estimated_minutes from clients where id=$1 and organization_id=$2',[clientId,org])).rows[0]?.estimated_minutes||0);
+  const manual=provided!=null?provided:(hasHistory?0:estimated);
+  await query('insert into client_time_sessions(id,organization_id,user_id,client_id,activity_id,manual_minutes,started_at,accumulated_seconds) values($1,$2,$3,$4,$5,$6,now(),0)',[id,org,userId,clientId,activityId,Math.max(0,Number.isFinite(manual)?manual:0)]);
   return id;
 }
 async function stopClientTimer(org:string,userId:string,clientId:string){
-  await query(`update client_time_sessions set duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),ended_at=now(),status='completed',paused_at=null where organization_id=$1 and user_id=$2 and client_id=$3 and ended_at is null and status='running'`,[org,userId,clientId]);
-  await query(`update client_time_sessions set ended_at=now(),status='completed' where organization_id=$1 and user_id=$2 and client_id=$3 and ended_at is null and status='paused'`,[org,userId,clientId]);
+  await query(`update client_time_sessions set duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),ended_at=now(),status='completed',paused_at=null where organization_id=$1 and user_id=$2 and client_id=$3 and excluded_at is null and ended_at is null and status='running'`,[org,userId,clientId]);
+  await query(`update client_time_sessions set ended_at=now(),status='completed' where organization_id=$1 and user_id=$2 and client_id=$3 and excluded_at is null and ended_at is null and status='paused'`,[org,userId,clientId]);
 }
 
 async function marginGuard(org:string,activityId:string,purchaseHt:number,totalHt:number,requestedCoefficient:unknown){const a=(await query('select margin_min_percent from activities where id=$1 and organization_id=$2',[activityId,org])).rows[0];const min=Math.max(0,Number(a?.margin_min_percent??0));const coefficient=Number(requestedCoefficient??min);if(purchaseHt>0&&(!Number.isFinite(coefficient)||coefficient<min))throw new AurionError('INVALID_INPUT','Coefficient de marge inférieur au minimum métier.');const safeCoefficient=Number.isFinite(coefficient)?coefficient:min;const requiredHt=purchaseHt*(1+safeCoefficient/100);return {coefficient:safeCoefficient,min,requiredHt,ok:purchaseHt<=0||totalHt>=requiredHt}}
@@ -980,8 +986,8 @@ export async function businessRoutes(app:FastifyInstance){
     // création n'était jamais close. La session précédente est close ici avec la SÉMANTIQUE
     // EXACTE de l'arrêt du chronomètre existant (running : durée accumulée ; paused : clôture
     // simple) — aucun autre comportement du chronomètre n'est modifié.
-    await query(`update client_time_sessions set duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),ended_at=now(),status='completed',paused_at=null where organization_id=$1 and user_id=$2 and ended_at is null and status='running'`,[org,r.auth!.userId]);
-    await query(`update client_time_sessions set ended_at=now(),status='completed' where organization_id=$1 and user_id=$2 and ended_at is null and status='paused'`,[org,r.auth!.userId]);
+    await query(`update client_time_sessions set duration_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),accumulated_seconds=accumulated_seconds+greatest(0,extract(epoch from(now()-started_at))::int),ended_at=now(),status='completed',paused_at=null where organization_id=$1 and user_id=$2 and excluded_at is null and ended_at is null and status='running'`,[org,r.auth!.userId]);
+    await query(`update client_time_sessions set ended_at=now(),status='completed' where organization_id=$1 and user_id=$2 and excluded_at is null and ended_at is null and status='paused'`,[org,r.auth!.userId]);
     await query('insert into clients(id,organization_id,activity_id,name,email,phone,address,intervention_address,siret,estimated_minutes,buyer_category,country_code,vat_number) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',[id,org,aid,b.name.trim(),b.email||null,b.phone||null,b.address||null,b.interventionAddress||null,(String(b.siret||'').replace(/\D/g,'')||null),manual,buyerCategoryInput(b.buyerCategory),countryCodeInput(b.countryCode),vatNumberInput(b.vatNumber)]);
     if(String(b.interventionAddress||'').trim())await query(`insert into client_intervention_addresses(id,organization_id,client_id,label,address,is_default) values($1,$2,$3,$4,$5,true)`,[crypto.randomUUID(),org,id,'Adresse principale',String(b.interventionAddress).trim()]);
     await query('insert into client_time_sessions(id,organization_id,user_id,client_id,activity_id,manual_minutes,started_at) values($1,$2,$3,$4,$5,$6,now())',[crypto.randomUUID(),org,r.auth!.userId,id,aid,manual]);
@@ -2041,16 +2047,22 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
   });
   app.post('/time-metrics/reset',async(r,reply)=>{
     const org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));
-    // Une remise à zéro sans activité supprimait l'historique de TOUTES les activités de
-    // l'organisation. Elle est désormais refusée dès qu'il existe plusieurs activités :
-    // l'interface transmet l'activité affichée et la suppression reste strictement bornée.
+    // Une remise à zéro sans activité visait l'historique de TOUTES les activités de
+    // l'organisation : elle est refusée dès qu'il existe plusieurs activités.
+    // L'interface transmet l'activité affichée et la remise à zéro reste strictement bornée.
     if(!aid){
       const count=Number((await query('select count(*)::int n from activities where organization_id=$1',[org])).rows[0]?.n||0);
       if(count>1)return reply.code(400).send({error:'ACTIVITY_REQUIRED',message:'La remise à zéro doit viser une activité précise. Sélectionnez l’activité affichée et réessayez.'});
     }
-    if(aid)await query('delete from client_time_sessions where organization_id=$1 and activity_id=$2',[org,aid]);
-    else await query('delete from client_time_sessions where organization_id=$1',[org]);
-    return {ok:true,activityId:aid};
+    // 15.4.58 — la remise à zéro EXCLUT les sessions du compteur (excluded_at) sans les
+    // supprimer : référentiel documentaire §07-6 — l'historique reste disponible pour les
+    // statistiques, les chantiers et l'audit. Les sessions déjà exclues gardent leur date.
+    if(aid){
+      const x=await query('update client_time_sessions set excluded_at=coalesce(excluded_at,now()) where organization_id=$1 and activity_id=$2 and excluded_at is null returning id',[org,aid]);
+      return {ok:true,activityId:aid,excludedSessions:x.rowCount||0};
+    }
+    const x=await query('update client_time_sessions set excluded_at=coalesce(excluded_at,now()) where organization_id=$1 and excluded_at is null returning id',[org]);
+    return {ok:true,activityId:aid,excludedSessions:x.rowCount||0};
   });
   app.get('/time-metrics',async r=>{
     const org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));
@@ -2058,18 +2070,18 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
       coalesce(sum(duration_seconds),0) actual_seconds,
       count(*)::int sessions,count(distinct client_id)::int clients
       from client_time_sessions
-      where organization_id=$1 and ($2::uuid is null or activity_id=$2) and status='completed' and ended_at is not null`,[org,aid])).rows[0];
+      where organization_id=$1 and ($2::uuid is null or activity_id=$2) and excluded_at is null and status='completed' and ended_at is not null`,[org,aid])).rows[0];
     const active=(await query(`select s.id,s.client_id,c.estimated_minutes,s.started_at,c.name client_name
       from client_time_sessions s join clients c on c.id=s.client_id
       where s.organization_id=$1 and ($2::uuid is null or s.activity_id=$2)
-        and s.ended_at is null and s.status='running' limit 1`,[org,aid])).rows[0]||null;
+        and s.excluded_at is null and s.ended_at is null and s.status='running' limit 1`,[org,aid])).rows[0]||null;
     const manual=Number(totals.manual_minutes||0),actual=Number(totals.actual_seconds||0)/60,saved=Math.max(0,manual-actual);
     const sessions=Number(totals.sessions||0);
     return {manualMinutes:manual,actualMinutes:actual,savedMinutes:saved,averageSavedMinutes:sessions?saved/sessions:0,sessions,clients:Number(totals.clients||0),active,activityId:aid};
   });
   app.get('/time-metrics/stats',async r=>{
     const org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));
-    const scope=`organization_id=$1 and ($2::uuid is null or activity_id=$2) and status='completed' and ended_at is not null`;
+    const scope=`organization_id=$1 and ($2::uuid is null or activity_id=$2) and excluded_at is null and status='completed' and ended_at is not null`;
     const rows=(await query(`select date_trunc('day',ended_at)::date as day,coalesce(sum(manual_minutes),0) manual,coalesce(sum(duration_seconds),0)/60.0 actual,count(*)::int sessions from client_time_sessions where ${scope} group by 1 order by 1 desc limit 366`,[org,aid])).rows;
     return {activityId:aid,daily:rows,
       weekly:(await query(`select date_trunc('week',ended_at)::date as week,coalesce(sum(manual_minutes),0) manual,coalesce(sum(duration_seconds),0)/60.0 actual,count(*)::int sessions from client_time_sessions where ${scope} group by 1 order by 1 desc limit 104`,[org,aid])).rows,
@@ -2077,7 +2089,16 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
   });
   app.post('/time-sessions/start',async(r,reply)=>{
     const b:any=r.body||{},org=r.auth!.organizationId,clientId=String(b.clientId||'');
-    const existing=(await query("select id from client_time_sessions where client_id=$1 and organization_id=$2 and user_id=$3 and ended_at is null and status='paused' order by created_at desc limit 1",[clientId,org,r.auth!.userId])).rows[0];if(existing){await query("update client_time_sessions set started_at=now(),paused_at=null,status='running' where id=$1 and organization_id=$2 and user_id=$3",[existing.id,org,r.auth!.userId]);return {id:existing.id,resumed:true};}const hasHistory=Number((await query('select 1 from client_time_sessions where client_id=$1 and organization_id=$2 limit 1',[clientId,org])).rowCount||0)>0;const manual=hasHistory?0:(Number.isFinite(Number(b.manualMinutes))?Number(b.manualMinutes):Number((await query('select estimated_minutes from clients where id=$1 and organization_id=$2',[clientId,org])).rows[0]?.estimated_minutes||0));
+    const existing=(await query("select id from client_time_sessions where client_id=$1 and organization_id=$2 and user_id=$3 and excluded_at is null and ended_at is null and status='paused' order by created_at desc limit 1",[clientId,org,r.auth!.userId])).rows[0];if(existing){await query("update client_time_sessions set started_at=now(),paused_at=null,status='running' where id=$1 and organization_id=$2 and user_id=$3",[existing.id,org,r.auth!.userId]);return {id:existing.id,resumed:true};}
+    // 15.4.58 — moteur du « temps économisé » : l'estimation saisie au démarrage est HONORÉE à
+    // chaque prise en charge (l'aide à l'écran demande de la saisir au début de CHAQUE
+    // intervention). Sans saisie explicite : la première session comptabilisée repart de
+    // l'estimation de la fiche client ; ensuite 0 — aucune estimation n'est inventée.
+    // L'ancien `hasHistory ? 0 : …` écrasait la saisie par 0 dès la deuxième session :
+    // Σ manuel = 0 → temps économisé bloqué à 0 (défaut corrigé).
+    const providedManual=Number.isFinite(Number(b.manualMinutes))?Math.max(0,Number(b.manualMinutes)):null;
+    const hasHistory=Number((await query('select 1 from client_time_sessions where client_id=$1 and organization_id=$2 and excluded_at is null limit 1',[clientId,org])).rowCount||0)>0;
+    const manual=providedManual!=null?providedManual:(hasHistory?0:Number((await query('select estimated_minutes from clients where id=$1 and organization_id=$2',[clientId,org])).rows[0]?.estimated_minutes||0));
     if(!clientId||!Number.isFinite(manual)||manual<0||manual>100000)return reply.code(400).send({error:'INVALID_INPUT'});
     const aid=await ensureActivity(r,activityId(r,b));if(!aid)return reply.code(400).send({error:'INVALID_INPUT'});
     const c=await query('select id from clients where id=$1 and organization_id=$2 and activity_id=$3',[clientId,org,aid]);if(!c.rowCount)return reply.code(400).send({error:'INVALID_INPUT'});

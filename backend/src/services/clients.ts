@@ -23,7 +23,7 @@ export async function clientSummary(orgId: string, id: string) {
   const invoices = docs.filter((d: any) => d.document_type === 'invoice'), quotes = docs.filter((d: any) => d.document_type !== 'invoice');
   const lastBilling = (await query(`select invoice_address_source from quotes where client_id=$1 and organization_id=$2 and invoice_address_source is not null order by updated_at desc limit 1`, [id, orgId])).rows[0]?.invoice_address_source || null;
   const tm=(await query(`select coalesce(sum(manual_minutes),0) manual_minutes,coalesce(sum(duration_seconds),0) actual_seconds,count(*)::int completed_sessions
-    from client_time_sessions where client_id=$1 and organization_id=$2 and status='completed' and ended_at is not null`,[id,orgId])).rows[0];
+    from client_time_sessions where client_id=$1 and organization_id=$2 and excluded_at is null and status='completed' and ended_at is not null`,[id,orgId])).rows[0];
   // La comparaison ne porte que sur les sessions réellement terminées, pas sur un temps estimé
   // de fiche client qui n'a jamais été chronométré.
   const estimatedMinutes=Number(tm?.manual_minutes||0), actualMinutes=Number(tm?.actual_seconds||0)/60;
