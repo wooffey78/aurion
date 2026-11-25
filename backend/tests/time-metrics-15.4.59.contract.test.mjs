@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 
 const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 const business = read('backend/src/routes/business.ts');
+  const clients = read('backend/src/services/clients.ts');
 const api = read('assets/js/core/api.js');
 const sheet = read('assets/js/pages/dash/clientsheet.js');
 
@@ -141,3 +142,9 @@ test('Chantiers : retour au masquage par activité (fonctionnement antérieur à
   assert.match(pfFront, /chantiers: false/);
   assert.doesNotMatch(pfFront, /chantiers: true/);
 });
+
+// 15.4.65 — formule harmonisée : baseline de 20 minutes par session terminée (compteur
+// global ET stats par client), temps économisé jamais négatif.
+assert.match(business, /MANUAL_BASELINE_MINUTES=20/);
+assert.match(business, /greatest\(coalesce\(manual_minutes,0\),\$\{MANUAL_BASELINE_MINUTES\}\)/);
+assert.match(clients, /greatest\(coalesce\(manual_minutes,0\),20\)/);

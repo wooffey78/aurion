@@ -1181,7 +1181,8 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="
    (facturation électronique Tiime, paiements Stripe), mention discrète au design Aurion. */
 .app-footer{margin-top:auto;padding:18px clamp(14px,4vw,32px);border-top:1px solid var(--line);background:linear-gradient(180deg,rgba(201,220,244,.06),rgba(201,220,244,0))}
 .app-footer-inner{max-width:1200px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 20px;font-size:.82rem}
-.app-footer-brand{font-weight:800;letter-spacing:.14em;color:var(--muted)}
+.app-footer-brand{font-weight:800;letter-spacing:.14em;color:var(--muted);display:inline-flex;align-items:center;gap:8px}
+.app-footer-logo{width:20px;height:20px;flex:0 0 auto}
 .app-footer-links{display:flex;flex-wrap:wrap;gap:6px 14px}
 .app-footer-links a,.app-footer-partners a{color:var(--muted);text-decoration:none;border-bottom:1px dotted rgba(130,178,154,.55)}
 .app-footer-links a:hover,.app-footer-partners a:hover{color:var(--text);border-bottom-color:rgba(130,178,154,.95)}

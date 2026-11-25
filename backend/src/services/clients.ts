@@ -22,7 +22,8 @@ export async function clientSummary(orgId: string, id: string) {
   const devices = (await query(`select id,type,brand,model,imei,serial_number from devices where client_id=$1 and organization_id=$2 order by created_at desc limit 30`, [id, orgId])).rows;
   const invoices = docs.filter((d: any) => d.document_type === 'invoice'), quotes = docs.filter((d: any) => d.document_type !== 'invoice');
   const lastBilling = (await query(`select invoice_address_source from quotes where client_id=$1 and organization_id=$2 and invoice_address_source is not null order by updated_at desc limit 1`, [id, orgId])).rows[0]?.invoice_address_source || null;
-  const tm=(await query(`select coalesce(sum(manual_minutes),0) manual_minutes,coalesce(sum(duration_seconds),0) actual_seconds,count(*)::int completed_sessions
+  // 15.4.65 — même baseline de 20 minutes par session terminée que le compteur global (harmonisation).
+  const tm=(await query(`select coalesce(sum(greatest(coalesce(manual_minutes,0),20)),0) manual_minutes,coalesce(sum(duration_seconds),0) actual_seconds,count(*)::int completed_sessions
     from client_time_sessions where client_id=$1 and organization_id=$2 and excluded_at is null and status='completed' and ended_at is not null`,[id,orgId])).rows[0];
   // La comparaison ne porte que sur les sessions réellement terminées, pas sur un temps estimé
   // de fiche client qui n'a jamais été chronométré.

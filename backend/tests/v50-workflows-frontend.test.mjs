@@ -72,8 +72,11 @@ test('interface : charts.js quatre types, barre de commutation, refus honnête d
   assert.match(dash, /loadProfileFeatures/);
   assert.match(dash, /features:cachedFlags\(\)/);
   const other = read('../../assets/js/pages/dash/other.js');
-  assert.match(other, /home-visual-analysis/);
-  assert.match(other, /chartToolbar\('chart-home-ca'/);
+  // 15.4.65 — exigence exploitant : plus de diagrammes dans la comptabilité/trésorerie
+  // (le panneau « Analyse visuelle » de l'accueil est supprimé, bind compris).
+  assert.doesNotMatch(other, /home-visual-analysis/);
+  assert.doesNotMatch(other, /chart-home-ca/);
+  assert.doesNotMatch(other, /Réalisé encaissé/);
   const pf = read('../../assets/js/core/profile-features.js');
   assert.match(pf, /Repli conservateur/);
   assert.match(pf, /chantiers: false/);

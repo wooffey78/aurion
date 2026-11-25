@@ -92,6 +92,10 @@ export async function bind(){
   if(!q&&S.prefillClient){$('#qclient').value=S.prefillClient;S.prefillClient=null}
     // 15.4.63 — multi-prestations : les lignes « service » (prestations complémentaires) sont
     // séparées des pièces ; leur prix TTC est reconstitué depuis le HT stocké et la TVA du document.
+    // 15.4.65 — CORRECTIF : la déclaration est remontée AVANT la restauration du brouillon
+    // (elle se trouvait plus bas dans le bind : « Cannot access 'serviceExtras' before
+    // initialization » tuait tout le bind — calculateur, suggestions, boutons, enregistrement).
+    let serviceExtras=[];
     const vatReload=Number(q?.vat_rate??active()?.vat_rate??0)||0;
     lines=q?(q.items||[]).filter(i=>i.kind!=='service').map(i=>({label:i.label,quantity:Number(i.quantity),unitCost:Number(i.unitCost),unitPrice:i.unitPrice==null?'':Number(i.unitPrice),partId:i.partId,saleCoefficientPercent:Number(i.saleCoefficientPercent??0),activityCategory:i.activityCategory||null})):[];
     serviceExtras=q?(q.items||[]).filter(i=>i.kind==='service').map(i=>({label:String(i.label||''),price:Number(((Number(i.unitPrice)||0)*(1+vatReload/100)).toFixed(2))})):[];
@@ -194,9 +198,8 @@ export async function bind(){
   };
   let learnedParts=[];
   let detectedService=null;
-  // 15.4.63 — prestations complémentaires : réparations supplémentaires ajoutées et retirées
-  // librement ; leur total s'ajoute au TTC du document et figure sur le PDF comme ligne « service ».
-  let serviceExtras=[];
+  // 15.4.63 — prestations complémentaires : ajout et retrait libres ; le total s'ajoute au TTC
+  // du document et figure sur le PDF comme ligne « service » (déclaration plus haut : TDZ corrigé).
   // Les redraws périodiques (détection de prestation, 350 ms après la saisie) préservent
   // toujours les valeurs tapées non encore validées.
   const syncLinesFromDom=()=>{document.querySelectorAll('.line-row').forEach(row=>{const l=lines[Number(row.dataset.i)];if(!l)return;const g=s=>row.querySelector(s)?.value;const label=g('.ln-label');if(label!=null)l.label=label;const qty=g('.ln-qty');if(qty!=null)l.quantity=qty;const cost=g('.ln-cost');if(cost!=null)l.unitCost=cost;const sale=g('.ln-sale');if(sale!=null)l.unitPrice=sale;const cat=g('.ln-cat');if(cat!=null)l.activityCategory=cat||null})};

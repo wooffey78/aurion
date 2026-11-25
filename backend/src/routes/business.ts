@@ -2156,7 +2156,12 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
   });
   app.get('/time-metrics',async r=>{
     const org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));
-    const totals=(await query(`select coalesce(sum(manual_minutes),0) manual_minutes,
+    // 15.4.65 — formule harmonisée : chaque session terminée représente au minimum 20 minutes de
+    // travail MANUEL (recherche tarifaire, calculs HT/TVA/marges, mise en forme, archivage), même
+    // si aucune estimation n'a été saisie ou si l'estimation saisie est plus basse. Le temps
+    // économisé reste la différence manuel − réel, jamais négative.
+    const MANUAL_BASELINE_MINUTES=20;
+    const totals=(await query(`select coalesce(sum(greatest(coalesce(manual_minutes,0),${MANUAL_BASELINE_MINUTES})),0) manual_minutes,
       coalesce(sum(duration_seconds),0) actual_seconds,
       count(*)::int sessions,count(distinct client_id)::int clients
       from client_time_sessions

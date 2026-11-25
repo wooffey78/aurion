@@ -24,7 +24,7 @@ let lastUserInteractionAt = Date.now();
 let lastDashboardSummaryRefreshAt = 0, lastFinancialRefreshAt = 0;
 let lifecycleRefreshInstalled=false,lastBackgroundRefreshAt=0,backgroundRefreshRunning=false;
 let lastRenderedFinancialSnapshot = null;
-for (const eventName of ['pointerdown', 'keydown', 'input', 'change']) {
+for (const eventName of ['pointerdown', 'keydown', 'input', 'change', 'wheel', 'scroll', 'touchstart']) {
   document.addEventListener(eventName, () => { lastUserInteractionAt = Date.now(); }, true);
 }
 function financialSnapshot() {
@@ -301,7 +301,7 @@ function installBackgroundRefresh(){
   });
   window.addEventListener('focus',()=>maybeRefresh(true),{passive:true});
   window.addEventListener('online',()=>maybeRefresh(true),{passive:true});
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')maybeRefresh(true)});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){maybeRefresh(true);try{maybeSyncShellAvatar()}catch{}}});
   window.setInterval(()=>maybeRefresh(false),45000);
 }
 
@@ -385,6 +385,9 @@ export async function renderDashboard(){
   window.__aurionMetricsTimer=setInterval(async()=>{
     if(metricsRefreshInProgress)return;
     metricsRefreshInProgress=true;
+    // 15.4.65 — l'avatar de la bulle se resynchronise en tâche de fond (throttle 60 s) :
+    // une image téléversée apparaît dans la bulle même après un échec transitoire.
+    try{maybeSyncShellAvatar()}catch{}
     const viewAtStart=S.view;
     try{
       if(viewAtStart==='home'&&Date.now()-lastDashboardSummaryRefreshAt>=30000){
@@ -418,8 +421,11 @@ export async function renderDashboard(){
           const focused=document.activeElement;
           const editing=!!(viewRoot&&focused&&viewRoot.contains(focused)&&focused.matches('input,textarea,select,[contenteditable="true"]'));
           const modalOpen=!!document.querySelector('.modal-backdrop,.confirm-backdrop');
-          const recentInteraction=Date.now()-lastUserInteractionAt<1200;
-          if(!editing&&!modalOpen&&!recentInteraction)show(viewAtStart);
+          // 15.4.65 — même garde de 12 s que le rafraîchissement d'arrière-plan : un clic ou un
+          // scroll suffit à suspendre le re-rendu ; et le snapshot est resynchronisé après le
+          // re-rendu pour qu'aucune boucle d'affichage ne puisse se répéter.
+          const recentInteraction=Date.now()-lastUserInteractionAt<12000;
+          if(!editing&&!modalOpen&&!recentInteraction){show(viewAtStart);lastRenderedFinancialSnapshot=financialSnapshot()}
         }
       }
     }catch{}finally{metricsRefreshInProgress=false;}

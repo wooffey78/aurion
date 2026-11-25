@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Logo Aurion">
+  <defs>
+    <linearGradient id="aurionMark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8cb8a8"/>
+      <stop offset="1" stop-color="#4e7569"/>
+    </linearGradient>
+  </defs>
+  <!-- Marque « A » d'Aurion — fond volontairement absent : logo détouré, fond transparent -->
+  <path d="M32 5 L59 59 H46.5 L32 28.5 L17.5 59 H5 Z" fill="url(#aurionMark)"/>
+  <path d="M32 35 L43.5 59 H20.5 Z" fill="#82b29a" opacity=".5"/>
+</svg>

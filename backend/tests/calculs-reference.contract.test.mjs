@@ -14,7 +14,7 @@ const xlsxPath = new URL('../../assets/reference/AURION-classeur-calculs.xlsx', 
 test('le classeur Excel de référence existe et est non vide', () => {
   assert.ok(existsSync(xlsxPath), 'classeur manquant');
   assert.ok(statSync(xlsxPath).size > 1000, 'classeur vide');
-  assert.equal(ref.version, '15.4.64');
+  assert.equal(ref.version, '15.4.65');
 });
 
 const round2 = v => Math.round(Number(v) * 100) / 100;
