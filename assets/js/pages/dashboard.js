@@ -4,7 +4,7 @@ import{appLogo,toast,startLocalClock}from'../core/ui.js';
 import{invalidateSession}from'../core/session.js';
 import{go,routeQuery}from'../core/router.js';
 import{hiddenViews,navigationItems}from'../core/navigation.js';
-import{S,e,hooks,active,prof,money,askConfirm}from'./dash/core.js';
+import{S,e,hooks,active,money,askConfirm}from'./dash/core.js';
 import*as catalog from'./dash/catalog.js';
 import{suppliers}from'./dash/suppliers.js';
 import*as quote from'./dash/quote.js';
@@ -202,16 +202,40 @@ function paintShell(){
   const a=active();
   // 15.4.63 — barre supérieure jamais bloquée par une donnée absente : chaque champ tolère
   // l'absence de société/activité.
-  // 15.4.66 (consigne éditeur) : la bulle avatar de la barre supérieure est remplacée par un
-  // simple lien « Mon compte » au design Aurion — plus de synchronisation d'image en bulle.
+  // 15.4.67 (consigne éditeur) : la bulle d'activité de la barre supérieure (« Réparation
+  // smartphone / tablette ») disparaît ; le lien « Mon compte » devient un lien-image arrondi
+  // qui reprend l'avatar téléversé dans « Mon compte » (repli : initiales du compte).
   document.querySelector('#shell-company').textContent=`ENTREPRISE · ${S.company?.name||'Entreprise'}`;
   document.querySelector('#shell-activity').textContent=a?.name||'Activité';
-  document.querySelector('#shell-pill').textContent=prof().title||a?.name||'';
 }
 
-// 15.4.66 (consigne éditeur) : toute la mécanique « avatar de la barre supérieure » (cache
-// Cache API, blob objet, resynchronisations) est retirée avec la bulle ; le lien « Mon compte »
-// n'affiche aucune image. L'avatar téléversé reste disponible dans la page Mon compte.
+// 15.4.67 — lien-image arrondi de la barre supérieure : l'avatar téléversé dans « Mon compte »
+// (fetch authentifié → blob) remplace les initiales ; la page Mon compte signale toute mise à
+// jour par l'événement « aurion:avatar-updated ». Aucun échec n'empêche jamais la navigation.
+let shellAvatarToken=0;
+async function refreshShellAvatar(){
+  const el=document.getElementById('shell-avatar');if(!el)return;
+  const token=++shellAvatarToken;
+  try{
+    const acc=await api.account();
+    if(token!==shellAvatarToken)return;
+    const name=String(acc?.user?.fullName||acc?.user?.email||'');
+    const init=name.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]?.toUpperCase()||'').join('')||'·';
+    el.textContent=init;el.dataset.initials=init;el.classList.remove('has-photo');
+    const res=await api.authFetch('/account/avatar');
+    if(token!==shellAvatarToken)return;
+    if(res.ok){
+      const b=await res.blob();
+      if(b&&b.size>0&&b.type.startsWith('image/')){
+        el.innerHTML='';
+        const img=document.createElement('img');img.alt='';img.src=URL.createObjectURL(b);
+        img.onerror=()=>{img.remove();el.textContent=el.dataset.initials||'·';el.classList.remove('has-photo')};
+        el.append(img);el.classList.add('has-photo');
+      }
+    }
+  }catch{/* initiales conservées */}
+}
+window.addEventListener('aurion:avatar-updated',()=>{refreshShellAvatar()});
 
 function installBackgroundRefresh(){
   if(lifecycleRefreshInstalled)return;lifecycleRefreshInstalled=true;
@@ -248,7 +272,7 @@ export async function renderDashboard(){
   await load([...(EXTRAS[initialView]||[])],initialView);
   if(initialView==='accounting'||initialView==='treasury')lastFinancialRefreshAt=Date.now();
   lastBackgroundRefreshAt=Date.now();installBackgroundRefresh();installDataGoDelegation();
-  document.querySelector('#app').innerHTML=`<div class="dashboard-shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#/dashboard" aria-label="Aurion — retour au tableau de bord" title="Retour au tableau de bord">${appLogo('42')}<span>AURION<small>PRO</small></span></a><button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar"><span></span><span></span><span></span></button><nav class="nav" aria-label="Navigation principale"></nav><div class="sidebar-bottom"><button id="logout" class="nav-logout">Quitter</button><div class="status-dot"><i></i> Système opérationnel</div></div></aside><section class="workspace"><header class="dashboard-top"><div class="activity-switch"><span class="eyebrow" id="shell-company"></span><button id="activity-picker" class="activity-picker"><span>ACTIVITÉ ACTIVE</span><strong id="shell-activity"></strong><small>▾</small></button></div><div class="top-actions"><span class="pill shell-clock" id="local-clock" aria-label="Heure locale" title="Heure locale de votre appareil"></span><span class="pill" id="shell-pill"></span><button class="btn secondary small" id="fs-toggle" type="button" title="Activer le plein écran" aria-label="Activer le plein écran" aria-pressed="false"><span class="fs-icon" aria-hidden="true">⛶</span><span class="fs-label">Plein écran</span></button><a class="account-link" href="#/dashboard?view=account" title="Mon compte">Mon compte</a></div></header><main id="main" class="content"><div id="view"></div></main></section></div><div id="activity-modal-root"></div>`;
+  document.querySelector('#app').innerHTML=`<div class="dashboard-shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#/dashboard" aria-label="Aurion — retour au tableau de bord" title="Retour au tableau de bord">${appLogo('42')}<span>AURION<small>PRO</small></span></a><button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar"><span></span><span></span><span></span></button><nav class="nav" aria-label="Navigation principale"></nav><div class="sidebar-bottom"><button id="logout" class="nav-logout">Quitter</button><div class="status-dot"><i></i> Système opérationnel</div></div></aside><section class="workspace"><header class="dashboard-top"><div class="activity-switch"><span class="eyebrow" id="shell-company"></span><button id="activity-picker" class="activity-picker"><span>ACTIVITÉ ACTIVE</span><strong id="shell-activity"></strong><small>▾</small></button></div><div class="top-actions"><span class="pill shell-clock" id="local-clock" aria-label="Heure locale" title="Heure locale de votre appareil"></span><button class="btn secondary small" id="fs-toggle" type="button" title="Activer le plein écran" aria-label="Activer le plein écran" aria-pressed="false"><span class="fs-icon" aria-hidden="true">⛶</span><span class="fs-label">Plein écran</span></button><a class="account-link account-avatar-link" href="#/dashboard?view=account" title="Mon compte" aria-label="Mon compte"><span class="account-avatar-bubble" id="shell-avatar">···</span></a></div></header><main id="main" class="content"><div id="view"></div></main></section></div><div id="activity-modal-root"></div>`;
   // Horloge unique de la coquille : visible sur toute la navigation, jamais dupliquée par vue.
   startLocalClock(document.getElementById('local-clock'));
   // File locale des documents cloud : liée à l'entreprise de la session (jamais d'envoi pour un autre compte de l'appareil).
@@ -292,7 +316,7 @@ export async function renderDashboard(){
     finally{syncFullscreenButton()}
   };
   syncFullscreenButton();
-  paintShell();show(initialView);
+  paintShell();refreshShellAvatar();show(initialView);
   // 15.4.54 (PROMPT D2) — bannière de re-acceptation contractuelle : à chaque montée de version
   // des documents (CGU / confidentialité / DPA), le compte est invité à accepter les documents
   // à jour. Les documents en brouillon ne déclenchent jamais la bannière (jamais bloquants) et
@@ -328,19 +352,19 @@ export async function renderDashboard(){
         // dépendance au nombre exact de cartes d'action (le compteur restait figé si la grille
         // changeait) ni aux libellés trouvés par balayage.
         const homeRevenue=document.querySelector('#home-month-revenue');if(homeRevenue)homeRevenue.textContent=money(S.dashboardCounters?.forecast?.monthHt||0);
-        const homeClients=document.querySelector('#home-clients');if(homeClients)homeClients.textContent=String(S.clients.length);
-        const homeQuotes=document.querySelector('#home-open-quotes');if(homeQuotes)homeQuotes.textContent=String(S.quotes.filter(q=>q.document_type!=='invoice'&&!['canceled','cancelled','rejected','void','deleted'].includes(String(q.status||'').toLowerCase())).length);
         const homeRdv=document.querySelector('#home-rdv');if(homeRdv)homeRdv.textContent=String(Number(S.dashboardCounters?.upcomingAppointments??0));
         const ticketCaption=document.querySelector('#home-tickets-caption');if(ticketCaption)ticketCaption.textContent=`${Number(S.dashboardCounters?.tickets||0)} ticket(s) non traité(s)`;
-        const entriesCaption=document.querySelector('#home-entries-caption');if(entriesCaption)entriesCaption.textContent=`${money(S.dashboardCounters?.forecastEntries||0)} à venir · TTC, SAV déduits`;
+        // 15.4.67 — les encarts « Clients », « Devis en cours » et « Entrées prévues » sont
+        // supprimés (consigne éditeur) : leurs mises à jour périodiques disparaissent avec eux.
         S.timeMetrics=await api.timeMetrics();
         if(S.view==='home'){
-          const map={manualMinutes:Number(S.timeMetrics?.manualMinutes||0).toFixed(0),actualMinutes:Number(S.timeMetrics?.actualMinutes||0).toFixed(0),savedMinutes:Number(S.timeMetrics?.savedMinutes||0).toFixed(0),averageSavedMinutes:Number(S.timeMetrics?.averageSavedMinutes||0).toFixed(1)};
-          const metricCards=[...document.querySelectorAll('#view .metrics article')].slice(-4);
-          if(metricCards.length===4){
-            const values=[map.manualMinutes+' min',map.actualMinutes+' min',map.savedMinutes+' min',map.averageSavedMinutes+' min'];
-            metricCards.forEach((card,index)=>{const value=card.querySelector('b');if(value)value.textContent=values[index]});
-          }
+          // 15.4.67 — mise à jour par identifiants dédiés du panneau « Temps économisé »
+          // (temps manuel FIXE par client, compté une fois quel que soit le nombre de sessions).
+          const tmSet=(id,val)=>{const el=document.querySelector(id);if(el)el.textContent=val};
+          tmSet('#tm-manual',`${Number(S.timeMetrics?.manualMinutes||0).toFixed(0)} min`);
+          tmSet('#tm-actual',`${Number(S.timeMetrics?.actualMinutes||0).toFixed(0)} min`);
+          tmSet('#tm-saved',`${Number(S.timeMetrics?.savedMinutes||0).toFixed(0)} min`);
+          tmSet('#tm-average',`${Number(S.timeMetrics?.averageSavedMinutes||0).toFixed(1)} min`);
         }
       }else if((viewAtStart==='accounting'||viewAtStart==='treasury')&&S.view===viewAtStart&&Date.now()-lastFinancialRefreshAt>=30000){
         await load(['accounting','treasury']);

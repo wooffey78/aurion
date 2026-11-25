@@ -24,8 +24,10 @@ test('accueil et trésorerie partagent le même calcul de devis TTC et SAV finan
   // La trésorerie sépare les deux populations : potentiel = devis NON signés uniquement.
   assert.match(routes, /potentialIn=rows\.filter\(\(x:any\)=>x\.document_type==='quote'&&String\(x\.status\|\|''\)\.toLowerCase\(\)!=='accepted'\)/);
   assert.match(routes, /signedIn:cashForecast\.quotesTtc/);
-  assert.match(ui, /Entrées prévues/);
-  assert.match(ui, /TTC, SAV déduits/);
+  // 15.4.67 — l'encart « Entrées prévues » de l'accueil disparaît ; le moteur partagé
+  // (accueil ⇄ trésorerie) reste unique via le panneau « Horizon de facturation ».
+  assert.doesNotMatch(ui, /id="home-entries-caption"/);
+  assert.match(ui, /Horizon de facturation/);
   assert.match(ui, /Devis SIGNÉS \(acceptés par le client\) TTC diminués des SAV financiers/);
 });
 

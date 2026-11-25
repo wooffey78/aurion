@@ -54,7 +54,7 @@ export async function renderLegal(kind){
   if(!target){box.innerHTML='<p class="muted">Aucun document disponible.</p>';return}
   try{
     const d=await api.legalDoc(target);
-    box.innerHTML=`<div class="legal-meta"><span class="pill">Version ${e(d.version)}</span>${d.is_draft?'<span class="pill warn">Brouillon : non validé juridiquement</span>':''}<span class="muted">Publié le ${new Date(d.published_at).toLocaleDateString('fr-FR')}</span></div><h1>${e(d.title)}</h1>${md(d.body)}`;
+    box.innerHTML=`<div class="legal-meta"><span class="pill">Version ${e(d.version)}</span><span class="muted">Publié le ${new Date(d.published_at).toLocaleDateString('fr-FR')}</span></div><h1>${e(d.title)}</h1>${md(d.body)}`;
   }catch(x){box.innerHTML=`<p class="error">${e(x.message)}</p>`}
 }
 

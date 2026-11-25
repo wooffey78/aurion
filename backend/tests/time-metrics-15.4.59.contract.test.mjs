@@ -143,12 +143,12 @@ test('Chantiers : retour au masquage par activité (fonctionnement antérieur à
   assert.doesNotMatch(pfFront, /chantiers: true/);
 });
 
-// 15.4.66 — formule harmonisée (consigne éditeur) : chaque session terminée représente au
-// minimum 1 minute de travail manuel (compteur global ET stats par client), temps économisé
-// jamais négatif.
-assert.match(business, /MANUAL_BASELINE_MINUTES=1;/);
-assert.match(business, /greatest\(coalesce\(manual_minutes,0\),\$\{MANUAL_BASELINE_MINUTES\}\)/);
-assert.match(clients, /greatest\(coalesce\(manual_minutes,0\),1\)/);
+// 15.4.67 — temps manuel FIXE PAR CLIENT (consigne éditeur) : l'estimation de chaque client
+// compte UNE SEULE FOIS quel que soit le nombre de sessions terminées ; le temps réel reste
+// la somme des durées ; temps économisé jamais négatif.
+assert.match(business, /sum\(c\.estimated_minutes\),0\) manual_minutes/);
+assert.match(business, /distinct s\.client_id/);
+assert.match(clients, /estimatedMinutes=Number\(c\.estimated_minutes\|\|0\)/);
 
 // 15.4.66 — cycle de vie du compteur (consigne éditeur) : OUVRIR la fiche client lance le
 // chrono, la SORTIE de la fiche l'arrête automatiquement (aucune session ouverte à l'infini),

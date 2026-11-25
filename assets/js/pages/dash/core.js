@@ -56,17 +56,38 @@ export async function confirmDelete(message,action,done='Supprimé',{title='Conf
   try{await action();toast(done,'success');await hooks.refresh()}catch(x){toast(x.message,'error')}
 }
 
+/** 15.4.67 (consigne éditeur) — visionneuse intégrée : les PDF (fiche client, fiche produit,
+ * fiche fournisseur, facture, devis, justificatifs) s'affichent dans une fenêtre Aurion en
+ * blob: (autorisé par la CSP). Plus jamais d'onglet « about:blank » : l'ancien motif
+ * window.open('') + assignation différée laissait une page blanche dès que la popup était
+ * bloquée ou lente, notamment sur mobile. « Ouvrir dans un onglet » reste disponible. */
+export function showPdfViewer(blob,title){
+  const url=URL.createObjectURL(blob);
+  const root=document.createElement('div');
+  root.className='modal-backdrop pdf-viewer-backdrop';
+  const isPdf=String(blob.type||'')==='application/pdf';
+  const safeTitle=e(String(title||'Document'));
+  root.innerHTML=`<section class="modal glass pdf-viewer" role="dialog" aria-modal="true" aria-label="${safeTitle}"><header class="pdf-viewer-head"><b class="pdf-viewer-title">${safeTitle}</b><div class="button-row"><a class="btn secondary small" href="${url}" target="_blank" rel="noopener">Ouvrir dans un onglet</a><a class="btn primary small" href="${url}" download="${safeTitle.replace(/[^\w.\-]+/g,'_')}">Télécharger</a><button type="button" class="icon-btn" data-pdf-close aria-label="Fermer">×</button></div></header><div class="pdf-viewer-body">${isPdf?`<embed src="${url}" type="application/pdf">`:`<img class="pdf-viewer-image" src="${url}" alt="${safeTitle}">`}</div></section>`;
+  document.body.append(root);
+  const close=()=>{document.removeEventListener('keydown',onKey);root.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)};
+  const onKey=ev=>{if(ev.key==='Escape')close()};
+  document.addEventListener('keydown',onKey);
+  root.addEventListener('click',ev=>{if(ev.target===root||ev.target.closest('[data-pdf-close]'))close()});
+}
+
 /** Ouvre (aperçu PDF) ou télécharge un document généré ; une erreur s'affiche dans Aurion, jamais sur une page blanche du navigateur. */
 async function fetchAndOpen(url,mode,fallbackName,extraHeaders={}){
-  const w=mode==='view'?window.open('','_blank'):null;
   try{
     const res=await api.authFetch(url.replace(api.baseUrl,''),{headers:extraHeaders});
     if(!res.ok){let msg='Le document n\u2019a pas pu \u00eatre ouvert.';try{msg=(await res.json()).message||msg}catch{}throw new Error(msg)}
     const blob=await res.blob(),name=(res.headers.get('content-disposition')||'').match(/filename="?([^";]+)/)?.[1]||fallbackName;
+    // 15.4.67 — aperçu des PDF dans la visionneuse intégrée d'Aurion (aucune popup, aucun
+    // about:blank) ; les autres types d'aperçu passent par un onglet direct vers l'URL blob.
+    if(mode==='view'&&blob.type==='application/pdf'){showPdfViewer(blob,name);return}
     const obj=URL.createObjectURL(blob);
-    if(w){w.location.href=obj;setTimeout(()=>URL.revokeObjectURL(obj),120000)}
+    if(mode==='view'){window.open(obj,'_blank','noopener');setTimeout(()=>URL.revokeObjectURL(obj),120000)}
     else{const a=document.createElement('a');a.href=obj;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(obj),10000);toast(`${name} t\u00e9l\u00e9charg\u00e9`,'success')}
-  }catch(x){w?.close();toast(x.message,'error')}
+  }catch(x){toast(x.message,'error')}
 }
 
 export function openDoc(kind,id,ext,mode){

@@ -1063,18 +1063,54 @@ input:-webkit-autofill,textarea:-webkit-autofill,select:-webkit-autofill{box-sha
   .landing-visual img{position:static;width:100%;max-width:640px;height:auto;margin:6px auto 0;border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow)}
 }
 .auth-card h1{font-size:clamp(1.5rem,3vw,2.2rem)}
-/* 15.4.66 — lien « Mon compte » (la bulle avatar de la coquille est supprimée) : lien simple
-   au design Aurion, dans la barre supérieure. Le bloc de dimensionnement de l'ancien
-   avatar (.avatar, « Bloc 10 ») est retiré avec lui. */
+/* 15.4.67 — lien « Mon compte » = lien-IMAGE arrondi : reprend l'avatar téléversé dans
+   « Mon compte » (repli : initiales du compte). La bulle d'activité de la barre supérieure
+   (ex. « Réparation smartphone / tablette ») est supprimée. */
 .account-link{display:inline-flex;align-items:center;min-height:34px;padding:6px 12px;border:1px solid var(--line);border-radius:11px;color:var(--text);background:rgba(201,220,244,.03);font-weight:650;font-size:.85rem;letter-spacing:.02em;transition:.22s ease}
 .account-link:hover{transform:translateY(-2px);border-color:rgba(130,178,154,.7);box-shadow:0 12px 30px rgba(130,178,154,.12)}
+.account-link.account-avatar-link{padding:3px;border-radius:50%}
+.account-avatar-bubble{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--accent);font-weight:700;font-size:.78rem;letter-spacing:.04em;overflow:hidden;position:relative}
+.account-avatar-bubble img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+/* 15.4.67 — photo de fiche client : l'image téléversée couvre les initiales (fiche + liste). */
+.avatar-photo{position:relative;overflow:hidden}
+.avatar-photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+.avatar-photo.has-photo{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 55%,transparent)}
+/* 15.4.67 — visionneuse PDF intégrée : plus jamais d'onglet « about:blank ». */
+.pdf-viewer-backdrop{z-index:220}
+.pdf-viewer{width:min(1080px,96vw);height:min(92vh,900px);display:flex;flex-direction:column;gap:0;padding:14px}
+.pdf-viewer-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.pdf-viewer-title{font-size:.95rem;color:var(--text)}
+.pdf-viewer-body{flex:1;min-height:0;border-radius:10px;overflow:hidden;background:#fff;border:1px solid var(--line)}
+.pdf-viewer-body embed,.pdf-viewer-body iframe{width:100%;height:100%;border:0;display:block}
+.pdf-viewer-image{max-width:100%;max-height:100%;margin:0 auto;display:block;object-fit:contain}
+/* 15.4.67 — « Derniers documents » : factures et devis regroupés, sous-menus dépliables. */
+.doc-groups{display:flex;flex-direction:column;gap:8px}
+.doc-group-toggle{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:rgba(201,220,244,.03);color:var(--text);font-weight:650;font-size:.9rem;cursor:pointer;text-align:left;transition:.18s ease}
+.doc-group-toggle:hover{border-color:rgba(130,178,154,.7)}
+.doc-group-toggle .pill{margin-left:auto}
+.doc-group-caret{color:var(--muted);font-size:.8rem}
+.doc-group-list{padding:4px 6px 4px 14px;border-left:2px solid color-mix(in srgb,var(--accent) 35%,transparent);margin:6px 0 2px 10px;display:flex;flex-direction:column;gap:2px}
+/* 15.4.67 — « Horizon » : graphique natif (barres groupées) à côté du tableau. */
+.forecast-chart-wrap{margin-top:6px}
+.forecast-chart{width:100%;height:auto;max-height:300px}
+.forecast-chart-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;color:var(--muted);font-size:.8rem}
+.forecast-chart-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+/* 15.4.67 — remise TTC dans l'éditeur de devis/facture. */
+.discount-row .grid-2{align-items:center}
+.calc-discount b{color:#f87171}
 /* Bloc 11 — horloge : composant dédié, chiffres tabulaires, secondes discrètes */
 #local-clock{display:inline-flex;align-items:baseline;gap:6px}
 /* Horloge de la coquille : visible sur toutes les vues, aux couleurs Aurion. */
 .shell-clock{display:inline-flex;align-items:center;gap:6px;border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 10%,transparent);padding:5px 12px}
 #local-clock .clock-main{font-variant-numeric:tabular-nums;font-size:1.05rem;font-weight:700;color:var(--accent);letter-spacing:.04em}
 #local-clock .clock-sec{font-variant-numeric:tabular-nums;font-size:.74rem;color:color-mix(in srgb,var(--accent) 62%,var(--muted))}
-@media(max-width:720px){.shell-clock{display:none}}
+/* 15.4.67 — horloge de la coquille : lisible sur mobile aussi (consigne éditeur) — plus de
+   masquage : fond transparent, texte au-dessus du reste du bandeau (z-index), taille réduite. */
+@media(max-width:720px){
+  .shell-clock{display:inline-flex;background:transparent;border-color:transparent;padding:2px 2px;position:relative;z-index:30}
+  #local-clock .clock-main{font-size:.92rem}
+  #local-clock .clock-sec{font-size:.62rem}
+}
 /* Bloc 9 — harmonisation des encarts touchés (tokens existants, sobre, sans refonte) */
 .month-history summary{display:flex;justify-content:space-between;align-items:center;gap:15px;cursor:pointer;padding:13px 0;border-bottom:1px solid rgba(185,196,190,.1);list-style:none}
 .month-history summary::-webkit-details-marker{display:none}

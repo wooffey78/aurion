@@ -7,7 +7,8 @@ test('étape 12 — le devis ne majore plus automatiquement le total catalogue d
   const business = readFileSync(new URL('../src/routes/business.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(quote, /suggestedTtcFromCatalogTotal/);
   assert.doesNotMatch(business, /suggestedTtcFromCatalogTotal/);
-  assert.match(quote, /\$\('#targetTtc'\)\.value=total\.toFixed\(2\)/);
+  // 15.4.67 — le champ affiche le TOTAL (base + prestations complémentaires), temps réel.
+  assert.match(quote, /baseTtcMain=service;driver='ttc';applyTargetTtc\(\);/);
 });
 
 test('étape 12 — le helper historique +1 n\'est plus utilisé par le parcours devis', () => {

@@ -1,6 +1,6 @@
 # DPA — Contrat de sous-traitance de traitement des données personnelles (article 28 RGPD)
 
-Version **5.0**, révision du 23 novembre 2026 pour Aurion 15.4.51. Ce document est un document contractuel du service : il est accepté avec les conditions générales (bannière de re-acceptation versionnée) et publié en consultation libre à l'adresse légale du service. Les éléments entre crochets `{{…}}` sont complétés par la configuration d'édition au moment de la publication ; un document contenant un champ non résolu reste en brouillon et n'est jamais présenté comme publié.
+Version **5.1**, révision du 25 novembre 2026 pour Aurion 15.4.67. La révision 5.1 précise que les photographies des fiches clients (avatars téléversés par le responsable de traitement pour identifier ses clients) font partie des données traitées pour son compte. Ce document est un document contractuel du service : il est accepté avec les conditions générales (bannière de re-acceptation versionnée) et publié en consultation libre à l'adresse légale du service. Les éléments entre crochets `{{…}}` sont complétés par la configuration d'édition au moment de la publication ; un document contenant un champ non résolu reste en brouillon et n'est jamais présenté comme publié.
 
 > Statut de rédaction : ce contrat repose exclusivement sur des réalités techniques du produit (RLS multi-tenant, chiffrement, journaux d'audit, réversibilité testée). Il reste soumis à la **validation juridique externe** prévue avant l'ouverture commerciale (docs/GO-LIVE-15.4.51.md, section légale).
 

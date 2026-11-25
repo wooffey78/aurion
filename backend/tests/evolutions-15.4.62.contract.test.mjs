@@ -36,8 +36,13 @@ test('2 — le prévisionnel prend les devis en compte dans le volume mensuel', 
 
 test('3 — la prévision de facturation ne propose plus de menu déroulant', () => {
   assert.doesNotMatch(other, /forecast-history/);
-  assert.match(other, /plus aucun menu déroulant dans la prévision de facturation/);
-  assert.match(other, /id="forecast-detail" type="button"/);
+  // 15.4.67 — plus aucun menu déroulant ni projections repliées : le panneau « Horizon »
+  // (tableau ⇄ graphique) se bascule par simple bouton, sans menu ni bloc caché.
+  assert.match(other, /data-horizon-toggle="1"/);
+  assert.doesNotMatch(other, /id="forecast-more"/);
+  assert.doesNotMatch(other, /SCÉNARIO INDICATIF/);
+  // 15.4.67 — le bouton Détail laisse place à la bascule tableau ⇄ graphique.
+  assert.match(other, /data-horizon-toggle="1"/);
 });
 
 test('4 — carrousel : espacement PC nettement supérieur (anneau profond, cartes écartées, scène agrandie)', () => {
@@ -57,10 +62,10 @@ test('6 — l\u2019avatar n\u2019est plus jamais vide : initiales toujours rendu
   assert.match(account, /<div class="account-avatar-stack"><div class="avatar-lg" aria-hidden="true">/);
   assert.match(account, /img\.onerror=\(\)=>img\.remove\(\);/);
   assert.match(account, /if\(blob&&blob\.size>0\)/);
-  // 15.4.66 (consigne éditeur) : la bulle avatar de la coquille est remplacée par le lien
-  // « Mon compte » — plus aucune mécanique d'image avatar dans le tableau de bord.
-  assert.doesNotMatch(dashboard, /id="shell-avatar"/);
-  assert.match(dashboard, /class="account-link"/);
+  // 15.4.67 (consigne éditeur) : le lien « Mon compte » devient un lien-image arrondi qui
+  // reprend l'avatar téléversé dans « Mon compte » (fetch authentifié, repli initiales).
+  assert.match(dashboard, /id="shell-avatar"/);
+  assert.match(dashboard, /class="account-link account-avatar-link"/);
   assert.match(css, /\.account-avatar-stack\{position:relative/);
   assert.match(css, /\.account-avatar-stack \.account-avatar-image\{position:absolute/);
 });

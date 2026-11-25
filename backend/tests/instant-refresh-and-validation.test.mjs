@@ -33,7 +33,8 @@ test('le moteur de tableau de bord expose la prévision et son historique',()=>{
   assert.match(other,/Prévision de facturation — scénario indicatif/);
   // 15.4.62 — plus aucun menu déroulant dans la prévision de facturation (le détail reste un bouton).
   assert.doesNotMatch(other,/forecast-history/);
-  assert.match(other,/id="forecast-detail"/);
+  // 15.4.67 — bascule tableau ⇄ graphique au simple clic sur le bouton dédié.
+  assert.match(other,/data-horizon-toggle="1"/);
   // 15.4.62 — les compteurs backend (projection HT) restent affichés via S.dashboardCounters.
   assert.match(other,/S\.dashboardCounters\?\.forecast/);
 });

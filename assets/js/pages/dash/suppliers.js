@@ -2,7 +2,7 @@
 import{api,getActiveActivity}from'../../core/api.js';
 import{mergeRegistryFields}from'../../core/registry-fill.js';
 import{renderCompanyChoices}from'../../core/company-detect.js';
-import{S,e as escape,toast,modalForm,confirmDelete,hooks}from'./core.js';
+import{S,e as escape,toast,modalForm,confirmDelete,hooks,showPdfViewer}from'./core.js';
 const e=v=>v==null?'':escape(v);const empty=t=>`<p class="muted">${e(t)}</p>`;
 
 const websiteLink=v=>v?`<a href="${/^https?:\/\//i.test(v)?e(v):`https://${e(v)}`}" target="_blank" rel="noopener noreferrer" class="link-btn">${e(v)} ↗</a>`:'<em>Non renseigné</em>';
@@ -27,7 +27,7 @@ export function openSupplierSheet(s,{onEdit,onDelete}={}){
   </div>`;
   document.body.append(root);
   const close=()=>root.remove();root.querySelector('.modal-close').onclick=close;root.addEventListener('click',ev=>{if(ev.target===root)close()});
-  root.querySelector('#supplier-pdf').onclick=async()=>{const w=window.open('','_blank','noopener');try{const res=await api.authFetch(`/suppliers/${encodeURIComponent(s.id)}.pdf`);if(!res.ok)throw new Error('La fiche fournisseur PDF n’a pas pu être ouverte.');const blob=await res.blob();const url=URL.createObjectURL(blob);if(w)w.location.href=url;setTimeout(()=>URL.revokeObjectURL(url),120000)}catch(err){w?.close();toast(err.message,'error')}};
+  root.querySelector('#supplier-pdf').onclick=async()=>{try{const res=await api.authFetch(`/suppliers/${encodeURIComponent(s.id)}.pdf`);if(!res.ok)throw new Error('La fiche fournisseur PDF n’a pas pu être ouverte.');showPdfViewer(await res.blob(),`Fiche fournisseur — ${s.name||'fournisseur'}`)}catch(err){toast(err.message,'error')}};
   root.querySelector('#supplier-edit').onclick=()=>{close();onEdit?.(s)};
   root.querySelector('#supplier-del').onclick=()=>{close();onDelete?.(s)};
   return root;

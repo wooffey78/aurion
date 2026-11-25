@@ -19,13 +19,20 @@ export async function createRefreshSession(identity:SessionIdentity, request:any
 
 export async function rotateRefreshSession(raw:string, request:any){
   const h=hashToken(raw);
+  // 15.4.67 — les sessions dont la fenêtre de grâce est expirée sont closes (routine interne
+  // de la rotation : aucun lien avec la révocation explicite d'une déconnexion).
+  await query(`update native_sessions set revoked_at=now() where revoked_at is null and grace_until is not null and grace_until<now()`);
   const r=await query<any>(`select s.*,u.email,u.session_version,om.role
     from native_sessions s join users u on u.id=s.user_id
     join organization_members om on om.user_id=u.id and om.organization_id=s.organization_id
     where s.refresh_token_hash=$1 and s.revoked_at is null and s.expires_at>now() and s.session_version=u.session_version limit 1`,[h]);
   const old=r.rows[0]; if(!old) return null;
-  await query('update native_sessions set revoked_at=now(),last_used_at=now() where id=$1',[old.id]);
-  const identity={userId:old.user_id,organizationId:old.organization_id,role:old.role,sessionVersion:Number(old.session_version||0)};
+  // 15.4.67 — fenêtre de grâce : le jeton fraîchement roté reste utilisable 60 s au lieu d'être
+  // révoqué immédiatement. Deux onglets (ou deux requêtes) qui rafraîchissent en parallèle
+  // avec le MÊME cookie ne se révoquent plus en chaîne — c'était la cause des déconnexions
+  // aléatoires « votre session a expiré ». Passé la fenêtre, le jeton ancien est invalide.
+  await query(`update native_sessions set last_used_at=now(),grace_until=now()+interval '60 seconds' where id=$1`,[old.id]);
+  const identity={userId:old.user_id,organizationId:old.organizationId,role:old.role,sessionVersion:Number(old.session_version||0)};
   return {identity,...await createRefreshSession(identity,request)};
 }
 

@@ -15,7 +15,8 @@ test('étape 6 : le backend applique le prix catalogue même lorsque le coeffici
 
 test('étape 6 : le prix catalogue de prestation est un TTC fixe et les pièces restent internes', () => {
   assert.match(quote, /const service=Number\(iv\?\.default_price\|\|0\)/);
-  assert.match(quote, /const total=service/);
+  // 15.4.67 — TTC client = base catalogue + prestations complémentaires (cumul temps réel).
+  assert.match(quote, /baseTtcMain=service;/);
   assert.doesNotMatch(quote, /const total=service\+partHt/);
   assert.match(catalog, /Prix client habituel TTC/);
   assert.match(catalog, /Prix de vente HT \(indicatif\)/);

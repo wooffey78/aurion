@@ -47,10 +47,10 @@ test('3 — pied de page : Développement & support : EasyWeb-dev', () => {
 });
 
 test('4 — barre supérieure : simple lien « Mon compte » au design Aurion (15.4.66)', () => {
-  // 15.4.66 (consigne éditeur) : la bulle avatar (bouton rond, synchronisation d'image) est
-  // remplacée par un lien texte « Mon compte » qui navigue vers la vue Compte.
-  assert.match(dashboard, /<a class="account-link" href="#\/dashboard\?view=account" title="Mon compte">Mon compte<\/a>/);
-  assert.doesNotMatch(dashboard, /id="shell-avatar"/);
+  // 15.4.67 (consigne éditeur) : le lien « Mon compte » devient un lien-IMAGE arrondi qui
+  // reprend l'avatar téléversé dans « Mon compte » (repli : initiales du compte).
+  assert.match(dashboard, /<a class="account-link account-avatar-link" href="#\/dashboard\?view=account" title="Mon compte" aria-label="Mon compte"><span class="account-avatar-bubble" id="shell-avatar">/);
+  assert.match(dashboard, /refreshShellAvatar/);
   assert.doesNotMatch(dashboard, /syncShellAvatar/);
   assert.match(dashboard, /S\.company\?\.name\|\|'Entreprise'/);
   assert.match(dashboard, /barre supérieure jamais bloquée par une donnée absente/);
@@ -70,8 +70,13 @@ test('5 — modèles : cartes plus petites, écarts garantis, scène élargie, a
 
 test('6 — détail prévisionnel : projections du scénario (plus jamais 0 sans raison)', () => {
   assert.match(forecast, /entriesHt: monthlyEntriesHt \* months,/);
-  assert.match(other, /const htFor=months=>/);
-  assert.match(other, /projection HT \(scénario\)/);
+  // 15.4.67 — le panneau Horizon dessine un graphique natif (SVG) à bascule.
+  assert.match(other, /function horizonChartSvg\(p\)/);
+  assert.match(other, /forecast-chart-wrap/);
+  // 15.4.67 — les projections HT du scénario disparaissent ; le graphique SVG de l'horizon
+  // les remplace (aucune valeur inventée à l'écran, mêmes bases de calcul).
+  assert.doesNotMatch(other, /projection HT \(scénario\)/);
+  assert.match(other, /forecast-chart-wrap/);
   assert.doesNotMatch(other, /S\.dashboardCounters\?\.forecast\?\.months3\|\|0/);
 });
 
@@ -95,7 +100,8 @@ test('9 — multi-prestations : ajout/retrait manuels, calculs, PDF et sauvegard
   assert.match(quote, /const extrasTotal=\(\)=>serviceExtras\.reduce/);
   assert.match(quote, /const addServiceExtra=\(\)=>/);
   assert.match(quote, /kind:'service'/);
-  assert.match(quote, /finalPriceTtc:r2\(num\('#targetTtc'\)\+extrasSave\)/);
+  // 15.4.67 — le champ porte le TOTAL cumulé + la remise TTC tracée séparément.
+  assert.match(quote, /finalPriceTtc:r2\(num\('#targetTtc'\)\),discountTtc:r2\(discountTtc\)/);
   assert.match(quote, /Prestations complémentaires \(TTC\)/);
   assert.match(quote, /serviceExtras=q\?\(q\.items\|\|\[\]\)\.filter\(i=>i\.kind==='service'\)/);
   // backend : la ligne porte son kind et le TTC final intègre les prestations

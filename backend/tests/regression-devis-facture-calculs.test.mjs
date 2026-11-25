@@ -51,7 +51,8 @@ test('coefficient : le coût fournisseur reste réel, le coefficient entre dans 
 
 test('prestation catalogue : son prix TTC est fixe et englobe les éléments de calcul',()=>{
   assert.match(route,/const total=Number\(service\?\.default_price\|\|0\)/);
-  assert.match(quote,/const total=service/);
+  // 15.4.67 — la base catalogue est conservée ; le champ affiche base + prestations cumulées.
+  assert.match(quote,/baseTtcMain=service;/);
   assert.doesNotMatch(route,/total\+=qty\*unitHt/);
 });
 

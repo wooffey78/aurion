@@ -151,7 +151,8 @@ test('cotisations : détection par catégorie micro avec micro-social + CFP pour
 
 test('validation des devis/factures par un dialogue Aurion (aucune alerte native)', () => {
   assert.match(quoteJs, /Valider \$\{editing\?`les modifications de ce \$\{docLabel\}`:`la création de ce \$\{docLabel\}`\} \?/);
-  assert.match(quoteJs, /Total HT : \$\{money\(r\.totalHt\+extrasSave/);
+  // 15.4.67 — le récapitulatif porte le total cumulé (prestations + remise déduite par le moteur).
+  assert.match(quoteJs, /Total HT : \$\{money\(r\.totalHt\)\} · TVA : \$\{money\(r\.totalTtc-r\.totalHt\)\} · Total TTC : \$\{money\(r\.totalTtc\)\}\$\{discountTtc>0/);
   // Aucun appel natif alert/confirm/prompt dans le CODE (les commentaires sont ignorés).
   const stripComments = t => t.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
   for (const [file, text] of [['quote', quoteJs], ['other', otherJs], ['account', accountJs]]) {
@@ -186,10 +187,10 @@ test('documents juridiques : révision technique tracée sur les cinq documents 
   // 15.4.54 : CGU-CGV et POLITIQUE-CONFIDENTIALITE portent la version contractuelle 5.0
   // (portail, webhooks, e-facture préparatoire, DPA) — la révision 4.0 du 20 novembre reste
   // citée dans leur historique ; les trois documents techniques restent en révision 4.0.
-  assert.match(read('docs/CGU-CGV.md'), /Version \*\*5\.0\*\*, révision du 23 novembre 2026 pour Aurion 15\.4\.51 \(mise à jour de la version 4\.0 du 20 novembre 2026/);
-  assert.match(read('docs/POLITIQUE-CONFIDENTIALITE.md'), /Version \*\*5\.0\*\*, révision du 23 novembre 2026 pour Aurion 15\.4\.51 \(mise à jour de la version 4\.0 du 20 novembre 2026/);
+  assert.match(read('docs/CGU-CGV.md'), /Version \*\*5\.1\*\*, révision du 25 novembre 2026 pour Aurion 15\.4\.67 \(mise à jour de la version 5\.0 du 23 novembre 2026/);
+  assert.match(read('docs/POLITIQUE-CONFIDENTIALITE.md'), /Version \*\*5\.1\*\*, révision du 25 novembre 2026 pour Aurion 15\.4\.67 \(mise à jour de la version 5\.0 du 23 novembre 2026/);
   for (const doc of ['docs/COOKIES.md', 'docs/LEGAL-NOTICE.md', 'docs/DECLARATION-ACCESSIBILITE.md']) {
-    assert.match(read(doc), /révision du 20 novembre 2026 pour Aurion 15\.4\.35/);
+    assert.match(read(doc), /révision du 25 novembre 2026 pour Aurion 15\.4\.67/);
   }
   assert.match(read('docs/POLITIQUE-CONFIDENTIALITE.md'), /Droit à l'effacement en ligne \(15\.4\.35\)/);
   assert.match(read('docs/POLITIQUE-CONFIDENTIALITE.md'), /legal\/suppression-compte/);

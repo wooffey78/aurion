@@ -19,8 +19,10 @@ test('les indicateurs comptables affichent leur base de trésorerie réelle', ()
   assert.match(business, /from invoice_payments p join quotes q on q\.id=p\.quote_id/);
 });
 
-test('les totaux de l’accueil excluent devis annulés et rendez-vous passés', () => {
-  assert.match(ui, /document_type!=='invoice'&&!\['canceled','cancelled','rejected','void','deleted'\]/);
+test('les totaux de l’accueil : rendez-vous futurs seuls, encarts devis supprimés (15.4.67)', () => {
+  // 15.4.67 — l'encart « Devis en cours » disparaît de l'accueil : le filtre d'exclusion des
+  // devis annulés n'y a plus d'équivalent (il reste appliqué côté trésorerie et documents).
+  assert.doesNotMatch(ui, /id="home-open-quotes"/);
   assert.match(ui, /new Date\(a\.starts_at\)>now/);
   assert.match(ui, /Rendez-vous à venir/);
 });
@@ -43,16 +45,19 @@ test('l’accueil ne présente pas des encaissements comme un chiffre d’affair
   assert.match(ui, /<small>Encaissements HT<\/small>/);
 });
 
-test('les prévisions issues des factures sont libellées comme factures et comme projections', () => {
-  assert.match(ui, /Factures moyennes \/ mois/);
+test('les prévisions sont présentées en tableau « Horizon » avec bascule graphique (15.4.67)', () => {
+  // 15.4.67 (consigne éditeur) : le bloc « scénario indicatif » (projections HT 3/6/12 mois,
+  // bouton Détail, cartes d’hypothèses) disparaît ; le tableau « Horizon » devient affichable
+  // en graphique au simple clic, avec les mêmes bases explicites de calcul.
+  assert.doesNotMatch(ui, /projection HT \(scénario\)/);
+  assert.doesNotMatch(ui, /id="forecast-more"/);
+  assert.doesNotMatch(ui, /Factures moyennes \/ mois/);
+  assert.match(ui, /Horizon de facturation/);
+  assert.match(ui, /data-horizon-toggle="1"/);
+  assert.match(ui, /forecast-chart-wrap/);
   assert.match(ui, /Factures projetées/);
-  // 15.4.65+ — le « Détail » affiche les projections HT du scénario (libellés actualisés).
-  assert.match(ui, /Année — projection HT \(scénario\)/);
-  // Bases explicites : entrées TTC, provision sur le HT, TVA non déduite du solde.
   assert.match(ui, /Sorties estimées \(TTC \+ provision HT\)/);
   assert.match(ui, /Solde estimé \(avant TVA à reverser\)/);
-  assert.match(ui, /La TVA collectée n’est pas déduite du solde/);
-  assert.match(ui, /elles ne constituent pas un historique ni une promesse d’encaissement/);
   assert.match(ui, /data-edit-forecast-fixed-costs/);
   assert.match(ui, /api\.saveForecastAssumptions\(payload\)/);
 });

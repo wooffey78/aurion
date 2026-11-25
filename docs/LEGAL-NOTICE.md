@@ -1,6 +1,6 @@
 # Mentions légales — Aurion
 
-Version **4.0**, révision du 20 novembre 2026 pour Aurion 15.4.35 (mise à jour de la révision 4.0 du 14 novembre 2026 ; les coordonnées et engagements du propriétaire sont inchangés ; révision technique compatible : droit à l'effacement en ligne depuis l'application et depuis la page publique).
+Version **5.1**, révision du 25 novembre 2026 pour Aurion 15.4.67 (mise à jour de la version 4.0 du 20 novembre 2026 ; les coordonnées et engagements du propriétaire sont inchangés ; révision technique compatible : droit à l'effacement en ligne depuis l'application et depuis la page publique, hébergeur identifié, coordonnées du médiateur complétées).
 
 ## Éditeur du service
 
@@ -21,7 +21,7 @@ Version **4.0**, révision du 20 novembre 2026 pour Aurion 15.4.35 (mise à jour
 - Base de données : PostgreSQL gérée en région européenne (Francfort).
 - Fichiers privés : OVHcloud Object Storage, région `de` (Francfort), bucket privé sans accès public.
 - E-mails transactionnels : Brevo.
-- [À compléter : nom contractuel, adresse et contact de l’hébergeur — à reprendre des conditions de service du compte de l’Éditeur et à publier après souscription.]
+- Hébergeur : Render Services, Inc., 525 Brannan Street, Suite 300, San Francisco, CA 94107, États-Unis — https://render.com — contact juridique : legal@render.com.
 
 ## Propriété intellectuelle et responsabilité éditoriale
 
@@ -33,7 +33,7 @@ Les traitements et sous-traitants sont décrits dans la politique de confidentia
 
 ## Médiation de la consommation
 
-Médiateur désigné : CM2C ([https://www.cm2c.net](https://www.cm2c.net)) [À compléter : coordonnées officielles de saisine après adhésion]. La médiation est gratuite pour le consommateur.
+Médiateur désigné : CM2C ([https://www.cm2c.net](https://www.cm2c.net)) — 49 rue de Ponthieu, 75008 Paris — courriel de saisine : declarer-un-litige@cm2c.net. La médiation est gratuite pour le consommateur.
 
 ## Droit applicable
 

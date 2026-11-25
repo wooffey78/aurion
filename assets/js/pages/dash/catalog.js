@@ -1,6 +1,6 @@
 // Refonte du Catalogue métier : routes existantes conservées, import JSON additif, calculs métier inchangés.
 import{api,getActiveActivity}from'../../core/api.js';
-import{S,e as escape,money,toast,modalForm,confirmDelete,askConfirm,prof,active,hooks}from'./core.js';
+import{S,e as escape,money,toast,modalForm,confirmDelete,askConfirm,prof,active,hooks,showPdfViewer}from'./core.js';
 
 // Bloc 8 — champ catégorie d'activité micro (référentiel daté de l'URSSAF, repli local déterministe).
 let microCatRates=[];
@@ -57,7 +57,7 @@ function detail(t,x){
 }
 function showDetail(t,x,opener){
  document.querySelector('#catalog-detail-modal')?.remove();
- document.body.insertAdjacentHTML('beforeend',`<div class="modal-backdrop catalog-detail-backdrop" id="catalog-detail-modal"><section class="modal glass catalog-detail-modal" role="dialog" aria-modal="true" aria-labelledby="catalog-detail-title" tabindex="-1"><header class="section-title"><div><span class="eyebrow">CONSULTATION · ${e(cats().find(c=>c.id===t)?.label||t)}</span><h2 id="catalog-detail-title">${e(x.name)}</h2></div><button type="button" class="icon-btn" data-close aria-label="Fermer">×</button></header><dl class="catalog-detail-list">${detail(t,x)}</dl><footer class="button-row"><button type="button" class="btn secondary" data-close>Fermer</button><button type="button" class="btn primary small" data-edit>Modifier</button></footer></section></div>`);
+ document.body.insertAdjacentHTML('beforeend',`<div class="modal-backdrop catalog-detail-backdrop" id="catalog-detail-modal"><section class="modal glass catalog-detail-modal" role="dialog" aria-modal="true" aria-labelledby="catalog-detail-title" tabindex="-1"><header class="section-title"><div><span class="eyebrow">CONSULTATION · ${e(cats().find(c=>c.id===t)?.label||t)}</span><h2 id="catalog-detail-title">${e(x.name)}</h2></div><button type="button" class="icon-btn" data-close aria-label="Fermer">×</button></header><dl class="catalog-detail-list">${detail(t,x)}</dl><footer class="button-row">${t==='parts'?'<button type="button" class="btn secondary small" data-part-pdf>Fiche PDF</button>':''}<button type="button" class="btn secondary" data-close>Fermer</button><button type="button" class="btn primary small" data-edit>Modifier</button></footer></section></div>`);
  const m=document.querySelector('#catalog-detail-modal');
  const focusable=()=>Array.from(m?.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')||[]).filter(node=>!node.hidden&&node.getAttribute('aria-hidden')!=='true');
  let onKey;
@@ -78,6 +78,14 @@ function showDetail(t,x,opener){
  document.addEventListener('keydown',onKey,true);
  m.querySelector('[data-close]')?.focus();
  m.querySelector('[data-edit]')?.addEventListener('click',()=>{close();edit(t,x)});
+ // 15.4.67 (consigne éditeur) — fiche produit consultable en PDF, dans la visionneuse intégrée
+ // d'Aurion (aucun about:blank) : génération serveur pdfkit, aperçu blob: autorisé par la CSP.
+ m.querySelector('[data-part-pdf]')?.addEventListener('click',async()=>{
+  const btn=m.querySelector('[data-part-pdf]');if(btn)btn.disabled=true;
+  try{const res=await api.authFetch(api.partPdfUrl(x.id).replace(api.baseUrl,''));if(!res.ok)throw new Error('La fiche produit PDF n’a pas pu être ouverte.');showPdfViewer(await res.blob(),`Fiche produit — ${x.name||'pièce'}`)}
+  catch(err){toast(err.message||'La fiche produit PDF n’a pas pu être ouverte.','error')}
+  finally{const b2=document.querySelector('[data-part-pdf]');if(b2)b2.disabled=false}
+ });
 }
 
 function form(t,x={}){

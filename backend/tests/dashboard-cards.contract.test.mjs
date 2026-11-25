@@ -3,22 +3,31 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 
-test('Accueil distingue devis actifs, encaissements et rendez-vous à venir', () => {
+test('Accueil : encarts Clients, Devis en cours et Entrées prévues supprimés (15.4.67), encaissements et rendez-vous conservés', () => {
   const ui = read('../../assets/js/pages/dash/other.js');
-  assert.match(ui, /Devis en cours/);
-  assert.match(ui, /!\['canceled','cancelled','rejected','void','deleted'\]\.includes/);
+  // 15.4.67 (consigne éditeur) : les encarts « Clients », « Devis en cours » et
+  // « Entrées prévues » disparaissent complètement de l'accueil.
+  assert.doesNotMatch(ui, /<span>Devis en cours<\/span>/);
+  assert.doesNotMatch(ui, /id="home-open-quotes"/);
+  assert.doesNotMatch(ui, /<span>Clients<\/span>/);
+  assert.doesNotMatch(ui, /id="home-clients"/);
+  assert.doesNotMatch(ui, /id="home-entries-caption"/);
+  // Les deux indicateurs conservés restent exacts.
   assert.match(ui, /Rendez-vous à venir/);
   assert.match(ui, /new Date\(a\.starts_at\)>now/);
   assert.match(ui, /Encaissements HT du mois/);
   assert.match(ui, /paiements reçus, majorations comprises/);
-  assert.match(ui, /TTC, SAV déduits/);
 });
 
 test('Accueil et trésorerie présentent les prévisions comme scénario et flux engagés distincts', () => {
   const ui = read('../../assets/js/pages/dash/other.js');
   const forecast = read('../../assets/js/core/forecast.js');
   const shared = read('../../backend/src/services/document-forecast.ts');
-  assert.match(ui, /Prévision de facturation — scénario indicatif/);
+  // 15.4.67 (consigne éditeur) : le bloc « scénario indicatif » disparaît ; le panneau
+  // partagé devient « Horizon de facturation », avec bascule tableau ⇄ graphique.
+  assert.match(ui, /Horizon de facturation/);
+  assert.match(ui, /data-horizon-toggle="1"/);
+  assert.doesNotMatch(ui, /SCÉNARIO INDICATIF/);
   assert.match(ui, /Factures projetées/);
   assert.match(ui, /Entrées estimées \(TTC\)/);
   assert.match(ui, /Créances restantes \(engagé\)/);
@@ -55,11 +64,16 @@ test('La fiche client sépare factures émises, payé et restant dû', () => {
   assert.match(ui, /' · Refusé'/);
 });
 
-test('Les indicateurs de temps sont libellés sur les sessions terminées', () => {
+test('Les indicateurs de temps portent la règle 15.4.67 (estimation fixe par client)', () => {
   const ui = read('../../assets/js/pages/dash/other.js');
   const route = read('../../backend/src/routes/business.ts');
-  assert.match(ui, /Sessions terminées uniquement/);
+  // 15.4.67 (consigne éditeur) : estimation FIXE par client, comptée une seule fois quel que
+  // soit le nombre de sessions ; plus aucune baseline par session, plus de bulle explicative.
+  assert.match(ui, /Estimation fixe de chaque client consulté, comptée une seule fois/);
   assert.match(ui, /Par session terminée/);
+  assert.doesNotMatch(ui, /Sessions terminées uniquement/);
+  assert.doesNotMatch(ui, /Mesure cumulée/);
+  assert.doesNotMatch(route, /MANUAL_BASELINE_MINUTES/);
   assert.match(route, /completed/);
   assert.match(route, /activity_id/);
 });

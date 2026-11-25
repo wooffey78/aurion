@@ -37,8 +37,9 @@ test('requirements 7/11/12/14 remain explicit in the implementation',()=>{
   assert.match(dashboard,/loadProfileFeatures/);
   assert.match(other,/Rendez-vous/);
   assert.match(other,/Journal de bord/);
-  assert.match(other,/id="forecast-more" hidden/);
-  assert.match(other,/Prévision de facturation/);
+  // 15.4.67 — le bloc scénario disparaît ; le tableau Horizon avec bascule graphique le remplace.
+  assert.match(other,/forecast-chart-wrap/);
+  assert.match(other,/Horizon de facturation/);
 });
 
 // Cahier 2.
@@ -146,7 +147,8 @@ test('requirements 8/9 keep editable per-quote coefficients and catalog prices',
   assert.match(business,/part_coefficient_percent/);assert.match(business,/labor_coefficient_percent/);
   assert.match(business,/selling_price/);
   assert.match(business,/item\.unitPrice!==null&&item\.unitPrice!==undefined\?Math\.max\(0,Number\(item\.unitPrice\)\):Math\.max\(0,Number\(item\.unitCost\|\|0\)\*\(1\+coefficient\/100\)\+euroCoefficient/);
-  assert.match(quote,/const total=service;/);
+  // 15.4.67 — cumul temps réel : la base catalogue est conservée, le champ affiche le total.
+  assert.match(quote,/baseTtcMain=service;/);
 });
 
 // Cahier 13.

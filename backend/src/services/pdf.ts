@@ -79,3 +79,28 @@ export async function supplierPdf(organizationId:string,id:string){
   if(!r.rowCount)throw new Error('NOT_FOUND'); const x=r.rows[0];
   return {buffer:await makePdf(`FICHE FOURNISSEUR`,{name:x.company_name,activity:x.company_activity,siret:x.org_siret},[['Fournisseur',x.name],['SIRET',x.siret||''],['Forme juridique',x.legal_form||''],['Site internet',x.website||''],['E-mail',x.email||''],['Téléphone',x.phone||''],['Adresse',x.address||'']],undefined),row:x};
 }
+
+// 15.4.67 — fiche produit : les fiches (pièces du catalogue) sont consultables en PDF comme
+// les fiches client / fournisseur, depuis la visionneuse intégrée (aucun about:blank).
+export async function partPdf(organizationId:string,id:string){
+  const r=await query(`select p.*,coalesce(json_agg(json_build_object('supplier',s.name,'supplierReference',sp.supplier_reference,'purchasePrice',sp.purchase_price) order by sp.purchase_price) filter(where s.id is not null),'[]') suppliers
+    from parts p left join supplier_parts sp on sp.part_id=p.id left join suppliers s on s.id=sp.supplier_id
+    where p.id=$1 and p.organization_id=$2 group by p.id`,[id,organizationId]);
+  if(!r.rowCount)throw new Error('NOT_FOUND');
+  const x=r.rows[0];
+  const o=(await query('select name,activity,siret from organizations where id=$1',[organizationId])).rows[0]||{};
+  const rows:[string,string][]=[
+    ['Désignation',esc(x.name||'')],
+    ...(x.reference?[['Référence',esc(x.reference)] as [string,string]]:[]),
+    ...(x.model?[['Modèle',esc(x.model)] as [string,string]]:[]),
+    ...(x.variant?[['Variante',esc(x.variant)] as [string,string]]:[]),
+    ...(x.color?[['Couleur',esc(x.color)] as [string,string]]:[]),
+    ...(x.quality?[['Qualité',esc(x.quality)] as [string,string]]:[]),
+    ['Stock',esc(x.stock??0)],
+    ...(x.min_stock_threshold!=null?[['Seuil d’alerte',esc(x.min_stock_threshold)] as [string,string]]:[]),
+    ['Prix de vente HT',money(x.selling_price)],
+    ['Prix de vente TTC (TVA 20 %)',money(Number(x.selling_price||0)*1.2)],
+    ...((Array.isArray(x.suppliers)&&x.suppliers.length)?[['Fournisseurs (prix d’achat HT)',x.suppliers.map((s:any)=>`${esc(s.supplier||'—')} · ${money(s.purchasePrice)}`).join('  ·  ')] as [string,string]]:[]),
+  ];
+  return {buffer:await makePdf('FICHE PRODUIT',{name:x.name?`${o.name||''}`:o.name,activity:o.activity,siret:o.siret},rows,undefined),row:x};
+}

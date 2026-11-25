@@ -407,7 +407,12 @@ async function catalogQuoteTarget(org:string,activityId:string,intervention:stri
   // Le prix catalogue d’une prestation est un prix TTC fixe : il englobe déjà
   // main-d’œuvre, pièces, livraison, kilométrage, cotisations et taxes.
   // Les pièces restent des coûts internes et ne s’ajoutent jamais au TTC client.
-  const total=Number(service?.default_price||0);
+  // 15.4.67 — les prestations complémentaires (lignes « service », saisies en TTC, stockées
+  // en HT reconstitué) CUMULENT au TTC facturé au client : le prix piloté par le catalogue
+  // additionne la prestation principale ET toutes les prestations complémentaires — jamais
+  // la seule prestation principale (règle : TTC client = cumul des prestations, temps réel).
+  const extras=items.filter(i=>i.kind==='service').reduce((t,i)=>t+(Number(i.quantity)||0)*Number(i.unitPrice||0)*(1+vatRate/100),0);
+  const total=Number(service?.default_price||0)+extras;
   if(!Number.isFinite(total)||total<0)throw new AurionError('INVALID_INPUT','Prix catalogue de prestation invalide.');
   return round2(total);
 }
@@ -1010,7 +1015,34 @@ export async function businessRoutes(app:FastifyInstance){
     // Prompt 06 — les fiches ARCHIVÉES sont exclues de la liste courante (réversibles via
     // /clients/:id/unarchive, jamais détruites) ; includeArchived=1 les réaffiche.
     const includeArchived=String((r.query as any)?.includeArchived||'')==='1';
-    return (await query(`select id,name,email,phone,address,intervention_address,siret,estimated_minutes,activity_id,buyer_category,country_code,vat_number,(archived_at is not null) as archived,archived_at,merged_into,created_at from clients where organization_id=$1 and ($2::uuid is null or activity_id=$2) and ($3::boolean or archived_at is null) order by name`,[org,aid,includeArchived])).rows;
+    return (await query(`select id,name,email,phone,address,intervention_address,siret,estimated_minutes,activity_id,buyer_category,country_code,vat_number,(archived_at is not null) as archived,archived_at,merged_into,created_at,(avatar_key is not null) as has_avatar from clients where organization_id=$1 and ($2::uuid is null or activity_id=$2) and ($3::boolean or archived_at is null) order by name`,[org,aid,includeArchived])).rows;
+  });
+  // 15.4.67 — photo de fiche client : l'image téléversée sert d'avatar et remplace les
+  // initiales dans la bulle à côté du nom (fiche + liste). Même chaîne privée que l'avatar
+  // du compte : PNG/JPEG/WebP ≤ 3 Mo, objet précédent supprimé, lecture authentifiée.
+  app.get('/clients/:id/avatar',async(r,reply)=>{
+    const id=String((r.params as any).id),org=r.auth!.organizationId;
+    const row=(await query('select avatar_key from clients where id=$1 and organization_id=$2',[id,org])).rows[0];
+    if(!row?.avatar_key)return reply.code(404).send({error:'NOT_FOUND',message:'Aucune photo enregistrée pour ce client.'});
+    try{
+      const key=String(row.avatar_key);
+      const mime=key.toLowerCase().endsWith('.png')?'image/png':key.toLowerCase().endsWith('.webp')?'image/webp':'image/jpeg';
+      const buf=await readPrivateObject(key);
+      return reply.header('Content-Type',mime).header('Cache-Control','private, max-age=0, no-store').send(buf);
+    }catch{return reply.code(404).send({error:'NOT_FOUND',message:'Photo introuvable.'});}
+  });
+  app.post('/clients/:id/avatar',async(r,reply)=>{
+    const id=String((r.params as any).id),org=r.auth!.organizationId;
+    const exists=await query('select id from clients where id=$1 and organization_id=$2',[id,org]);
+    if(!exists.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
+    const part=await r.file();
+    if(!part||!['image/png','image/jpeg','image/webp'].includes(part.mimetype))return reply.code(400).send({error:'INVALID_IMAGE',message:'Choisissez une image PNG, JPEG ou WebP.'});
+    const saved=await savePrivateUpload(org,part,3*1024*1024);
+    const newKey=`private/${org}/${saved.safe}`;
+    const old=(await query('select avatar_key from clients where id=$1 and organization_id=$2',[id,org])).rows[0]?.avatar_key;
+    await query('update clients set avatar_key=$1 where id=$2 and organization_id=$3',[newKey,id,org]);
+    if(old){try{await deletePrivateObject(String(old));}catch{}}
+    return {ok:true,avatarUrl:`/clients/${id}/avatar`};
   });
   // Bloc 11 — recherche de doublons AVANT validation d'un document avec un nouveau client :
   // propositions de réutilisation, sans fusion automatique incertaine (l'utilisateur choisit).
@@ -1324,7 +1356,8 @@ query(`select q.id,q.number,q.document_type,c.name client_name,q.total_ttc,q.cre
       if(stock>0)await createStockMovement(client,r.auth!.organizationId,{partId:id,type:'initial',quantity:stock,reason:'Stock initial à la création de l\'article',actorId:r.auth!.userId,opType:'part_create',opId:id});
     });
     return reply.code(201).send({id});
-  });app.get('/parts/:id/photo',async(r,reply)=>{const id=String((r.params as any).id),org=r.auth!.organizationId;const x=(await query('select photo_key from parts where id=$1 and organization_id=$2',[id,org])).rows[0];if(!x||!x.photo_key)return reply.code(404).send({error:'NOT_FOUND'});try{const buf=await readPrivateObject(x.photo_key);const ext=String(x.photo_key).toLowerCase();const type=ext.endsWith('.png')?'image/png':ext.endsWith('.webp')?'image/webp':'image/jpeg';return reply.header('Content-Type',type).header('Cache-Control','private, max-age=3600').send(buf)}catch{return reply.code(404).send({error:'NOT_FOUND'})}});
+  });  app.get('/parts/:id.pdf',async(r,reply)=>{const id=String((r.params as any).id),org=r.auth!.organizationId;try{const {partPdf}=await import('../services/pdf.js');const {buffer}=await partPdf(org,id);return reply.header('Content-Type','application/pdf').header('Content-Disposition',`inline; filename="fiche-produit-${id}.pdf"`).send(buffer)}catch(e:any){return reply.code(e?.message==='NOT_FOUND'?404:500).send({error:e?.message||'PDF_ERROR'})}});
+  app.get('/parts/:id/photo',async(r,reply)=>{const id=String((r.params as any).id),org=r.auth!.organizationId;const x=(await query('select photo_key from parts where id=$1 and organization_id=$2',[id,org])).rows[0];if(!x||!x.photo_key)return reply.code(404).send({error:'NOT_FOUND'});try{const buf=await readPrivateObject(x.photo_key);const ext=String(x.photo_key).toLowerCase();const type=ext.endsWith('.png')?'image/png':ext.endsWith('.webp')?'image/webp':'image/jpeg';return reply.header('Content-Type',type).header('Cache-Control','private, max-age=3600').send(buf)}catch{return reply.code(404).send({error:'NOT_FOUND'})}});
   app.post('/parts/:id/photo',async(request,reply)=>{const part=await request.file();if(!part||!['image/png','image/jpeg','image/webp'].includes(part.mimetype))return reply.code(400).send({error:'INVALID_IMAGE'});const id=String((request.params as any).id),org=request.auth!.organizationId;const ok=await query('select id from parts where id=$1 and organization_id=$2',[id,org]);if(!ok.rowCount)return reply.code(404).send({error:'NOT_FOUND'});const saved=await savePrivateUpload(org,part,5*1024*1024);await query('update parts set photo_key=$1,updated_at=now() where id=$2 and organization_id=$3',[`private/${org}/${saved.safe}`,id,org]);return {ok:true,photoKey:`private/${org}/${saved.safe}`};});  app.patch('/parts/:id',async(r,reply)=>{
     const parsed=partPatchInputSchema.safeParse(r.body||{});
     if(!parsed.success)return reply.code(400).send({error:'INVALID_INPUT'});
@@ -2156,23 +2189,28 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
   });
   app.get('/time-metrics',async r=>{
     const org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));
-    // 15.4.66 — formule harmonisée (consigne éditeur) : chaque session terminée représente au
-    // minimum 1 minute de travail MANUEL, même si aucune estimation n'a été saisie ou si
-    // l'estimation saisie est plus basse. Le temps économisé reste la différence manuel − réel,
-    // jamais négative.
-    const MANUAL_BASELINE_MINUTES=1;
-    const totals=(await query(`select coalesce(sum(greatest(coalesce(manual_minutes,0),${MANUAL_BASELINE_MINUTES})),0) manual_minutes,
-      coalesce(sum(duration_seconds),0) actual_seconds,
-      count(*)::int sessions,count(distinct client_id)::int clients
+    // 15.4.67 — temps manuel FIXE PAR CLIENT (consigne éditeur) : l'estimation d'un client
+    // (clients.estimated_minutes) compte UNE SEULE FOIS, quel que soit le nombre de sessions
+    // terminées ou d'ouvertures de sa fiche. Interagir cinq fois avec une fiche estimée à
+    // 10 minutes reste 10 minutes ; deux clients estimés à 10 minutes chacun font 20 minutes.
+    // Le temps réel reste la durée cumulée des sessions terminées ; temps économisé =
+    // manuel − réel, jamais négatif. Aucun arrondi intermédiaire : le moteur somme des valeurs
+    // exactes et l'écran présente le résultat à deux décimales.
+    const manualRow=(await query(`select coalesce(sum(c.estimated_minutes),0) manual_minutes,count(*)::int clients
+      from (select distinct s.client_id from client_time_sessions s
+        where s.organization_id=$1 and ($2::uuid is null or s.activity_id=$2)
+          and s.excluded_at is null and s.status='completed' and s.ended_at is not null) t
+      join clients c on c.id=t.client_id`,[org,aid])).rows[0];
+    const totals=(await query(`select coalesce(sum(duration_seconds),0) actual_seconds,count(*)::int sessions
       from client_time_sessions
       where organization_id=$1 and ($2::uuid is null or activity_id=$2) and excluded_at is null and status='completed' and ended_at is not null`,[org,aid])).rows[0];
     const active=(await query(`select s.id,s.client_id,c.estimated_minutes,s.started_at,c.name client_name
       from client_time_sessions s join clients c on c.id=s.client_id
       where s.organization_id=$1 and ($2::uuid is null or s.activity_id=$2)
         and s.excluded_at is null and s.ended_at is null and s.status='running' limit 1`,[org,aid])).rows[0]||null;
-    const manual=Number(totals.manual_minutes||0),actual=Number(totals.actual_seconds||0)/60,saved=Math.max(0,manual-actual);
+    const manual=Number(manualRow?.manual_minutes||0),actual=Number(totals.actual_seconds||0)/60,saved=Math.max(0,manual-actual);
     const sessions=Number(totals.sessions||0);
-    return {manualMinutes:manual,actualMinutes:actual,savedMinutes:saved,averageSavedMinutes:sessions?saved/sessions:0,sessions,clients:Number(totals.clients||0),active,activityId:aid};
+    return {manualMinutes:manual,actualMinutes:actual,savedMinutes:saved,averageSavedMinutes:sessions?saved/sessions:0,sessions,clients:Number(manualRow?.clients||0),active,activityId:aid};
   });
   app.get('/time-metrics/stats',async r=>{
     const org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));
@@ -2392,7 +2430,7 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     } else {
       await query(`update dashboard_journal_events set resolved_at=coalesce(resolved_at,now()) where organization_id=$1 and event_type='configuration_incomplete' and resolved_at is null`,[org]);
     }
-    if(!aid){const events=(await query(`select id,event_type,title,description,severity,internal_path,is_read,resolved_at,created_at from dashboard_journal_events where organization_id=$1 and event_type not like 'administrative_%' and event_type not like 'journey_%' and resolved_at is null and severity in ('action','warning','error') order by created_at desc`,[org])).rows;return {tickets:Number(t.rows[0]?.n||0),unpaidCount:0,unpaidTotal:0,forecastEntries:0,journal:events.map((x:any)=>({kind:'persistent',persisted:true,journalId:x.id,title:x.title,detail:x.description,severity:x.severity==='action'||x.severity==='error'?'red':x.severity==='warning'?'yellow':'blue',sortAt:x.created_at,internalPath:x.internal_path,isRead:x.is_read,eventType:x.event_type}))};}
+    if(!aid){const events=(await query(`select id,event_type,title,description,severity,internal_path,is_read,resolved_at,created_at from dashboard_journal_events where organization_id=$1 and event_type not like 'administrative_%' and event_type not like 'journey_%' and resolved_at is null and severity in ('action','warning','error') order by created_at desc`,[org])).rows;return {tickets:Number(t.rows[0]?.n||0),unpaidCount:0,unpaidTotal:0,forecastEntries:0,pendingEmails:await outboxCount(org).catch(()=>0),journal:events.map((x:any)=>({kind:'persistent',persisted:true,journalId:x.id,title:x.title,detail:x.description,severity:x.severity==='action'||x.severity==='error'?'red':x.severity==='warning'?'yellow':'blue',sortAt:x.created_at,internalPath:x.internal_path,isRead:x.is_read,eventType:x.event_type}))};}
     const historyMonths=Math.min(120,Math.max(1,Number((r.query as any)?.forecastMonths||6)));
     const accountingYear=new Date().getFullYear();
     const [u,f,r4,historicalResult,warrResult,appointmentsResult,subResult,yearAccounting,freeAccessResult,cashForecast,upcomingAppointmentsResult]=await Promise.all([
@@ -2495,7 +2533,10 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
       lowStockCount=Number(ls.rows[0]?.n||0);tasksOpenCount=Number(tk.rows[0]?.n||0);accountantOpenRequests=Number(ar.rows[0]?.n||0);
     }catch(e:any){r.log.warn({err:String(e?.message||e)},'dashboard module counters skipped');}
     journal.sort((a:any,b:any)=>{const rank=(x:any)=>x.severity==='red'?0:x.persisted&&!x.isRead?1:x.severity==='yellow'?2:3;const pr=rank(a)-rank(b);if(pr!==0)return pr;const at=a.sortAt?new Date(a.sortAt).getTime():Number.POSITIVE_INFINITY;const bt=b.sortAt?new Date(b.sortAt).getTime():Number.POSITIVE_INFINITY;return at-bt;});
-    return {tickets:Number(t.rows[0]?.n||0),unpaidCount:Number(u.rows[0]?.n||0),unpaidTotal:Number(u.rows[0]?.total||0),forecastEntries:cashForecast.entries,fourthReminderCount:Number(r4.rows[0]?.n||0),upcomingAppointments:Number(upcomingAppointmentsResult.rows[0]?.n||0),lowStockCount,tasksOpenCount,accountantOpenRequests,forecast,subscription:freeAccess?null:sub,warranty:{count:Number(warr?.n||0),nextEnd:warr?.next_end||null},trialDaysLeft:freeAccess?0:trialDaysLeft,journal};
+    // 15.4.67 — e-mails en attente (boîte d'envoi) exposés au tableau de bord : le journal de
+    // bord affiche la file et propose l'envoi immédiat (POST /communications/email/flush).
+    const pendingEmails=await outboxCount(org).catch(()=>0);
+    return {tickets:Number(t.rows[0]?.n||0),unpaidCount:Number(u.rows[0]?.n||0),unpaidTotal:Number(u.rows[0]?.total||0),forecastEntries:cashForecast.entries,pendingEmails,fourthReminderCount:Number(r4.rows[0]?.n||0),upcomingAppointments:Number(upcomingAppointmentsResult.rows[0]?.n||0),lowStockCount,tasksOpenCount,accountantOpenRequests,forecast,subscription:freeAccess?null:sub,warranty:{count:Number(warr?.n||0),nextEnd:warr?.next_end||null},trialDaysLeft:freeAccess?0:trialDaysLeft,journal};
   });
   app.get('/accounting/summary',async r=>{
     const aid=await ensureActivity(r,activityId(r));

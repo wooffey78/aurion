@@ -26,7 +26,7 @@ export async function openClientSheet(id,{onEdit,onQuote,onDelete}={}){
   try{d=await api.clientSummary(id)}catch(x){close();return toast(x.message,'error')}
   const c=d.client,st=d.stats;
   root.querySelector('.modal').innerHTML=`
-   <div class="sheet-head"><div class="avatar-xl">${e(initials(c.name))}</div><div class="sheet-id"><span class="eyebrow">FICHE CLIENT</span><h2>${e(c.name)}</h2><small class="muted">Client depuis le ${fdate(c.created_at)}</small></div><button class="icon-btn modal-close" aria-label="Fermer">×</button></div>
+   <div class="sheet-head"><div class="avatar-xl avatar-photo" id="sheet-avatar" title="Photo du client">${e(initials(c.name))}</div><div class="sheet-id"><span class="eyebrow">FICHE CLIENT</span><h2>${e(c.name)}</h2><small class="muted">Client depuis le ${fdate(c.created_at)}</small></div><button class="icon-btn modal-close" aria-label="Fermer">×</button></div>
    <div class="sheet-contact">
      <div class="contact-tile"><span>E-mail</span>${c.email?`<a href="mailto:${e(c.email)}">${e(c.email)}</a>`:'<em>Non renseigné</em>'}</div>
      <div class="contact-tile"><span>Téléphone</span>${c.phone?`<a href="tel:${e(c.phone.replace(/\s/g,''))}">${e(c.phone)}</a>`:'<em>Non renseigné</em>'}</div>
@@ -39,9 +39,25 @@ export async function openClientSheet(id,{onEdit,onQuote,onDelete}={}){
    </div>
    <section class="sheet-block" id="sheet-reliability"><h3>Fiabilité de paiement</h3><p class="muted" id="reliability-loading">Calcul en cours…</p><div id="reliability-body" hidden></div></section>
    <section class="sheet-block" id="sheet-portal"><h3>Portail client</h3><p class="help">Accès invité sans compte : le client consulte et accepte ses devis par lien sécurisé, révocable à tout moment.</p><div id="portal-body"><p class="muted">Chargement…</p></div></section>
-   <div class="button-row sheet-actions"><button type="button" class="link-btn" id="sh-time" title="Mettre en pause ou relancer le compteur de temps économisé de ce client">⏱ Compteur automatique</button><button class="btn primary" id="sh-quote">+ Nouveau devis</button><button class="btn secondary" id="sh-pdf">Fiche PDF</button><button class="btn secondary" id="sh-edit">Modifier</button><button class="btn danger" id="sh-del">Supprimer</button></div>`;
+   <div class="button-row sheet-actions"><button type="button" class="link-btn" id="sh-time" title="Mettre en pause ou relancer le compteur de temps économisé de ce client">⏱ Compteur automatique</button><button class="btn primary" id="sh-quote">+ Nouveau devis</button><button class="btn secondary" id="sh-pdf">Fiche PDF</button><button class="btn secondary" id="sh-edit">Modifier</button><button class="btn secondary" id="sh-photo" title="Téléverser une photo : elle remplace les initiales du client">Photo</button><button class="btn danger" id="sh-del">Supprimer</button><button class="btn primary" id="sh-close">Fermer</button></div>`;
   const q=s=>root.querySelector(s);
   q('.modal-close').onclick=close;
+  // 15.4.67 (consigne éditeur) : un bouton « Fermer » en bas de fiche — il ferme la fiche
+  // consultée et déclenche EXACTEMENT les mêmes mécanismes de compteur que la croix, Échap ou
+  // le clic hors fiche (close() → stopClientTimer : session terminée et comptabilisée).
+  q('#sh-close').onclick=close;
+  // 15.4.67 (consigne éditeur) : photo de fiche client — téléversée depuis la fiche, elle
+  // remplace les initiales dans la bulle à côté du nom (et dans la liste des clients).
+  const avatarBox=q('#sheet-avatar');
+  const setAvatarImage=src=>{const img=document.createElement('img');img.alt='';img.src=src;img.onload=()=>avatarBox.classList.add('has-photo');img.onerror=()=>{img.remove();avatarBox.classList.remove('has-photo')};avatarBox.querySelectorAll('img').forEach(x=>x.remove());avatarBox.append(img)};
+  if(c.has_avatar)setAvatarImage(api.clientAvatarUrl(c.id));
+  q('#sh-photo').onclick=()=>{
+    const input=document.createElement('input');input.type='file';input.accept='image/png,image/jpeg,image/webp';
+    input.onchange=async()=>{const f=input.files&&input.files[0];if(!f)return;
+      try{await api.uploadClientAvatar(c.id,f);setAvatarImage(api.clientAvatarUrl(c.id)+(api.clientAvatarUrl(c.id).includes('?')?'&':'?')+'v='+Date.now());toast('Photo enregistrée : elle remplace les initiales du client.','success');try{await hooks.refresh('clients')}catch{/* liste rafraîchie plus tard */}}
+      catch(x){toast(x.message||'Téléversement de la photo impossible.','error')}};
+    input.click();
+  };
   // 15.4.66 — OUVRIR la fiche LANCE le compteur (consigne éditeur) : session déjà en cours pour
   // ce client → conservée (idempotent) ; session en pause → relancée ; session d'un AUTRE
   // client → lui cède la place (durée accumulée préservée côté serveur). L'estimation de la

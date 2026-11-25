@@ -1,7 +1,7 @@
 // Notes de frais (Comptabilité & trésorerie) : ajout, consultation, téléchargement, suppression, transfert cloud.
 // Les montants sont pris en compte par le moteur de calcul (achats HT, TVA déductible, sorties de trésorerie prévues).
 import{api}from'../../core/api.js';
-import{S,e,money,toast,askConfirm,hooks}from'./core.js';
+import{S,e,money,toast,askConfirm,hooks,showPdfViewer}from'./core.js';
 import{enqueueFile,queueItem,retryQueueItem,STATUS_LABELS}from'../../core/cloud-sync.js';
 
 const CATEGORIES={deplacement:'Déplacement',repas:'Repas',hebergement:'Hébergement',carburant:'Carburant',peage_stationnement:'Péage / stationnement',fournitures:'Fournitures',materiel:'Matériel',telecom:'Téléphone / internet',formation:'Formation',autre:'Autre'};
@@ -65,7 +65,7 @@ export function bindExpenses(){
   document.querySelector('#expense-add')?.addEventListener('click',()=>openForm());
   document.querySelector('#expense-csv')?.addEventListener('click',async()=>{try{const y=S.accountingYear||new Date().getFullYear();const r=await api.expenseReportsCsv(y);if(!r.ok)throw new Error('Export impossible.');const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download=`aurion-notes-de-frais-${y}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),10000)}catch(x){toast(x.message,'error')}});
   document.querySelectorAll('[data-exp-edit]').forEach(b=>b.addEventListener('click',()=>openForm(find(b.dataset.expEdit))));
-  document.querySelectorAll('[data-exp-view]').forEach(b=>b.addEventListener('click',async()=>{const w=window.open('about:blank','_blank');try{const blob=await receiptBlob(find(b.dataset.expView));const url=URL.createObjectURL(blob);if(w)w.location.href=url;else location.assign(url);setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(x){w?.close();toast(x.message,'error')}}));
+  document.querySelectorAll('[data-exp-view]').forEach(b=>b.addEventListener('click',async()=>{try{const x=find(b.dataset.expView);showPdfViewer(await receiptBlob(x),x?.receiptName||'Justificatif')}catch(x){toast(x.message,'error')}}));
   document.querySelectorAll('[data-exp-download]').forEach(b=>b.addEventListener('click',async()=>{try{const x=find(b.dataset.expDownload);const blob=await receiptBlob(x);const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=x.receiptName||'justificatif';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),10000)}catch(x){toast(x.message,'error')}}));
   document.querySelectorAll('[data-exp-cloud]').forEach(b=>b.addEventListener('click',async()=>{const x=find(b.dataset.expCloud);const local=x?.receiptClientRef?await queueItem(x.receiptClientRef):null;if(!local){toast('Le justificatif n’est pas présent sur cet appareil : relancez le transfert depuis l’appareil qui l’a enregistré.','info');return}await retryQueueItem(local.clientRef);toast('Transfert relancé. L’état sera mis à jour après confirmation du cloud.','info');setTimeout(()=>hooks.refresh(S.view).catch(()=>{}),3000)}));
   document.querySelectorAll('[data-exp-delete]').forEach(b=>b.addEventListener('click',async()=>{if(!await askConfirm({title:'Supprimer cette note de frais ?',message:'Elle sera retirée de la comptabilité et de la trésorerie. Le justificatif déjà présent dans votre cloud n’est pas supprimé.',confirmLabel:'Supprimer',danger:true}))return;try{await api.deleteExpenseReport(b.dataset.expDelete);toast('Note de frais supprimée.','success');await hooks.refresh(S.view)}catch(x){toast(x.message,'error')}}));

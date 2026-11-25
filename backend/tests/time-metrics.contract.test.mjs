@@ -13,7 +13,11 @@ const end = business.indexOf("app.post('/time-sessions/start'", start);
 const metrics = business.slice(start, end);
 
 test('les indicateurs de temps utilisent uniquement les sessions terminées, non exclues, et l’activité sélectionnée', () => {
-  assert.match(metrics, /sum\(manual_minutes\)/);
+  // 15.4.67 — le compteur global additionne l'estimation FIXE de chaque client distinct
+  // (une seule fois par client), plus jamais une baseline par session ; le temps réel
+  // reste la somme exacte des durées de sessions terminées.
+  assert.match(metrics, /sum\(c\.estimated_minutes\),0\) manual_minutes/);
+  assert.match(metrics, /distinct s\.client_id/);
   assert.match(metrics, /sum\(duration_seconds\)/);
   assert.match(metrics, /excluded_at is null and status='completed' and ended_at is not null/);
   assert.match(metrics, /\$2::uuid is null or activity_id=\$2/);
@@ -52,13 +56,14 @@ test('toutes les lectures de sessions respectent l’exclusion (métriques, fich
   assert.doesNotMatch(chantiers, /excluded_at is null/);
 });
 
-test('la fiche client ne transforme plus une estimation sans session en temps économisé', () => {
-  // 15.4.66 — la somme applique la baseline par session (1 minute, consigne éditeur) : le
-  // moteur est désormais exprimé via sum(greatest(coalesce(manual_minutes,0),1)).
-  assert.match(clients, /sum\(greatest\(coalesce\(manual_minutes,0\),1\)\)/);
+test('la fiche client applique l’estimation FIXE du client, comptée une seule fois (15.4.67)', () => {
+  // 15.4.67 (consigne éditeur) — le temps manuel de la fiche est la valeur FIXE du client
+  // (estimated_minutes) : interagir cinq fois avec une fiche estimée à 10 minutes reste
+  // 10 minutes ; le temps réel reste la durée cumulée des sessions terminées.
+  assert.match(clients, /const estimatedMinutes=Number\(c\.estimated_minutes\|\|0\)/);
   assert.match(clients, /status='completed' and ended_at is not null/);
-  assert.match(clients, /const estimatedMinutes=Number\(tm\?\.manual_minutes\|\|0\)/);
-  assert.doesNotMatch(clients, /estimatedMinutes=Number\(c\?\.estimated_minutes/);
+  assert.doesNotMatch(clients, /sum\(greatest\(coalesce\(manual_minutes,0\),1\)\)/);
+  assert.doesNotMatch(clients, /estimatedMinutes=Number\(tm\?\.manual_minutes\|\|0\)/);
 });
 
 test('la fiche client n’affiche pas un faux « 0,0 min » sans session terminée', () => {

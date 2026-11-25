@@ -1,6 +1,6 @@
 # Conditions générales d’utilisation et de vente — Aurion
 
-Version **5.0**, révision du 23 novembre 2026 pour Aurion 15.4.51 (mise à jour de la version 4.0 du 20 novembre 2026 ; coordonnées et engagements du propriétaire inchangés). Cette révision couvre les fonctions livrées depuis la version 4.0 : portail client invités, partage de liens, webhooks sortants, contrats d’entretien récurrents, préparation de la facturation électronique et re-acceptation versionnée des documents contractuels. Les ajouts sont soumis à la validation juridique externe prévue avant ouverture commerciale.
+Version **5.1**, révision du 25 novembre 2026 pour Aurion 15.4.67 (mise à jour de la version 5.0 du 23 novembre 2026 ; coordonnées et engagements du propriétaire inchangés). Cette révision couvre les fonctions livrées depuis la version 5.0 : signature client des devis (bouton « Signé », acceptation horodatée), remises appliquées sur le TTC facturé, photographies des fiches clients (avatars), visionneuse de documents intégrée et suivi des e-mails en attente depuis le journal de bord. Les ajouts restent soumis à la validation juridique externe prévue avant ouverture commerciale.
 
 **Éditeur : Coulibaly Damien, entrepreneur individuel sous le régime micro-entreprise, nom commercial Easyweb-dev. Adresse : 5 Rue Jacques Prevert, 85300 Challans, France. SIRET : 88848569500033 (SIREN : 888485695). TVA non applicable — article 293 B du CGI. Contact : easyfixit.reparation@gmail.com — 07 81 51 33 21.**
 
@@ -50,7 +50,7 @@ Lorsque le consommateur demande expressément que la prestation commence avant l
 
 Les garanties légales applicables aux contenus et services numériques demeurent intégralement applicables. Le Client peut signaler une difficulté à **easyfixit.reparation@gmail.com** ou au **07 81 51 33 21**. Aucun délai de réponse garanti n’est promis.
 
-Après une réclamation écrite préalable restée sans solution, un consommateur peut recourir gratuitement au médiateur de la consommation désigné par l’Éditeur, dans les conditions légales. **Médiateur désigné : CM2C** ([https://www.cm2c.net](https://www.cm2c.net)) [À compléter : coordonnées officielles CM2C à publier — adresse électronique et adresse postale de saisine — une fois l’adhésion de l’Éditeur enregistrée]. La médiation est gratuite pour le consommateur ; les frais éventuels supportés par l’Éditeur sont à sa charge.
+Après une réclamation écrite préalable restée sans solution, un consommateur peut recourir gratuitement au médiateur de la consommation désigné par l’Éditeur, dans les conditions légales. **Médiateur désigné : CM2C** ([https://www.cm2c.net](https://www.cm2c.net)) coordonnées officielles de saisine : CM2C — 49 rue de Ponthieu, 75008 Paris — courriel : declarer-un-litige@cm2c.net — https://www.cm2c.net. La médiation est gratuite pour le consommateur ; les frais éventuels supportés par l’Éditeur sont à sa charge.
 
 ## 7. Durée, résiliation et données
 

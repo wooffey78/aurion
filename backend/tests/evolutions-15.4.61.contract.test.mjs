@@ -29,9 +29,9 @@ test('1 — le compteur de temps économisé démarre dès la création de la fi
   assert.match(business, /async function createClientForDocument\(executor:SqlExecutor,org:string,aid:string,userId:string,nc:any\)/);
   assert.match(business, /insert into client_time_sessions\(id,organization_id,user_id,client_id,activity_id,manual_minutes,started_at\) values\(\$1,\$2,\$3,\$4,\$5,coalesce\(\(select c\.estimated_minutes from clients c where c\.id=\$4\),0\),now\(\)\)/);
   // Le badge de la fiche reflète l'état réel (démarré par défaut → « en cours »).
-  assert.match(clientsheet, /Compteur en cours — cliquer pour mettre en pause/);
+  assert.match(clientsheet, /Compteur de temps économisé en cours — cliquer pour mettre en pause/);
   // L'utilisateur est informé au retour de la création.
-  assert.match(other, /le compteur de temps économisé est démarré automatiquement/);
+  assert.match(other, /le compteur de temps économisé démarre automatiquement à son ouverture/);
 });
 
 test('2 — la prévision de facturation ne traite plus tous les devis ouverts comme signés le mois suivant', () => {
