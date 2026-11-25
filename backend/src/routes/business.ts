@@ -2156,11 +2156,11 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
   });
   app.get('/time-metrics',async r=>{
     const org=r.auth!.organizationId,aid=await ensureActivity(r,activityId(r));
-    // 15.4.65 — formule harmonisée : chaque session terminée représente au minimum 20 minutes de
-    // travail MANUEL (recherche tarifaire, calculs HT/TVA/marges, mise en forme, archivage), même
-    // si aucune estimation n'a été saisie ou si l'estimation saisie est plus basse. Le temps
-    // économisé reste la différence manuel − réel, jamais négative.
-    const MANUAL_BASELINE_MINUTES=20;
+    // 15.4.66 — formule harmonisée (consigne éditeur) : chaque session terminée représente au
+    // minimum 1 minute de travail MANUEL, même si aucune estimation n'a été saisie ou si
+    // l'estimation saisie est plus basse. Le temps économisé reste la différence manuel − réel,
+    // jamais négative.
+    const MANUAL_BASELINE_MINUTES=1;
     const totals=(await query(`select coalesce(sum(greatest(coalesce(manual_minutes,0),${MANUAL_BASELINE_MINUTES})),0) manual_minutes,
       coalesce(sum(duration_seconds),0) actual_seconds,
       count(*)::int sessions,count(distinct client_id)::int clients
@@ -2231,6 +2231,18 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     const x=await query(`update client_time_sessions set ended_at=now(),duration_seconds=greatest(0,extract(epoch from(now()-started_at))::int),status='abandoned' where id=$1 and organization_id=$2 and user_id=$3 and ended_at is null and status='running' returning id`,[id,org,r.auth!.userId]);
     if(!x.rowCount)return reply.code(404).send({error:'NOT_FOUND'});
     return {ok:true,id};
+  });
+  // 15.4.66 — arrêt automatique du compteur à la SORTIE de la fiche client (consigne éditeur) :
+  // le compteur ne tourne jamais indéfiniment. La session ouverte du client — RUNNING comme
+  // PAUSED — est terminée avec la sémantique exacte de l'arrêt (stopClientTimer) : durée
+  // accumulée préservée, status='completed', donc comptabilisée (baseline 1 min/session).
+  app.post('/time-sessions/stop-client',async(r,reply)=>{
+    const b:any=r.body||{},org=r.auth!.organizationId,clientId=String(b.clientId||'');
+    if(!/^[0-9a-f-]{36}$/i.test(clientId))return reply.code(400).send({error:'INVALID_INPUT'});
+    const open=Number((await query(`select count(*)::int n from client_time_sessions where organization_id=$1 and user_id=$2 and client_id=$3 and excluded_at is null and ended_at is null and status in ('running','paused')`,[org,r.auth!.userId,clientId])).rows[0]?.n||0);
+    if(!open)return {ok:true,stopped:0};
+    await stopClientTimer(org,r.auth!.userId,clientId);
+    return {ok:true,stopped:open};
   });
   // Prompt 09 — détection de collisions : chevauchements contre les rendez-vous de
   // l'organisation (toutes activités : la personne est une) et les indisponibilités (108).
@@ -2557,10 +2569,13 @@ app.get('/interventions',async r=>(await query('select * from interventions wher
     // son RESTE DÛ ; une facture réglée n'est jamais un encaissement futur ; un devis converti
     // n'est compté ni comme devis ni doublement (les lignes excluent les devis annulés et les
     // factures payées). Les montants affichés sont TTC (bases homogènes, explicites en UI).
-    const potentialIn=rows.filter((x:any)=>x.document_type==='quote').reduce((n:any,x:any)=>n+Number(x.total_ttc||0),0);
+    // 15.4.66 — POTENTIEL = devis NON signés uniquement : un devis signé (accepté par le client)
+    // quitte le potentiel et entre dans les entrées prévisionnelles (documentForecastEntries).
+    const potentialIn=rows.filter((x:any)=>x.document_type==='quote'&&String(x.status||'').toLowerCase()!=='accepted').reduce((n:any,x:any)=>n+Number(x.total_ttc||0),0);
+    const signedIn=cashForecast.quotesTtc;
     const committedIn=rows.filter((x:any)=>x.document_type==='invoice').reduce((n:any,x:any)=>n+Math.max(0,Math.round((Number(x.total_ttc||0)+Number(x.total_penalty_amount||0)-Number(x.amount_paid||0))*100)/100),0);
     return {forecastEntries:cashForecast.entries,forecastOutputs:forecastOut+expenseToReimburse,forecastNet:cashForecast.entries-forecastOut-expenseToReimburse,expenses:forecastExpenses+expenseToReimburse,savDeduction:savTotal,expenseReports:{count:Number(er.n||0),total:Number(er.total||0),toReimburse:expenseToReimburse},
-      potentialIn,committedIn,committedOut:expenseToReimburse,savTotal,
+      potentialIn,signedIn:cashForecast.quotesTtc,committedIn,committedOut:expenseToReimburse,savTotal,
       outputsBreakdown:{directCosts:forecastOut,expenseReports:expenseToReimburse},
       committedNet:Math.round((committedIn-forecastOut-expenseToReimburse)*100)/100,
       excluded:{canceledQuotes:true,paidInvoices:true,convertedQuotes:true,avoirs:'aucun module d’avoir enregistré dans cette version'},rows};

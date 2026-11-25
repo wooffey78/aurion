@@ -22,7 +22,10 @@ test('Accueil et trésorerie présentent les prévisions comme scénario et flux
   assert.match(ui, /Factures projetées/);
   assert.match(ui, /Entrées estimées \(TTC\)/);
   assert.match(ui, /Créances restantes \(engagé\)/);
-  assert.match(ui, /Devis ouverts \(potentiel\)/);
+  // 15.4.66 — le potentiel ne contient plus que les devis NON signés ; les devis signés
+  // (acceptés par le client) entrent dans les calculs (entrées prévues).
+  assert.match(ui, /Devis non signés \(potentiel\)/);
+  assert.match(ui, /Devis signés \(intégrés\)/);
   assert.match(forecast, /averageTicketHt/);
   assert.match(forecast, /monthlyEntriesHt\s*=\s*repairsPerMonth\s*\*\s*assumptions\.averageTicketHt/);
   assert.match(forecast, /monthlyReserve\s*=\s*monthlyEntriesHt/);

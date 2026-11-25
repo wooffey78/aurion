@@ -25,21 +25,20 @@ const migration = read('backend/migrations/123_email_outbox_multi_services.sql')
 const outbox = read('backend/src/services/email-outbox.ts');
 const apijs = read('assets/js/core/api.js');
 
-test('1 — Administration : UNE bascule exclusive encarts ⇄ diagrammes, choix mémorisé', () => {
-  assert.match(other, /id="admin-view-toggle"/);
-  assert.match(other, /const applyAdminView=mode=>/);
-  assert.match(other, /aurion-admin-view/);
+test('1 — Administration : l\u2019encart d\u2019affichage des indicateurs est supprimé (15.4.66)', () => {
+  // 15.4.66 (consigne éditeur) : la bascule exclusive encarts ⇄ diagrammes et sa vue
+  // mémorisée disparaissent complètement ; les cartes chiffrées restent la seule vue.
+  assert.doesNotMatch(other, /id="admin-view-toggle"/);
+  assert.doesNotMatch(other, /id="admin-charts"/);
+  assert.doesNotMatch(other, /aurion-admin-view/);
   assert.doesNotMatch(other, /id="admin-view-cards"/);
   assert.doesNotMatch(other, /id="admin-view-charts"/);
-  // exclusivité : les deux vues sont mutuellement masquées
-  assert.match(other, /metricsGrid\.hidden=charts/);
-  assert.match(other, /chartsBox\.hidden=!charts/);
+  assert.match(other, /id="admin-metrics"/);
 });
 
-test('2 — les diagrammes d\u2019administration suivent le design Aurion', () => {
-  assert.match(css, /15\.4\.63 — diagrammes d'administration au design Aurion/);
-  assert.match(css, /\.admin-charts-grid \.chart-box\{border:1px solid var\(--line\);border-radius:16px;padding:18px;background:linear-gradient\(145deg,rgba\(14,29,51,\.9\),rgba\(5,12,24,\.82\)\)/);
-  assert.match(css, /\.admin-charts-grid svg text\{fill:#8f9692!important/);
+test('2 — les CSS des diagrammes d\u2019administration sont retirées avec l\u2019encart (15.4.66)', () => {
+  assert.doesNotMatch(css, /\.admin-charts-grid/);
+  assert.doesNotMatch(css, /\.admin-view-switch/);
 });
 
 test('3 — pied de page : Développement & support : EasyWeb-dev', () => {
@@ -47,10 +46,13 @@ test('3 — pied de page : Développement & support : EasyWeb-dev', () => {
   assert.doesNotMatch(index, /easyfixit\.reparation@gmail\.com/);
 });
 
-test('4 — avatar : bulle jamais vide (lettre statique dans la coquille + défenses)', () => {
-  assert.match(dashboard, /<button class="avatar" id="shell-avatar" title="Mon compte" aria-label="Mon compte">A<\/button>/);
+test('4 — barre supérieure : simple lien « Mon compte » au design Aurion (15.4.66)', () => {
+  // 15.4.66 (consigne éditeur) : la bulle avatar (bouton rond, synchronisation d'image) est
+  // remplacée par un lien texte « Mon compte » qui navigue vers la vue Compte.
+  assert.match(dashboard, /<a class="account-link" href="#\/dashboard\?view=account" title="Mon compte">Mon compte<\/a>/);
+  assert.doesNotMatch(dashboard, /id="shell-avatar"/);
+  assert.doesNotMatch(dashboard, /syncShellAvatar/);
   assert.match(dashboard, /S\.company\?\.name\|\|'Entreprise'/);
-  assert.match(dashboard, /!avatar\.textContent\.trim\(\)/);
   assert.match(dashboard, /barre supérieure jamais bloquée par une donnée absente/);
 });
 

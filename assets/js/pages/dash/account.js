@@ -151,11 +151,10 @@ export async function bind(){
   $('#acc-form').onsubmit=async ev=>{ev.preventDefault();try{await api.updateAccount({fullName:$('#fullName').value.trim(),jobTitle:$('#jobTitle').value.trim(),mobilePhone:$('#mobilePhone').value.trim(),fixedPhone:$('#fixedPhone').value.trim()});toast('Profil enregistré','success');await hooks.refresh('account')}catch(x){toast(x.message,'error')}};
   $('#avatar-form').onsubmit=async ev=>{ev.preventDefault();const file=$('#avatar-file').files?.[0];if(!file){toast('Choisissez une image.','error');return}try{
       await api.uploadAvatar(file);
+      // 15.4.66 — vérification que l'avatar est bien disponible après enregistrement ; plus
+      // d'événement coquille : la barre supérieure affiche désormais un lien « Mon compte ».
       const response=await api.accountAvatar();
       if(!response.ok)throw new Error('Avatar indisponible après enregistrement');
-      const blob=await response.blob();
-      const shellAvatarUrl=URL.createObjectURL(blob);
-      window.dispatchEvent(new CustomEvent('aurion-avatar-updated',{detail:{url:shellAvatarUrl}}));
       toast('Avatar enregistré','success');
       await hooks.refresh('account');
     }catch(x){toast(x.message,'error')}};

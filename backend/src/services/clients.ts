@@ -14,7 +14,7 @@ export async function clientSummary(orgId: string, id: string) {
         case when payment_status='paid' then total_ttc else coalesce(amount_paid,0) end else 0 end),0)::numeric paid_ttc,
       coalesce(sum(case when document_type='invoice' and lower(coalesce(status,'')) not in ('canceled','cancelled','annulé','annule','void','deleted') then greatest(0,total_ttc-case when payment_status='paid' then total_ttc else coalesce(amount_paid,0) end) else 0 end),0)::numeric remaining_ttc,
       count(*) filter(where document_type<>'invoice' and lower(coalesce(status,'')) not in ('canceled','cancelled','annulé','annule','void','deleted','rejected','refused'))::int quote_count,
-      coalesce(sum(total_ttc) filter(where document_type<>'invoice' and lower(coalesce(status,'')) not in ('canceled','cancelled','annulé','annule','void','deleted','rejected','refused')),0)::numeric pending_quotes_ttc
+      coalesce(sum(total_ttc) filter(where document_type<>'invoice' and lower(coalesce(status,'')) not in ('canceled','cancelled','annulé','annule','void','deleted','rejected','refused','accepted')),0)::numeric pending_quotes_ttc
       from quotes where client_id=$1 and organization_id=$2`, [id, orgId]),
     query(`select count(*)::int n from appointments where client_id=$1 and organization_id=$2 and starts_at>=now() and status not in ('canceled','cancelled','deleted','completed')`, [id, orgId]),
   ]);
@@ -22,8 +22,9 @@ export async function clientSummary(orgId: string, id: string) {
   const devices = (await query(`select id,type,brand,model,imei,serial_number from devices where client_id=$1 and organization_id=$2 order by created_at desc limit 30`, [id, orgId])).rows;
   const invoices = docs.filter((d: any) => d.document_type === 'invoice'), quotes = docs.filter((d: any) => d.document_type !== 'invoice');
   const lastBilling = (await query(`select invoice_address_source from quotes where client_id=$1 and organization_id=$2 and invoice_address_source is not null order by updated_at desc limit 1`, [id, orgId])).rows[0]?.invoice_address_source || null;
-  // 15.4.65 — même baseline de 20 minutes par session terminée que le compteur global (harmonisation).
-  const tm=(await query(`select coalesce(sum(greatest(coalesce(manual_minutes,0),20)),0) manual_minutes,coalesce(sum(duration_seconds),0) actual_seconds,count(*)::int completed_sessions
+  // 15.4.66 — même baseline de 1 minute par session terminée que le compteur global (consigne
+  // éditeur : « chaque session terminée représente au minimum 1 minute de travail manuel »).
+  const tm=(await query(`select coalesce(sum(greatest(coalesce(manual_minutes,0),1)),0) manual_minutes,coalesce(sum(duration_seconds),0) actual_seconds,count(*)::int completed_sessions
     from client_time_sessions where client_id=$1 and organization_id=$2 and excluded_at is null and status='completed' and ended_at is not null`,[id,orgId])).rows[0];
   // La comparaison ne porte que sur les sessions réellement terminées, pas sur un temps estimé
   // de fiche client qui n'a jamais été chronométré.

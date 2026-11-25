@@ -276,6 +276,13 @@ html{scrollbar-color:rgba(130,178,154,.55) rgba(5,10,22,.75);scrollbar-width:thi
 *::-webkit-scrollbar{width:8px;height:8px}
 *::-webkit-scrollbar-track{background:rgba(5,10,22,.55)}
 *::-webkit-scrollbar-thumb{background:linear-gradient(180deg,rgba(130,178,154,.55),rgba(78,117,105,.5));border-radius:999px;border:2px solid rgba(5,10,22,.55)}
+/* 15.4.66 (consigne éditeur) : la barre de défilement de la sidebar n'était pas assez
+   contrastée — elle passe en bleu Aurion (#477bff → #19bfff), la couleur de la marque
+   (favicon, icônes de plateformes). La règle couvre la sidebar ET ses descendants
+   (.nav est directement ciblé par la règle générique * ci-dessus). */
+.sidebar,.sidebar *{scrollbar-color:#477bff rgba(5,10,22,.75)}
+.sidebar::-webkit-scrollbar-thumb,.sidebar *::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#477bff,#19bfff);border-radius:999px;border:2px solid rgba(5,10,22,.75)}
+.sidebar::-webkit-scrollbar-thumb:hover,.sidebar *::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#19bfff,#477bff)}
 .dashboard-shell{grid-template-columns:220px 1fr}
 .sidebar{padding:16px 11px}
 .nav{gap:4px;margin-top:20px}
@@ -846,10 +853,9 @@ input:-webkit-autofill,textarea:-webkit-autofill,select:-webkit-autofill{box-sha
   .dashboard-shell #fs-toggle .fs-label {
     display: none !important;
   }
-  .dashboard-shell .avatar {
-    width: 32px;
-    height: 32px;
-    flex: 0 0 auto;
+  .dashboard-shell .account-link {
+    font-size: .82rem;
+    padding: 4px 2px;
   }
   .dashboard-shell .content {
     width: 100%;
@@ -1057,10 +1063,11 @@ input:-webkit-autofill,textarea:-webkit-autofill,select:-webkit-autofill{box-sha
   .landing-visual img{position:static;width:100%;max-width:640px;height:auto;margin:6px auto 0;border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow)}
 }
 .auth-card h1{font-size:clamp(1.5rem,3vw,2.2rem)}
-/* Bloc 10 — avatar agrandi, visible et bien cadré (plein écran compris) */
-.avatar{width:46px;height:46px;overflow:hidden}
-.avatar img{width:100%;height:100%;object-fit:cover;object-position:center;border-radius:50%;display:block}
-@media (max-width:1050px){.avatar{width:40px;height:40px}}
+/* 15.4.66 — lien « Mon compte » (la bulle avatar de la coquille est supprimée) : lien simple
+   au design Aurion, dans la barre supérieure. Le bloc de dimensionnement de l'ancien
+   avatar (.avatar, « Bloc 10 ») est retiré avec lui. */
+.account-link{display:inline-flex;align-items:center;min-height:34px;padding:6px 12px;border:1px solid var(--line);border-radius:11px;color:var(--text);background:rgba(201,220,244,.03);font-weight:650;font-size:.85rem;letter-spacing:.02em;transition:.22s ease}
+.account-link:hover{transform:translateY(-2px);border-color:rgba(130,178,154,.7);box-shadow:0 12px 30px rgba(130,178,154,.12)}
 /* Bloc 11 — horloge : composant dédié, chiffres tabulaires, secondes discrètes */
 #local-clock{display:inline-flex;align-items:baseline;gap:6px}
 /* Horloge de la coquille : visible sur toutes les vues, aux couleurs Aurion. */
@@ -1193,22 +1200,10 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="
 .guest-invite-row .guest-invite-field{flex:1 1 260px;margin:0}
 .app-footer-dev{color:var(--muted)}
 .app-footer-dev a{color:var(--muted);border-bottom:1px dotted rgba(130,178,154,.55);text-decoration:none}
-/* 15.4.62 — Administration : les indicateurs s'affichent aussi en diagrammes. */
-.admin-charts-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;min-height:300px}
-/* 15.4.63 — diagrammes d'administration au design Aurion : panneaux verre dépoli, titres
-   sobres, palette du thème (aucune couleur criarde importée). */
-.admin-charts-grid .chart-box{border:1px solid var(--line);border-radius:16px;padding:18px;background:linear-gradient(145deg,rgba(14,29,51,.9),rgba(5,12,24,.82));box-shadow:var(--shadow),inset 0 1px rgba(255,255,255,.04);backdrop-filter:blur(18px)}
-.admin-charts-grid .chart-box h3,.admin-charts-grid .chart-box .chart-title{color:#cccccc;font-size:.95rem;letter-spacing:.02em;margin:0 0 10px}
-.admin-charts-grid svg text{fill:#8f9692!important;font-size:11px!important}
-.admin-charts-grid svg .chart-bar{fill:url(#aurion-bar-grad),var(--blue);fill:var(--blue)}
-.admin-charts-grid .chart-wrap,.admin-charts-grid .chart-pie-wrap{color:var(--text)}
-.admin-charts-grid .chart-legend span{color:#8f9692}
-.admin-view-switch{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
-.admin-view-switch #admin-view-toggle[aria-pressed="true"]{border-color:rgba(130,178,154,.7);color:#cccccc}
+/* 15.4.66 (consigne éditeur) : l'encart de l'administration qui affichait les mêmes
+   indicateurs en diagrammes est supprimé complètement — cartes chiffrées uniquement ;
+   ses CSS dédiées sont retirées avec lui. */
 .email-pending-pill{border-color:rgba(255,95,131,.6)!important;color:#e5a3a3!important}
-@media (max-width:640px){.admin-charts-grid{min-height:0}}
-.admin-charts-grid .chart-box{border:1px solid var(--line);border-radius:14px;padding:14px;background:rgba(9,21,38,.55)}
-@media (max-width:900px){.admin-charts-grid{grid-template-columns:minmax(0,1fr)}}
 /* 15.4.63 — anti-sauts : les aperçus de modèles réservent leurs dimensions (aucun reflow au
    chargement des images), le bloc de détail prévisionnel garde une hauteur stable. */
 .template-face img,.template-back img{width:100%;height:100%;object-fit:cover;background:rgba(9,21,38,.35)}

@@ -15,7 +15,11 @@ export async function openClientSheet(id,{onEdit,onQuote,onDelete}={}){
   const root=document.createElement('div');
   root.className='modal-backdrop';let timerId=null;root.innerHTML='<div class="modal glass sheet"><p class="muted">Chargement de la fiche…</p></div>';
   document.body.append(root);
-  const close=()=>{document.removeEventListener('keydown',onKey);root.remove()};
+  // 15.4.66 — l'arrêt du compteur est AUTOMATIQUE à la sortie de la fiche (croix, Échap, clic
+  // hors de la fiche, ouverture d'un autre écran) : le compteur ne tourne jamais indéfiniment.
+  // La session ouverte du client — en cours OU en pause — est terminée côté serveur avec la
+  // sémantique exacte de l'arrêt (durée accumulée préservée, session comptabilisée).
+  const close=()=>{document.removeEventListener('keydown',onKey);api.stopClientTimer(c.id).catch(()=>{});root.remove()};
   const onKey=ev=>{if(ev.key==='Escape')close()};document.addEventListener('keydown',onKey);
   root.addEventListener('click',ev=>{if(ev.target===root)close()});
   let d;
@@ -30,18 +34,24 @@ export async function openClientSheet(id,{onEdit,onQuote,onDelete}={}){
    </div>
    <div class="kpi-grid"><div class="kpi"><span>Documents</span><b>${st.invoiceCount+st.quoteCount}</b><small>${st.invoiceCount} facture(s) · ${st.quoteCount} devis</small></div><div class="kpi accent"><span>Factures émises TTC</span><b>${money(st.invoicedTtc)}</b><small>${st.invoiceCount} facture(s) · payé ${money(st.paidTtc||0)} · restant ${money(st.remainingTtc||0)}</small></div><div class="kpi"><span>Devis en attente</span><b>${money(st.pendingQuotesTtc)}</b><small>${st.quoteCount} devis</small></div><div class="kpi"><span>Rendez-vous</span><b>${st.appointmentCount}</b><small>Rendez-vous programmés</small></div><div class="kpi"><span>Temps Aurion</span><b>${Number(st.timeSessionCount||0)>0?`${Number(st.actualMinutes||0).toFixed(1)} min`:'—'}</b><small>${Number(st.timeSessionCount||0)>0?(Number(st.savedMinutes||0)>0?`Économisé : ${Number(st.savedMinutes).toFixed(1)} min`:'Temps mesuré'):'Aucune session terminée'}</small></div></div>
    <div class="sheet-cols">
-    <section class="sheet-block"><h3>Historique des documents</h3>${d.documents.slice(0,12).map(x=>`<div class="hist-row"><div><b>${e(x.number)}</b><small>${x.document_type==='invoice'?'Facture':'Devis'}${['canceled','cancelled','void','deleted'].includes(String(x.status||'').toLowerCase())?' · Annulé':['refused','rejected'].includes(String(x.status||'').toLowerCase())?' · Refusé':''} · ${fdate(x.created_at)} · ${e(x.intervention||'')}</small></div><div class="hist-end"><strong>${money(x.total_ttc)}</strong><button class="link-btn sheet-pdf" data-id="${x.id}" data-kind="${x.document_type==='invoice'?'invoices':'quotes'}">PDF</button></div></div>`).join('')||'<p class="muted">Aucun document pour ce client.</p>'}</section>
+    <section class="sheet-block"><h3>Historique des documents</h3>${d.documents.slice(0,12).map(x=>`<div class="hist-row"><div><b>${e(x.number)}</b><small>${x.document_type==='invoice'?'Facture':'Devis'}${['canceled','cancelled','void','deleted'].includes(String(x.status||'').toLowerCase())?' · Annulé':['refused','rejected'].includes(String(x.status||'').toLowerCase())?' · Refusé':String(x.status||'').toLowerCase()==='accepted'?' · Signé':''} · ${fdate(x.created_at)} · ${e(x.intervention||'')}</small></div><div class="hist-end"><strong>${money(x.total_ttc)}</strong><button class="link-btn sheet-pdf" data-id="${x.id}" data-kind="${x.document_type==='invoice'?'invoices':'quotes'}">PDF</button></div></div>`).join('')||'<p class="muted">Aucun document pour ce client.</p>'}</section>
     <section class="sheet-block"><h3>Rendez-vous</h3>${d.appointments.slice(0,8).map(a=>`<div class="hist-row"><div><b>${e(a.title)}</b><small>${fdt(a.starts_at)}</small></div><span class="pill">${e(statusFr[a.status]||a.status||'')}</span></div>`).join('')||'<p class="muted">Aucun rendez-vous.</p>'}</section>
    </div>
    <section class="sheet-block" id="sheet-reliability"><h3>Fiabilité de paiement</h3><p class="muted" id="reliability-loading">Calcul en cours…</p><div id="reliability-body" hidden></div></section>
    <section class="sheet-block" id="sheet-portal"><h3>Portail client</h3><p class="help">Accès invité sans compte : le client consulte et accepte ses devis par lien sécurisé, révocable à tout moment.</p><div id="portal-body"><p class="muted">Chargement…</p></div></section>
-   <div class="button-row sheet-actions"><button type="button" class="link-btn" id="sh-time" title="Mettre en pause ou relancer le compteur de ce client">⏱ Compteur automatique</button><button class="btn primary" id="sh-quote">+ Nouveau devis</button><button class="btn secondary" id="sh-pdf">Fiche PDF</button><button class="btn secondary" id="sh-edit">Modifier</button><button class="btn danger" id="sh-del">Supprimer</button></div>`;
+   <div class="button-row sheet-actions"><button type="button" class="link-btn" id="sh-time" title="Mettre en pause ou relancer le compteur de temps économisé de ce client">⏱ Compteur automatique</button><button class="btn primary" id="sh-quote">+ Nouveau devis</button><button class="btn secondary" id="sh-pdf">Fiche PDF</button><button class="btn secondary" id="sh-edit">Modifier</button><button class="btn danger" id="sh-del">Supprimer</button></div>`;
   const q=s=>root.querySelector(s);
   q('.modal-close').onclick=close;
-  // 15.4.59 — le badge de compteur devient une COMMANDE : il reflète l'état réel du chrono
+  // 15.4.66 — OUVRIR la fiche LANCE le compteur (consigne éditeur) : session déjà en cours pour
+  // ce client → conservée (idempotent) ; session en pause → relancée ; session d'un AUTRE
+  // client → lui cède la place (durée accumulée préservée côté serveur). L'estimation de la
+  // fiche est transmise au moteur du « temps économisé » ; aucun échec de compteur ne bloque
+  // jamais l'ouverture de la fiche.
+  try{await api.startTimeSession({clientId:c.id,manualMinutes:Number(c.estimated_minutes)>0?Number(c.estimated_minutes):undefined})}catch{}
+  // 15.4.59 — le badge de compteur reste une COMMANDE : il reflète l'état réel du chrono
   // (en cours / en pause) et permet de le mettre en pause, puis de le relancer, sans quitter
-  // la fiche. Le compteur démarre toujours automatiquement à la création de la fiche.
-  const syncTimer=async()=>{try{const m=await api.timeMetrics();q('#sh-time').textContent=m.active?.client_id===c.id?'⏱ Compteur en cours — cliquer pour mettre en pause':'⏸ Compteur en pause — cliquer pour relancer';return m;}catch{return null}};
+  // la fiche. L'arrêt définitif reste automatique à la fermeture de la fiche (15.4.66).
+  const syncTimer=async()=>{try{const m=await api.timeMetrics();q('#sh-time').textContent=m.active?.client_id===c.id?'⏱ Compteur de temps économisé en cours — cliquer pour mettre en pause':'⏸ Compteur de temps économisé en pause — cliquer pour relancer';return m;}catch{return null}};
   await syncTimer();
   q('#sh-time').onclick=async()=>{
     const m=await syncTimer();
@@ -49,12 +59,12 @@ export async function openClientSheet(id,{onEdit,onQuote,onDelete}={}){
     try{
       if(m.active&&m.active.client_id===c.id){
         await api.pauseTimeSession(m.active.id);
-        toast('Compteur mis en pause. Cliquez à nouveau sur le badge pour le relancer.','success');
+        toast('Compteur mis en pause : il sera arrêté automatiquement à la fermeture de la fiche.','success');
       }else if(m.active){
         return toast(`Le compteur tourne déjà pour « ${m.active.client_name||'un autre client'} » : mettez-le en pause depuis sa fiche avant de relancer celui-ci.`,'info');
       }else{
         await api.startTimeSession({clientId:c.id,manualMinutes:Number(c.estimated_minutes)>0?Number(c.estimated_minutes):undefined});
-        toast('Compteur relancé pour ce client : il se met en pause à la facturation, ou via ce badge.','success');
+        toast('Compteur relancé pour ce client : il s\u2019arrête automatiquement à la fermeture de la fiche.','success');
       }
       await syncTimer();
     }catch(x){toast(x.message||'Action impossible sur le compteur.','error')}

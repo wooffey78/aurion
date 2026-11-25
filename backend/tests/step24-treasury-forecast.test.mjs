@@ -24,7 +24,10 @@ test('trésorerie : potentiel/engagé/sorties séparés, reste dû des factures 
   assert.match(treasuryRoute, /savTotal/);
   assert.match(treasuryRoute, /aucun module d/);
   assert.match(treasuryView, /Créances restantes \(engagé\)/);
-  assert.match(treasuryView, /Devis ouverts \(potentiel\)/);
+  // 15.4.66 — le potentiel ne contient plus que les devis NON signés ; les devis signés
+  // (acceptés par le client) entrent dans les entrées prévues et sont affichés à part.
+  assert.match(treasuryView, /Devis non signés \(potentiel\)/);
+  assert.match(treasuryView, /Devis signés \(intégrés\)/);
   assert.match(treasuryView, /Sorties prévues/);
   assert.match(treasuryView, /Solde engagé \(hors potentiel\)/);
   assert.match(treasuryView, /Aucun devis prévisionnel/);

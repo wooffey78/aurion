@@ -201,84 +201,17 @@ hooks.refresh=refresh;hooks.show=show;
 function paintShell(){
   const a=active();
   // 15.4.63 — barre supérieure jamais bloquée par une donnée absente : chaque champ tolère
-  // l'absence de société/activité, et la bulle avatar garde TOUJOURS une initiale visible
-  // tant qu'aucune image d'avatar n'est réellement affichée.
+  // l'absence de société/activité.
+  // 15.4.66 (consigne éditeur) : la bulle avatar de la barre supérieure est remplacée par un
+  // simple lien « Mon compte » au design Aurion — plus de synchronisation d'image en bulle.
   document.querySelector('#shell-company').textContent=`ENTREPRISE · ${S.company?.name||'Entreprise'}`;
   document.querySelector('#shell-activity').textContent=a?.name||'Activité';
   document.querySelector('#shell-pill').textContent=prof().title||a?.name||'';
-  const avatar=document.querySelector('#shell-avatar');
-  if(avatar&&!avatar.style.backgroundImage&&!avatar.textContent.trim()) avatar.textContent=(S.company?.name||'A').trim()[0].toUpperCase()||'A';
 }
 
-let shellAvatarObjectUrl='';
-// 15.4.56 — avatar de la barre supérieure : affichage immédiat depuis un cache local (Cache API,
-// persiste entre les sessions) puis actualisation réseau avec une nouvelle tentative. Un 401
-// transient au démarrage ou une réponse lente ne fait plus disparaître l'avatar téléversé.
-const AVATAR_CACHE='aurion-avatar-v1';
-async function cachedAvatarUrl(){
-  try{
-    if(!('caches'in window))return '';
-    const c=await caches.open(AVATAR_CACHE);
-    const hit=await c.match('/account/avatar');
-    if(!hit)return '';
-    return URL.createObjectURL(await hit.blob());
-  }catch{return ''}
-}
-async function storeAvatarCache(blob){
-  try{
-    if(!('caches'in window))return;
-    const c=await caches.open(AVATAR_CACHE);
-    await c.put('/account/avatar',new Response(blob,{headers:{'Content-Type':blob.type||'image/png'}}));
-  }catch{}
-}
-async function clearAvatarCache(){
-  try{if('caches'in window){const c=await caches.open(AVATAR_CACHE);await c.delete('/account/avatar')}}catch{}
-}
-async function applyAvatarBlob(blob){
-  // 15.4.62 — un blob vide ou illisible ne masque plus les initiales : l'application échoue
-  // explicitement et le repli (initiale de l'entreprise) reste visible.
-  if(!blob||!blob.size)throw new Error('AVATAR_EMPTY');
-  const avatar=document.querySelector('#shell-avatar');
-  if(!avatar)return;
-  if(shellAvatarObjectUrl)URL.revokeObjectURL(shellAvatarObjectUrl);
-  shellAvatarObjectUrl=URL.createObjectURL(blob);
-  avatar.textContent='';
-  avatar.style.backgroundImage=`url("${shellAvatarObjectUrl}")`;
-  avatar.style.backgroundSize='cover';
-  avatar.style.backgroundPosition='center';
-}
-async function syncShellAvatar(){
-  const avatar=document.querySelector('#shell-avatar');
-  if(!avatar)return;
-  const fallback=()=>{avatar.textContent=(S.company.name||'A')[0].toUpperCase();avatar.style.backgroundImage=''};
-  try{const cached=await cachedAvatarUrl();if(cached)await applyAvatarBlob(cached)}catch{}
-  for(let attempt=0;attempt<2;attempt++){
-    try{
-      const info=await api.account();
-      if(!info?.user?.avatarUrl){await clearAvatarCache();if(!shellAvatarObjectUrl)fallback();return}
-      const response=await api.accountAvatar();
-      if(!response.ok)throw new Error('Avatar indisponible');
-      const blob=await response.blob();
-      await applyAvatarBlob(blob);
-      await storeAvatarCache(blob);
-      return;
-    }catch{
-      if(attempt===0){await new Promise(r=>setTimeout(r,1200))}
-      else if(!shellAvatarObjectUrl)fallback();
-    }
-  }
-}
-
-function applyShellAvatar(url){
-  const avatar=document.querySelector('#shell-avatar');
-  if(!avatar||!url)return;
-  if(shellAvatarObjectUrl)URL.revokeObjectURL(shellAvatarObjectUrl);
-  shellAvatarObjectUrl=url;
-  avatar.textContent='';
-  avatar.style.backgroundImage=`url("${url}")`;
-  avatar.style.backgroundSize='cover';
-  avatar.style.backgroundPosition='center';
-}
+// 15.4.66 (consigne éditeur) : toute la mécanique « avatar de la barre supérieure » (cache
+// Cache API, blob objet, resynchronisations) est retirée avec la bulle ; le lien « Mon compte »
+// n'affiche aucune image. L'avatar téléversé reste disponible dans la page Mon compte.
 
 function installBackgroundRefresh(){
   if(lifecycleRefreshInstalled)return;lifecycleRefreshInstalled=true;
@@ -301,7 +234,7 @@ function installBackgroundRefresh(){
   });
   window.addEventListener('focus',()=>maybeRefresh(true),{passive:true});
   window.addEventListener('online',()=>maybeRefresh(true),{passive:true});
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){maybeRefresh(true);try{maybeSyncShellAvatar()}catch{}}});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){maybeRefresh(true)}});
   window.setInterval(()=>maybeRefresh(false),45000);
 }
 
@@ -315,8 +248,7 @@ export async function renderDashboard(){
   await load([...(EXTRAS[initialView]||[])],initialView);
   if(initialView==='accounting'||initialView==='treasury')lastFinancialRefreshAt=Date.now();
   lastBackgroundRefreshAt=Date.now();installBackgroundRefresh();installDataGoDelegation();
-  document.querySelector('#app').innerHTML=`<div class="dashboard-shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#/dashboard" aria-label="Aurion — retour au tableau de bord" title="Retour au tableau de bord">${appLogo('42')}<span>AURION<small>PRO</small></span></a><button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar"><span></span><span></span><span></span></button><nav class="nav" aria-label="Navigation principale"></nav><div class="sidebar-bottom"><button id="logout" class="nav-logout">Quitter</button><div class="status-dot"><i></i> Système opérationnel</div></div></aside><section class="workspace"><header class="dashboard-top"><div class="activity-switch"><span class="eyebrow" id="shell-company"></span><button id="activity-picker" class="activity-picker"><span>ACTIVITÉ ACTIVE</span><strong id="shell-activity"></strong><small>▾</small></button></div><div class="top-actions"><span class="pill shell-clock" id="local-clock" aria-label="Heure locale" title="Heure locale de votre appareil"></span><span class="pill" id="shell-pill"></span><button class="btn secondary small" id="fs-toggle" type="button" title="Activer le plein écran" aria-label="Activer le plein écran" aria-pressed="false"><span class="fs-icon" aria-hidden="true">⛶</span><span class="fs-label">Plein écran</span></button><button class="avatar" id="shell-avatar" title="Mon compte" aria-label="Mon compte">A</button></div></header><main id="main" class="content"><div id="view"></div></main></section></div><div id="activity-modal-root"></div>`;
-  await syncShellAvatar();
+  document.querySelector('#app').innerHTML=`<div class="dashboard-shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#/dashboard" aria-label="Aurion — retour au tableau de bord" title="Retour au tableau de bord">${appLogo('42')}<span>AURION<small>PRO</small></span></a><button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar"><span></span><span></span><span></span></button><nav class="nav" aria-label="Navigation principale"></nav><div class="sidebar-bottom"><button id="logout" class="nav-logout">Quitter</button><div class="status-dot"><i></i> Système opérationnel</div></div></aside><section class="workspace"><header class="dashboard-top"><div class="activity-switch"><span class="eyebrow" id="shell-company"></span><button id="activity-picker" class="activity-picker"><span>ACTIVITÉ ACTIVE</span><strong id="shell-activity"></strong><small>▾</small></button></div><div class="top-actions"><span class="pill shell-clock" id="local-clock" aria-label="Heure locale" title="Heure locale de votre appareil"></span><span class="pill" id="shell-pill"></span><button class="btn secondary small" id="fs-toggle" type="button" title="Activer le plein écran" aria-label="Activer le plein écran" aria-pressed="false"><span class="fs-icon" aria-hidden="true">⛶</span><span class="fs-label">Plein écran</span></button><a class="account-link" href="#/dashboard?view=account" title="Mon compte">Mon compte</a></div></header><main id="main" class="content"><div id="view"></div></main></section></div><div id="activity-modal-root"></div>`;
   // Horloge unique de la coquille : visible sur toute la navigation, jamais dupliquée par vue.
   startLocalClock(document.getElementById('local-clock'));
   // File locale des documents cloud : liée à l'entreprise de la session (jamais d'envoi pour un autre compte de l'appareil).
@@ -332,8 +264,8 @@ export async function renderDashboard(){
   burger.onclick=()=>setMenu(!side.classList.contains('open'));
   hooks.closeMenu=()=>setMenu(false);
   document.querySelector('#activity-picker').onclick=openActivityPicker;
-  document.querySelector('#shell-avatar').onclick=()=>show('account');
-  window.addEventListener('aurion-avatar-updated',ev=>applyShellAvatar(ev.detail?.url));
+  // 15.4.66 — le lien « Mon compte » navigue par hachage (#/dashboard?view=account) : la
+  // navigation reste réelle (clic droit, copier le lien), aucun gestionnaire d'image à syncroniser.
   document.querySelector('#logout').onclick=()=>api.logout().finally(()=>{import('../core/session-identity.js').then(m=>m.resetIdentity()).catch(()=>{});import('../core/outbox.js').then(m=>m.clearOutboxOwner()).catch(()=>{});import('../core/sync-manager.js').then(m=>m.clearSyncOwner()).catch(()=>{});invalidateSession();go('/')});
   const fullscreenButton=document.querySelector('#fs-toggle');
   const syncFullscreenButton=()=>{
@@ -385,9 +317,6 @@ export async function renderDashboard(){
   window.__aurionMetricsTimer=setInterval(async()=>{
     if(metricsRefreshInProgress)return;
     metricsRefreshInProgress=true;
-    // 15.4.65 — l'avatar de la bulle se resynchronise en tâche de fond (throttle 60 s) :
-    // une image téléversée apparaît dans la bulle même après un échec transitoire.
-    try{maybeSyncShellAvatar()}catch{}
     const viewAtStart=S.view;
     try{
       if(viewAtStart==='home'&&Date.now()-lastDashboardSummaryRefreshAt>=30000){

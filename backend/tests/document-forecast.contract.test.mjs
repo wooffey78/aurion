@@ -10,6 +10,10 @@ const ui = readFileSync(new URL('assets/js/pages/dash/other.js', root), 'utf8');
 test('accueil et trésorerie partagent le même calcul de devis TTC et SAV financiers', () => {
   assert.match(service, /sum\(total_ttc\)/);
   assert.match(service, /document_type='quote'/);
+  // 15.4.66 (consigne éditeur) : un devis NON signé n'est pas pris en compte dans les
+  // calculs — seuls les devis acceptés par le client (statut 'accepted', horodaté) entrent
+  // dans les entrées prévisionnelles.
+  assert.match(service, /lower\(coalesce\(status,''\)\)='accepted' and accepted_at is not null/);
   assert.match(service, /lower\(coalesce\(status,''\)\) not in/);
   assert.match(service, /'rejected','refused','expired','void','deleted'/);
   assert.match(service, /sum\(amount_ttc\)/);
@@ -17,9 +21,12 @@ test('accueil et trésorerie partagent le même calcul de devis TTC et SAV finan
   assert.match(service, /entries: quotesTtc \+ savTtc/);
   assert.equal((routes.match(/documentForecastEntries\(org,aid\)/g) || []).length, 2);
   assert.match(routes, /forecastEntries:cashForecast\.entries/);
+  // La trésorerie sépare les deux populations : potentiel = devis NON signés uniquement.
+  assert.match(routes, /potentialIn=rows\.filter\(\(x:any\)=>x\.document_type==='quote'&&String\(x\.status\|\|''\)\.toLowerCase\(\)!=='accepted'\)/);
+  assert.match(routes, /signedIn:cashForecast\.quotesTtc/);
   assert.match(ui, /Entrées prévues/);
   assert.match(ui, /TTC, SAV déduits/);
-  assert.match(ui, /Devis ouverts TTC diminués des SAV financiers/);
+  assert.match(ui, /Devis SIGNÉS \(acceptés par le client\) TTC diminués des SAV financiers/);
 });
 
 

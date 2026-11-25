@@ -143,8 +143,17 @@ test('Chantiers : retour au masquage par activité (fonctionnement antérieur à
   assert.doesNotMatch(pfFront, /chantiers: true/);
 });
 
-// 15.4.65 — formule harmonisée : baseline de 20 minutes par session terminée (compteur
-// global ET stats par client), temps économisé jamais négatif.
-assert.match(business, /MANUAL_BASELINE_MINUTES=20/);
+// 15.4.66 — formule harmonisée (consigne éditeur) : chaque session terminée représente au
+// minimum 1 minute de travail manuel (compteur global ET stats par client), temps économisé
+// jamais négatif.
+assert.match(business, /MANUAL_BASELINE_MINUTES=1;/);
 assert.match(business, /greatest\(coalesce\(manual_minutes,0\),\$\{MANUAL_BASELINE_MINUTES\}\)/);
-assert.match(clients, /greatest\(coalesce\(manual_minutes,0\),20\)/);
+assert.match(clients, /greatest\(coalesce\(manual_minutes,0\),1\)/);
+
+// 15.4.66 — cycle de vie du compteur (consigne éditeur) : OUVRIR la fiche client lance le
+// chrono, la SORTIE de la fiche l'arrête automatiquement (aucune session ouverte à l'infini),
+// le badge de la fiche permet de le mettre en pause puis de le relancer.
+assert.match(sheet, /api\.startTimeSession\(\{clientId:c\.id/);
+assert.match(sheet, /api\.stopClientTimer\(c\.id\)/);
+assert.match(business, /app\.post\('\/time-sessions\/stop-client'/);
+assert.match(api, /stopClientTimer:clientId=>request\('\/time-sessions\/stop-client'/);

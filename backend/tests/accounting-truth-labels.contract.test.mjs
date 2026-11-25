@@ -13,7 +13,10 @@ test('les indicateurs comptables affichent leur base de trésorerie réelle', ()
   assert.match(ui, /Factures encaissées/);
   assert.match(ui, /Kilométrage sur factures/);
   assert.match(ui, /Dépenses et coûts directs HT/);
-  assert.match(business, /count\(distinct q\.id\)::int n from quotes q join invoice_payments p/);
+  // 15.4.65+ — « Factures encaissées » croise paiements détaillés et factures payées sans
+  // ligne de paiement (UNION) : le contrat suit la requête réelle.
+  assert.match(business, /count\(distinct quote_id\)::int n from \(/);
+  assert.match(business, /from invoice_payments p join quotes q on q\.id=p\.quote_id/);
 });
 
 test('les totaux de l’accueil excluent devis annulés et rendez-vous passés', () => {
@@ -43,7 +46,8 @@ test('l’accueil ne présente pas des encaissements comme un chiffre d’affair
 test('les prévisions issues des factures sont libellées comme factures et comme projections', () => {
   assert.match(ui, /Factures moyennes \/ mois/);
   assert.match(ui, /Factures projetées/);
-  assert.match(ui, /Année — réalisé HT \+ projection HT/);
+  // 15.4.65+ — le « Détail » affiche les projections HT du scénario (libellés actualisés).
+  assert.match(ui, /Année — projection HT \(scénario\)/);
   // Bases explicites : entrées TTC, provision sur le HT, TVA non déduite du solde.
   assert.match(ui, /Sorties estimées \(TTC \+ provision HT\)/);
   assert.match(ui, /Solde estimé \(avant TVA à reverser\)/);

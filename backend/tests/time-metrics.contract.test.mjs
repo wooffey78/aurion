@@ -53,7 +53,9 @@ test('toutes les lectures de sessions respectent l’exclusion (métriques, fich
 });
 
 test('la fiche client ne transforme plus une estimation sans session en temps économisé', () => {
-  assert.match(clients, /sum\(manual_minutes\)/);
+  // 15.4.66 — la somme applique la baseline par session (1 minute, consigne éditeur) : le
+  // moteur est désormais exprimé via sum(greatest(coalesce(manual_minutes,0),1)).
+  assert.match(clients, /sum\(greatest\(coalesce\(manual_minutes,0\),1\)\)/);
   assert.match(clients, /status='completed' and ended_at is not null/);
   assert.match(clients, /const estimatedMinutes=Number\(tm\?\.manual_minutes\|\|0\)/);
   assert.doesNotMatch(clients, /estimatedMinutes=Number\(c\?\.estimated_minutes/);

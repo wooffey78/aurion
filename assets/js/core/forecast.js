@@ -45,7 +45,6 @@ export function deriveAutomaticForecastAssumptions(documents = [], activity = {}
   const recentWindow = recent.filter(({ date }) => date >= startSixMonths);
   const invoices = recentWindow.filter(({ document }) => document?.document_type === 'invoice');
   const recentInvoices = invoices;
-  const quoteSamples = recentWindow.filter(({ document }) => document?.document_type === 'quote');
   const sample = invoices.length ? invoices : quoteSamples;
 
   const average = values => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
@@ -112,6 +111,10 @@ export function deriveAutomaticForecastAssumptions(documents = [], activity = {}
   // 15.4.62 — le prévisionnel PREND LES DEVIS EN COMPTE : le volume mensuel retient les
   // factures récentes ET les devis récents (document_type='quote' non annulé), sinon une
   // activité qui devisse sans encore facturer restait à 0 facture/mois.
+  // 15.4.66 (consigne éditeur) : seuls les devis SIGNÉS (acceptés par le client) entrent dans
+  // les calculs — un devis non signé n'est pas pris en compte, ni dans les entrées prévues,
+  // ni dans ce scénario dérivé des documents récents.
+  const quoteSamples = recentWindow.filter(({ document }) => document?.document_type === 'quote' && String(document?.status || '').trim().toLowerCase() === 'accepted');
   const projectedCount = recentInvoices.length + quoteSamples.length;
   const normalized = normalizeForecastAssumptions({
     potentialClientsPerMonth: projectedCount / 6,
@@ -127,12 +130,12 @@ export function deriveAutomaticForecastAssumptions(documents = [], activity = {}
     metadata: {
       recentInvoiceCount: recentInvoices.length,
       sampleCount: sample.length,
-      sampleSource: fromInvoices ? 'factures récentes' : (quoteSamples.length ? 'devis récents (aucune facture récente)' : 'aucun document récent'),
+      sampleSource: fromInvoices ? 'factures récentes' : (quoteSamples.length ? 'devis signés récents (aucune facture récente)' : 'aucun document récent'),
       volumeNote: projectedCount
-        ? (recentInvoices.length ? 'Moyenne des factures' : 'Moyenne des devis') + (recentInvoices.length && quoteSamples.length ? ' et devis' : '') + ' créés sur les 6 derniers mois.'
-        : 'Aucun document récent : Aurion retient 0 facture par mois faute d’historique.',
+        ? (recentInvoices.length ? 'Moyenne des factures' : 'Moyenne des devis signés') + (recentInvoices.length && quoteSamples.length ? ' et devis signés' : '') + ' créés sur les 6 derniers mois.'
+        : 'Aucun document récent : Aurion retient 0 facture par mois faute d\u2019historique.',
       ticketNote: ticketValues.length
-        ? 'Ticket moyen calculé à partir des ' + (fromInvoices ? 'factures' : 'devis récents') + ' disponibles.'
+        ? 'Ticket moyen calculé à partir des ' + (fromInvoices ? 'factures' : 'devis signés récents') + ' disponibles.'
         : 'Aucun montant de document récent exploitable.',
       ticketHtNote: ticketHtValues.length
         ? 'Moyenne de la base HT retenue pour la provision, hors déplacement refacturé au client.'

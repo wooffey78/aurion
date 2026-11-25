@@ -57,7 +57,10 @@ test('6 — l\u2019avatar n\u2019est plus jamais vide : initiales toujours rendu
   assert.match(account, /<div class="account-avatar-stack"><div class="avatar-lg" aria-hidden="true">/);
   assert.match(account, /img\.onerror=\(\)=>img\.remove\(\);/);
   assert.match(account, /if\(blob&&blob\.size>0\)/);
-  assert.match(dashboard, /if\(!blob\|\|!blob\.size\)throw new Error\('AVATAR_EMPTY'\)/);
+  // 15.4.66 (consigne éditeur) : la bulle avatar de la coquille est remplacée par le lien
+  // « Mon compte » — plus aucune mécanique d'image avatar dans le tableau de bord.
+  assert.doesNotMatch(dashboard, /id="shell-avatar"/);
+  assert.match(dashboard, /class="account-link"/);
   assert.match(css, /\.account-avatar-stack\{position:relative/);
   assert.match(css, /\.account-avatar-stack \.account-avatar-image\{position:absolute/);
 });
@@ -82,14 +85,13 @@ test('7 — Administration → Intégrations → Plateformes agréées → Tiime
   assert.match(apijs, /adminTiime:\(\)=>request\('\/admin\/tiime'\),flushEmails:\(\)=>request\('\/communications\/email\/flush',\{method:'POST'\}\),saveAdminTiime:b=>request\('\/admin\/tiime',\{method:'PUT',body:JSON\.stringify\(b\)\}\)/);
 });
 
-test('8 — Administration : les indicateurs s\u2019affichent aussi en diagrammes (mêmes données)', () => {
-  // 15.4.63 — la bascule est devenue un bouton unique exclusif et persistant.
-  assert.match(other, /id="admin-view-toggle"/);
-  assert.match(other, /aurion-admin-view/);
-  assert.match(other, /renderChart\('chart-admin-orgs'/);
-  assert.match(other, /renderChart\('chart-admin-free'/);
-  assert.match(other, /renderChart\('chart-admin-billing'/);
-  assert.match(other, /renderChart\('chart-admin-conversion'/);
-  assert.match(other, /const applyAdminView=mode=>/);
-  assert.match(css, /\.admin-charts-grid\{display:grid/);
+test('8 — Administration : cartes chiffrées uniquement (encart diagrammes supprimé, 15.4.66)', () => {
+  // 15.4.66 (consigne éditeur) : l'encart d'affichage des indicateurs en diagrammes disparaît
+  // complètement — bascule, vue mémorisée, conteneur et CSS. Les cartes chiffrées restent.
+  assert.doesNotMatch(other, /id="admin-view-toggle"/);
+  assert.doesNotMatch(other, /aurion-admin-view/);
+  assert.doesNotMatch(other, /id="admin-charts"/);
+  assert.doesNotMatch(other, /class="admin-view-switch"/);
+  assert.match(other, /id="admin-metrics"/);
+  assert.doesNotMatch(css, /\.admin-charts-grid\{/);
 });
