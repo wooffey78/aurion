@@ -1,6 +1,6 @@
 # RAPPORT DE LIVRAISON — 15.4.66 (signé devis = calculs intégrés · compteur 1 min lié à la fiche · administration allégée · lien Mon compte · scrollbar bleu Aurion)
 
-Date : 25 novembre 2026 · Précédente : 15.4.65 · Patch de publication CUMULATIF (porte aussi 15.4.65) fourni, prêt à pousser sur `main` → Render.
+Date : 25 novembre 2026 · Précédente : 15.4.65 · **Publiée directement sur `main` par l'atelier** (commit posé au-dessus de la 15.4.65 en ligne, arbre vérifié identique au contrat) → Render redéploie automatiquement.
 
 ## 1 · Consignes de l'éditeur — toutes réalisées (prouvées par contrats + harnais d'exécution)
 1. **Compteur temps — minimum 1 minute par session terminée** (au lieu de 20) : moteur global (`/time-metrics`, `MANUAL_BASELINE_MINUTES=1`) ET statistiques de la fiche client harmonisés ; textes d'écran mis à jour.
@@ -16,8 +16,8 @@ Contrats statiques mis à jour pour verrouiller chaque consigne (baseline 1 min,
 ## 3 · Vérifications (boucle complète, arbre estampillé 15.4.66)
 Build Render exact **0 erreur** · typecheck **0 erreur** · smoke **177/177** · lot métier **50/50** · golden calculs **5/5** · contrats admin/temps/prévisionnel/trésorerie **verts** · smoke vues **20/20** · bind éditeur **tout réglé** · check frontend 50 fichiers · ESLint **0**. L'e2e navigateur exige PostgreSQL + Playwright (indisponibles dans le bac à sable de préparation) : il s'exécute dans la CI GitHub au push.
 
-## 4 · Livraison
-Patch de publication **cumulatif** prêt : `download/AURION-15.4.66-PUBLICATION.patch` (base `13238f7` = 15.4.64 publiée — il contient donc aussi la totalité de 15.4.65) → `git am` + `git push origin main` → déploiement Render automatique. ZIP complet : `download/AURION-15.4.66-production.zip`. Version estampillée 15.4.66 partout (VERSION.txt, package.json, locks, `?v=15.4.66-r1`, service worker `aurion-shell-v15.4.66-r1` → rechargement du cache au premier accès).
+## 4 · Livraison — publiée sur `main`, plus de patch à appliquer
+La 15.4.66 est **poussée directement sur `main` par l'atelier** : commit « Aurion 15.4.66 » posé au-dessus de la 15.4.65 publiée (`03be25d`), arbre vérifié **identique au contrat** — Render redéploie automatiquement, **aucune commande n'est requise de votre côté** (un simple **Ctrl+F5** au premier accès ; pour resynchroniser votre clone local : `git pull origin main`, facultatif). Le **prompt d'exigences est intégré au dépôt** (`docs/PROMPT-EXIGENCES-15.4.66.md`) — plus de téléchargement séparé. En archive de sécurité : le patch **incrémental 15.4.65 → 15.4.66** (30 fichiers, +311/−226, régénéré propre — sans lien symbolique ni inversion de mode) vérifié par simulation exacte (`13238f7` + patch 15.4.65 + `git am` incrémental → arbre identique au contrat), et le ZIP complet de production. Version estampillée 15.4.66 partout (VERSION.txt, package.json, locks, `?v=15.4.66-r1`, service worker `aurion-shell-v15.4.66-r1` → rechargement du cache au premier accès).
 
 ## 5 · Recette conseillée
 1. **Devis** : créer un devis → « Entrées prévues » ne bouge PAS ; cliquer « Signé », confirmer → pastille verte « Signé », « Entrées prévues » intègre le TTC ; « Devis non signés (potentiel) » baisse d'autant dans Trésorerie.
