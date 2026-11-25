@@ -21,7 +21,11 @@ export async function loadProfileFeatures(force = false) {
   if (INFLIGHT && !force) return INFLIGHT;
   INFLIGHT = (async () => {
     try {
-      const res = await (await import('./api.js')).api.authFetch('/profile-features');
+      // 15.4.70 — les fonctionnalités doivent suivre l'ACTIVITÉ ACTIVE : sans cet en-tête, le
+      // serveur répondait pour la dernière activité modifiée et Chantiers restait visible.
+      const activeId = localStorage.getItem('aurion.activeActivityId') || '';
+      const headers = activeId ? { 'x-aurion-activity-id': activeId } : {};
+      const res = await (await import('./api.js')).api.authFetch('/profile-features', { headers });
       if (!res.ok) throw new Error(String(res.status));
       CACHE = await res.json();
     } catch {

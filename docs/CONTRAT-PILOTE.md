@@ -1,6 +1,6 @@
 # Contrat de pilote — Aurion (template, PROMPT F1)
 
-Document type à personnaliser pour chacun des 10 clients pilotes. Durée : **3 mois**. Le pilote est gratuit ; en contrepartie, le pilote s'engage sur le retour d'expérience et la mesure (docs/PILOTE-SUIVI.md). Le cadre juridique est complet dès l'installation : CGU v5.0 + DPA signé (acceptation tracée dans l'application) + réversibilité totale.
+Document type à personnaliser pour chacun des 10 clients pilotes. Durée : **3 mois**. Le pilote est gratuit ; en contrepartie, le pilote s'engage sur le retour d'expérience et la mesure (docs/PILOTE-SUIVI.md). Le cadre juridique est complet dès l'installation : CGU v5.1 + DPA signé (acceptation tracée dans l'application) + réversibilité totale.
 
 ---
 
@@ -12,7 +12,7 @@ Document type à personnaliser pour chacun des 10 clients pilotes. Durée : **3 
 
 ## 1. Objet
 
-Mise à disposition gratuite du service Aurion (version courante) au Pilote pour une durée de trois (3) mois à compter du {{date de début}}, aux conditions générales v5.0 et au contrat de sous-traitance de traitement (DPA) publiés dans l'application, que le Pilote accepte lors de l'activation de son compte (acceptation datée et conservée).
+Mise à disposition gratuite du service Aurion (version courante) au Pilote pour une durée de trois (3) mois à compter du {{date de début}}, aux conditions générales v5.1 et au contrat de sous-traitance de traitement (DPA) publiés dans l'application, que le Pilote accepte lors de l'activation de son compte (acceptation datée et conservée).
 
 ## 2. Engagements du Pilote
 
@@ -32,7 +32,7 @@ Mise à disposition gratuite du service Aurion (version courante) au Pilote pour
 ## 4. Conditions financières
 
 - Pilote : **gratuit** pendant 3 mois.
-- À l'issue, si le Pilote souscrit dans les **30 jours** suivant la fin du pilote : tarif de **19,50 €/mois ( TTC) la première année** (-50 % sur la grille docs/TARIFS-ABONNEMENT.md), puis grille normale. Sans souscription, aucune somme n'est due.
+- À l'issue, si le Pilote souscrit dans les **30 jours** suivant la fin du pilote : tarif de **7,00 €/mois (TTC) la première année** (-50 % sur la grille de 14,00 €/mois, docs/TARIFS-ABONNEMENT.md), puis grille normale. Sans souscription, aucune somme n'est due.
 
 ## 5. Limites assumées pendant le pilote
 

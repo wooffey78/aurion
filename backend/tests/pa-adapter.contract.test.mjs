@@ -12,7 +12,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const genericPath = fileURLToPath(new URL('../dist/services/pa/generic.js', import.meta.url));
 const registryPath = fileURLToPath(new URL('../dist/services/pa/index.js', import.meta.url));
@@ -29,7 +29,7 @@ process.env.JWT_SECRET ||= 'contract-test-jwt-secret-0123456789abcdef';
 
 function makeAdapter() {
   // Import unique par fichier (le registre importe l'adaptateur) — cache ESM partagé.
-  return import(genericPath).then(generic => import(registryPath).then(registry => ({ generic, registry })));
+  return import(pathToFileURL(genericPath).href).then(generic => import(pathToFileURL(registryPath).href).then(registry => ({ generic, registry })));
 }
 const modules = ready ? await makeAdapter() : null;
 

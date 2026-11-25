@@ -21,7 +21,9 @@ const read = p => readFileSync(new URL(p, import.meta.url), 'utf8');
 test('bloc11: le schéma accepte newClient et la création se fait dans la transaction du document', () => {
   const business = read('../src/routes/business.ts');
   assert.match(business, /newClient: z\.object\(\{[\s\S]*?name: z\.string\(\)\.trim\(\)\.min\(1\)/);
-  assert.match(business, /createClientForDocument\(clientDb,org,aid,b\.newClient\)/);
+  // 15.4.70 — la création directe porte aussi l'utilisateur auteur (traçabilité) : le contrat
+  // vérifie l'appel transactionnel, pas la position exacte de ce paramètre supplémentaire.
+  assert.match(business, /createClientForDocument\(clientDb,org,aid,(?:r\.auth!\.userId,)?b\.newClient\)/);
   // Adresse composée des seules coordonnées saisies (aucune invention) :
   assert.match(business, /composeClientAddress/);
   // Recherche de doublons dédiée, sans route de fusion automatique :

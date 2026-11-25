@@ -28,6 +28,8 @@ assert.match(docs,/api\.createSav\(/,'Étape 34: création SAV');
 assert.match(docs,/api\.updateSav\(/,'Étape 34: modification SAV');
 assert.match(docs,/api\.deleteSav\(/,'Étape 34: suppression SAV');
 assert.match(core,/await hooks\.refresh\(\)/,'Étape 35: rafraîchissement après mutation');
-assert.match(other,/value="__all__">Toutes les activités/,'Étape 35: choix Toutes les activités non ambigu');
-assert.match(other,/selectedActivity==='__all__'\?''\:selectedActivity/,'Étape 35: Toutes les activités conserve le contrat API');
+// 15.4.67 : le mode ambigu « Toutes les activités » a été retiré du sélecteur ; une activité
+// réelle est toujours active (aucune requête sans x-aurion-activity-id). On verrouille ce choix.
+assert.doesNotMatch(other,/__all__/,'Étape 35: aucun mode agrégé ambigu dans les vues métier');
+assert.match(dashboard,/S\.activities\.map\(a=>`<button class="activity-choice/,'Étape 35: le sélecteur ne propose que de vraies activités');
 console.log('final-cycle-31-35: 5/5 OK');

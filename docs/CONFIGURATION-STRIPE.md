@@ -1,4 +1,4 @@
-# Configuration Stripe — runbook éditeur (15.4.51, PROMPT E1)
+# Configuration Stripe — runbook éditeur (15.5.0)
 
 Procédure d'activation de la facturation d'abonnement. **Opérations console = éditeur** ; les garde-fous applicatifs sont livrés et testés. Aucun identifiant de prix n'est codé en dur dans le code : la cohérence « code ↔ Stripe » passe par les variables d'environnement ci-dessous.
 

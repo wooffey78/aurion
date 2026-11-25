@@ -16,8 +16,9 @@ process.env.AURION_STORAGE_BACKEND ||= 'local';
 
 const databaseUrl = process.env.DATABASE_URL || process.env.AURION_INTEGRATION_DATABASE_URL;
 const distAccount = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'services', 'account.js');
-const ready = existsSync(distAccount) && Boolean(databaseUrl);
-const skip = ready ? false : 'dist/ absent ou DATABASE_URL non défini : exécuter après « npm run build » sur une base de test migrée';
+// Les scénarios Stripe/abonnement touchent PostgreSQL : ne jamais les lancer sur une URL factice.
+const ready = existsSync(distAccount) && Boolean(databaseUrl) && process.env.AURION_INTEGRATION_TESTS === '1';
+const skip = ready ? false : 'dist/ absent, AURION_INTEGRATION_TESTS≠1 ou DATABASE_URL non défini : exécuter après « npm run build » sur une base de test migrée';
 
 const createdOrganizations = new Set();
 

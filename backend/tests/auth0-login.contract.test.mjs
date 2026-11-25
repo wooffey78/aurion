@@ -59,7 +59,8 @@ test('Auth0 : la session finale reste une session Aurion et le bouton est facult
 
 test('Auth0 : la documentation n’expose aucun secret côté frontend', () => {
   const env = read('backend/.env.example');
-  const render = read('render.yaml');
+  // `render.yaml` peut être livré en CRLF (Windows) : normaliser avant la comparaison exacte.
+  const render = read('render.yaml').replace(/\r\n/g, '\n');
   const docs = read('docs/AUTH0-CONFIGURATION.md');
   assert.match(env, /^AUTH0_DOMAIN=$/m);
   assert.match(env, /^AUTH0_CLIENT_ID=$/m);

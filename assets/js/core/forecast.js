@@ -45,6 +45,10 @@ export function deriveAutomaticForecastAssumptions(documents = [], activity = {}
   const recentWindow = recent.filter(({ date }) => date >= startSixMonths);
   const invoices = recentWindow.filter(({ document }) => document?.document_type === 'invoice');
   const recentInvoices = invoices;
+  // 15.4.70 — les devis SIGNÉS sont définis AVANT le choix de l'échantillon : l'ancien ordre
+  // utilisait quoteSamples dans une zone morte temporelle (Cannot access 'quoteSamples'
+  // before initialization) et cassait tout le tableau de bord.
+  const quoteSamples = recentWindow.filter(({ document }) => document?.document_type === 'quote' && String(document?.status || '').trim().toLowerCase() === 'accepted');
   const sample = invoices.length ? invoices : quoteSamples;
 
   const average = values => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
@@ -114,7 +118,6 @@ export function deriveAutomaticForecastAssumptions(documents = [], activity = {}
   // 15.4.66 (consigne éditeur) : seuls les devis SIGNÉS (acceptés par le client) entrent dans
   // les calculs — un devis non signé n'est pas pris en compte, ni dans les entrées prévues,
   // ni dans ce scénario dérivé des documents récents.
-  const quoteSamples = recentWindow.filter(({ document }) => document?.document_type === 'quote' && String(document?.status || '').trim().toLowerCase() === 'accepted');
   const projectedCount = recentInvoices.length + quoteSamples.length;
   const normalized = normalizeForecastAssumptions({
     potentialClientsPerMonth: projectedCount / 6,

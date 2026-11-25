@@ -122,7 +122,8 @@ test('10 — compteur temps : arrêt automatique en fin de prise en charge clien
 
 test('11 — e-mail document : statut honnête, file d\u2019attente, alertes Aurion, badge et vidage', () => {
   // serveur : mise en file quand la messagerie est absente ou en échec + vidage automatique
-  assert.match(business, /await queueOutboxEmail\(org,id,type,c\.email,subject,body\);\n    return 'queued';/);
+  // Le fichier est livré en CRLF sous Windows : accepter les deux fins de ligne.
+  assert.match(business, /await queueOutboxEmail\(org,id,type,c\.email,subject,body\);\r?\n    return 'queued';/);
   assert.match(business, /app\.post\('\/communications\/email\/flush'/);
   assert.match(mailRoute, /flushOutbox\(org\)/);
   assert.match(mailRoute, /le test réussi déclenche le vidage de la boîte d'envoi/);

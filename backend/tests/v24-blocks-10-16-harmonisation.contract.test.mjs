@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 process.env.NODE_ENV ||= 'test';
 process.env.JWT_SECRET ||= 'integration-test-jwt-secret-0123456789abcdef0123456789';
@@ -145,7 +146,7 @@ const wfPath = fileURLToPath(new URL('../dist/services/workflows.js', import.met
 const skippable = existsSync(wfPath) ? false : 'dist/ absente : lancer le build (npm test le fait)';
 
 test('unitaire — configuration de règle validée : conditions et actions déterministes', { skip: skippable }, async () => {
-  const { normalizeRuleConfig, substitute, WorkflowError, TRIGGER_LABELS } = await import(wfPath);
+  const { normalizeRuleConfig, substitute, WorkflowError, TRIGGER_LABELS } = await import(pathToFileURL(wfPath).href);
   // Aucune action inconnue acceptée ; au moins une action requise.
   assert.throws(() => normalizeRuleConfig('invoice_overdue', { actions: [] }), WorkflowError);
   assert.throws(() => normalizeRuleConfig('invoice_overdue', { actions: [{ type: 'send_money', title: 'x' }] }), WorkflowError);

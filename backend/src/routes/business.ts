@@ -340,7 +340,11 @@ function cleanItems(raw:any):QuoteItem[]{
     saleCoefficientPercent:x?.saleCoefficientPercent===null||x?.saleCoefficientPercent===undefined||x?.saleCoefficientPercent===''?null:Number(String(x.saleCoefficientPercent).replace(',','.')),
     // Bloc 8 — catégorie d'activité de la ligne (activité mixte) : conservée telle quelle,
     // validée par normalizeCategoryInput en amont (vide = non renseigné).
-    activityCategory:x?.activityCategory===null||x?.activityCategory===undefined||x?.activityCategory===''?null:String(x.activityCategory)
+    activityCategory:x?.activityCategory===null||x?.activityCategory===undefined||x?.activityCategory===''?null:String(x.activityCategory),
+    // 15.4.70 — le type de ligne est CONSERVÉ : sans lui, les prestations complémentaires
+    // (« service ») étaient enregistrées comme pièces et le total du document ne retenait que
+    // la prestation principale. Le calcul et le PDF doivent voir les deux.
+    kind:(x?.kind==='service'?'service':'part') as QuoteItem['kind']
   }))
     .filter(x=>x.label)
     .map(x=>{
@@ -406,13 +410,17 @@ async function catalogQuoteTarget(org:string,activityId:string,intervention:stri
   const service=(await query('select default_price from interventions where organization_id=$1 and activity_id=$2 and lower(trim(name))=lower(trim($3)) limit 1',[org,activityId,intervention])).rows[0];
   // Le prix catalogue d’une prestation est un prix TTC fixe : il englobe déjà
   // main-d’œuvre, pièces, livraison, kilométrage, cotisations et taxes.
-  // Les pièces restent des coûts internes et ne s’ajoutent jamais au TTC client.
+  // 15.4.70 — une pièce dont le PRIX DE VENTE est renseigné est un matériel vendu : elle
+  // s’ajoute au TTC client. Sans prix de vente, elle reste un coût interne (comme avant).
   // 15.4.67 — les prestations complémentaires (lignes « service », saisies en TTC, stockées
   // en HT reconstitué) CUMULENT au TTC facturé au client : le prix piloté par le catalogue
   // additionne la prestation principale ET toutes les prestations complémentaires — jamais
   // la seule prestation principale (règle : TTC client = cumul des prestations, temps réel).
   const extras=items.filter(i=>i.kind==='service').reduce((t,i)=>t+(Number(i.quantity)||0)*Number(i.unitPrice||0)*(1+vatRate/100),0);
-  const total=Number(service?.default_price||0)+extras;
+  // 15.4.70 — le matériel vendu (prix de vente HT renseigné) entre lui aussi dans le TTC
+  // client : une pièce ajoutée avec un prix de vente ne peut plus rester invisible du total.
+  const partsSale=items.filter(i=>i.kind!=='service'&&i.unitPrice!==null&&i.unitPrice!==undefined).reduce((t,i)=>t+(Number(i.quantity)||0)*Number(i.unitPrice||0)*(1+vatRate/100),0);
+  const total=Number(service?.default_price||0)+extras+partsSale;
   if(!Number.isFinite(total)||total<0)throw new AurionError('INVALID_INPUT','Prix catalogue de prestation invalide.');
   return round2(total);
 }
@@ -496,9 +504,12 @@ async function prepareQuoteCalculation(org:string,activityId:string,body:any,cur
   const partCoefficient=basis==='purchase'&&unit==='percent'?selectedValue:0;
   const laborCoefficient=basis==='margin'&&unit==='percent'?selectedValue:0;
 
-  const partQuantity=Math.max(1,items.reduce((total,item)=>total+(Number(item.quantity)||0),0));
-  const rawPart=items.some(i=>i.unitCost>0)
-    ?round2(items.reduce((total,item)=>total+item.quantity*item.unitCost,0))
+  // 15.4.70 — les prestations complémentaires ne sont pas des pièces : elles ne doivent ni
+  // gonfler la quantité de pièces ni intervenir dans le coefficient « euros par pièce ».
+  const partItems=items.filter(i=>i.kind!=='service');
+  const partQuantity=Math.max(1,partItems.reduce((total,item)=>total+(Number(item.quantity)||0),0));
+  const rawPart=partItems.some(i=>i.unitCost>0)
+    ?round2(partItems.reduce((total,item)=>total+item.quantity*item.unitCost,0))
     :(optionalNumber(effective('partCost','part_cost'),'Coût des pièces',0,1e9)??0);
   const shippingCost=optionalNumber(effective('shippingCost','shipping_cost'),'Livraison',0,1e9)??0;
   const mileageKm=optionalNumber(effective('mileageKm','mileage_km'),'Kilométrage',0,1e7)??0;

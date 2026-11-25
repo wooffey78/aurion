@@ -30,7 +30,8 @@ test('bloc20: la matrice de contrôles est cohérente avec le code (preuves exis
       if (f === '—') continue;
       // Le premier segment du chemin uniquement (les annotations entre parenthèses ne sont pas des fichiers).
       const clean = f.trim().replace(/\s*\(.*$/, '');
-      assert.ok(existsSync(new URL(`../../${clean}`, import.meta.url).pathname), `emplacement cité introuvable : ${clean}`);
+      // `URL.pathname` produit « /C:/… » sous Windows : fileURLToPath est requis.
+      assert.ok(existsSync(fileURLToPath(new URL(`../../${clean}`, import.meta.url))), `emplacement cité introuvable : ${clean}`);
     }
   }
   // La page publique existe et est routée :

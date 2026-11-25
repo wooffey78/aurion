@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 process.env.DATABASE_URL ||= 'postgres://x:y@127.0.0.1:1/z';
 process.env.JWT_SECRET ||= 'x'.repeat(40);
 const read = p => readFileSync(new URL(p, import.meta.url), 'utf8');
@@ -30,7 +31,7 @@ const dist = p => existsSync(fileURLToPath(new URL(p, import.meta.url))) ? fileU
 const chantiersPath = dist('../dist/services/chantiers.js');
 
 test('unitaire — rentabilité réelle : coûts, marge, dérive et alertes honnêtes', { skip: !chantiersPath }, async () => {
-  const { computeChantierProfitability } = await import(chantiersPath);
+  const { computeChantierProfitability } = await import(pathToFileURL(chantiersPath).href);
   const base = { quoteTotalHt: 10000, quoteTotalTtc: 12000, invoicedTotalHt: 0, invoicedTotalTtc: 0, expensesTotalTtc: 4000, savTotalTtc: 1000, totalMinutes: 240, hourlyRateCents: 5000, vatRateBps: 2000 };
   // Main-d'œuvre : 4 h × 50 € HT = 200 € HT → 240 € TTC ; coûts = 4000 + 1000 + 240 = 5240.
   const r = computeChantierProfitability(base);

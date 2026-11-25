@@ -1,6 +1,6 @@
 # Politique de confidentialité et annexe de sous-traitance — Aurion
 
-Version **5.1**, révision du 25 novembre 2026 pour Aurion 15.4.67 (mise à jour de la version 5.0 du 23 novembre 2026 ; coordonnées et engagements inchangés). Cette révision décrit les données introduites par le portail client invités, les webhooks sortants, la supervision des lettres mortes, la chaîne d’intégrité documentaire et les photographies des fiches clients (avatars téléversés par le professionnel). Ajouts restant soumis à la validation juridique externe prévue avant ouverture commerciale.
+Version **5.1**, révision du 25 novembre 2026 pour Aurion 15.5.0 (mise à jour de la version 5.0 du 23 novembre 2026 ; coordonnées et engagements inchangés). Cette révision décrit les données introduites par le portail client invités, les webhooks sortants, la supervision des lettres mortes, la chaîne d’intégrité documentaire et les photographies des fiches clients (avatars téléversés par le professionnel). Ajouts restant soumis à la validation juridique externe prévue avant ouverture commerciale.
 
 **Responsable de traitement : Coulibaly Damien, entrepreneur individuel, nom commercial Easyweb-dev. Adresse : 5 Rue Jacques Prevert, 85300 Challans, France. SIREN : 888485695. Contact données personnelles : easyfixit.reparation@gmail.com.** Cette politique décrit les traitements du service ; pour les dossiers que le client professionnel saisit dans son espace, le client demeure responsable de ses propres contacts (voir l’article 1).
 

@@ -1,7 +1,11 @@
 import crypto from 'node:crypto';
 import { query } from '../db.js';
 
-export const ACCESS_SECONDS = 60 * 30;
+// 15.4.70 — jeton d'accès long (12 h) : une journée de travail ne doit plus être interrompue
+// par une déconnexion après quelques minutes d'inactivité. Le refresh token (30 jours) reste
+// la seule source de reconnexion ; la révocation (mot de passe, déconnexion globale) s'applique
+// toujours immédiatement via session_version.
+export const ACCESS_SECONDS = 60 * 60 * 12;
 export const REFRESH_SECONDS = 60 * 60 * 24 * 30;
 
 export type SessionIdentity={userId:string;organizationId:string;role:string;sessionVersion:number};
@@ -31,7 +35,7 @@ export async function rotateRefreshSession(raw:string, request:any){
   // révoqué immédiatement. Deux onglets (ou deux requêtes) qui rafraîchissent en parallèle
   // avec le MÊME cookie ne se révoquent plus en chaîne — c'était la cause des déconnexions
   // aléatoires « votre session a expiré ». Passé la fenêtre, le jeton ancien est invalide.
-  await query(`update native_sessions set last_used_at=now(),grace_until=now()+interval '60 seconds' where id=$1`,[old.id]);
+  await query(`update native_sessions set last_used_at=now(),grace_until=now()+interval '300 seconds' where id=$1`,[old.id]);
   const identity={userId:old.user_id,organizationId:old.organizationId,role:old.role,sessionVersion:Number(old.session_version||0)};
   return {identity,...await createRefreshSession(identity,request)};
 }

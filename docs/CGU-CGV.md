@@ -1,6 +1,6 @@
 # Conditions générales d’utilisation et de vente — Aurion
 
-Version **5.1**, révision du 25 novembre 2026 pour Aurion 15.4.67 (mise à jour de la version 5.0 du 23 novembre 2026 ; coordonnées et engagements du propriétaire inchangés). Cette révision couvre les fonctions livrées depuis la version 5.0 : signature client des devis (bouton « Signé », acceptation horodatée), remises appliquées sur le TTC facturé, photographies des fiches clients (avatars), visionneuse de documents intégrée et suivi des e-mails en attente depuis le journal de bord. Les ajouts restent soumis à la validation juridique externe prévue avant ouverture commerciale.
+Version **5.1**, révision du 25 novembre 2026 pour Aurion 15.5.0 (mise à jour de la version 5.0 du 23 novembre 2026 ; coordonnées et engagements du propriétaire inchangés). Cette révision couvre les fonctions livrées depuis la version 5.0 : signature client des devis (bouton « Signé », acceptation horodatée), remises appliquées sur le TTC facturé, photographies des fiches clients (avatars), visionneuse de documents intégrée et suivi des e-mails en attente depuis le journal de bord. Les ajouts restent soumis à la validation juridique externe prévue avant ouverture commerciale.
 
 **Éditeur : Coulibaly Damien, entrepreneur individuel sous le régime micro-entreprise, nom commercial Easyweb-dev. Adresse : 5 Rue Jacques Prevert, 85300 Challans, France. SIRET : 88848569500033 (SIREN : 888485695). TVA non applicable — article 293 B du CGI. Contact : easyfixit.reparation@gmail.com — 07 81 51 33 21.**
 

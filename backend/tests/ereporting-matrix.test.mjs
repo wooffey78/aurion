@@ -8,6 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
 
@@ -33,7 +34,7 @@ const invoice = overrides => ({
 });
 
 test('matrice : B2C domestique (non-assujetti, TVA française due) est dans le périmètre', { skip }, async () => {
-  const { classifyInvoice } = await import(matrixPath);
+  const { classifyInvoice } = await import(pathToFileURL(matrixPath).href);
   const result = classifyInvoice(invoice());
   assert.equal(result.kind, 'in_scope');
   assert.equal(result.reason, 'b2c_domestic');
@@ -41,7 +42,7 @@ test('matrice : B2C domestique (non-assujetti, TVA française due) est dans le p
 });
 
 test('matrice : B2B international (assujetti non établi en France) est dans le périmètre, écart sans numéro de TVA', { skip }, async () => {
-  const { classifyInvoice } = await import(matrixPath);
+  const { classifyInvoice } = await import(pathToFileURL(matrixPath).href);
   const inScope = classifyInvoice(invoice({ clientBuyerCategory: 'assujetti_etranger', clientCountryCode: 'DE', clientVatNumber: 'DE123456789' }));
   assert.equal(inScope.kind, 'in_scope');
   assert.equal(inScope.reason, 'b2b_international');
@@ -54,14 +55,14 @@ test('matrice : B2B international (assujetti non établi en France) est dans le 
 });
 
 test('matrice : B2B domestique (assujetti établi en France) est exclu — relève de l’émission électronique (bloc 4)', { skip }, async () => {
-  const { classifyInvoice } = await import(matrixPath);
+  const { classifyInvoice } = await import(pathToFileURL(matrixPath).href);
   const result = classifyInvoice(invoice({ clientBuyerCategory: 'assujetti_fr' }));
   assert.equal(result.kind, 'excluded');
   assert.equal(result.reason, 'einvoicing_b2b_domestic');
 });
 
 test('matrice : exonération déclarée exclut la facture ; motif manquant = écart bloquant', { skip }, async () => {
-  const { classifyInvoice } = await import(matrixPath);
+  const { classifyInvoice } = await import(pathToFileURL(matrixPath).href);
   const exempt = classifyInvoice(invoice({ exemptDeclared: true, exemptReason: 'Exportation hors UE (art. 262 I du CGI)' }));
   assert.equal(exempt.kind, 'excluded');
   assert.equal(exempt.reason, 'exempt_declared');
@@ -74,7 +75,7 @@ test('matrice : exonération déclarée exclut la facture ; motif manquant = éc
 });
 
 test('matrice : catégorie d’acheteur manquante = écart (aucune inférence depuis le nom ou le SIRET)', { skip }, async () => {
-  const { classifyInvoice } = await import(matrixPath);
+  const { classifyInvoice } = await import(pathToFileURL(matrixPath).href);
   const result = classifyInvoice(invoice({ clientBuyerCategory: null }));
   assert.equal(result.kind, 'in_scope');
   assert.equal(result.gaps.length, 1);
@@ -82,14 +83,14 @@ test('matrice : catégorie d’acheteur manquante = écart (aucune inférence de
 });
 
 test('matrice : TVA non facturée (franchise en base, taux 0) est exclue de l’e-reporting de transaction', { skip }, async () => {
-  const { classifyInvoice } = await import(matrixPath);
+  const { classifyInvoice } = await import(pathToFileURL(matrixPath).href);
   const franchise = classifyInvoice(invoice({ vatRate: 0, totalVat: 0, totalHt: 100, totalTtc: 100 }));
   assert.equal(franchise.kind, 'excluded');
   assert.equal(franchise.reason, 'vat_not_billed');
 });
 
 test('flux : construction déterministe avec totaux et lignes de paiement', { skip }, async () => {
-  const { buildEreportingPayload, buildTransactionLine, buildPaymentLine } = await import(matrixPath);
+  const { buildEreportingPayload, buildTransactionLine, buildPaymentLine } = await import(pathToFileURL(matrixPath).href);
   const transaction = buildTransactionLine(invoice(), 'b2c_domestic');
   assert.equal(transaction.inclusionReason, 'b2c_domestic_transaction');
   assert.equal(transaction.amountTtc, 120);
@@ -113,7 +114,7 @@ test('flux : construction déterministe avec totaux et lignes de paiement', { sk
 });
 
 test('flux : validation accepte un flux cohérent et refuse les incohérences arithmétiques et de période', { skip }, async () => {
-  const { buildEreportingPayload, buildTransactionLine, buildPaymentLine, validateEreportingPayload } = await import(matrixPath);
+  const { buildEreportingPayload, buildTransactionLine, buildPaymentLine, validateEreportingPayload } = await import(pathToFileURL(matrixPath).href);
   const ok = buildEreportingPayload({
     kind: 'initial', correctsDeclarationId: null,
     periodStart: '2026-10-01', periodEnd: '2026-10-31', periodicity: 'monthly',
@@ -149,7 +150,7 @@ test('flux : validation accepte un flux cohérent et refuse les incohérences ar
 });
 
 test('flux : les quatre données de paiement et d’identification obligatoires sont contrôlées', { skip }, async () => {
-  const { buildEreportingPayload, buildTransactionLine, validateEreportingPayload } = await import(matrixPath);
+  const { buildEreportingPayload, buildTransactionLine, validateEreportingPayload } = await import(pathToFileURL(matrixPath).href);
   const missingBuyer = buildEreportingPayload({
     kind: 'initial', correctsDeclarationId: null,
     periodStart: '2026-10-01', periodEnd: '2026-10-31', periodicity: 'monthly',

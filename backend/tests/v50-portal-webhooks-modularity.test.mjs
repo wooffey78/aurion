@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 process.env.DATABASE_URL ||= 'postgres://x:y@127.0.0.1:1/z';
 process.env.JWT_SECRET ||= 'x'.repeat(40);
 const read = p => readFileSync(new URL(p, import.meta.url), 'utf8');
@@ -49,7 +50,7 @@ test('routes webhooks : HTTPS obligatoire, secret chiffré, lettre morte documen
 });
 
 test('unitaire — signature HMAC déterministe, vérifiable, sensible au corps et au timestamp', { skip: !webhookPath }, async () => {
-  const { buildDeliveryHeaders, verifyDeliverySignature, webhookNextDelayMs, secretFingerprint } = await import(webhookPath);
+  const { buildDeliveryHeaders, verifyDeliverySignature, webhookNextDelayMs, secretFingerprint } = await import(pathToFileURL(webhookPath).href);
   const body = '{"event":"invoice_paid","data":{"id":"x"}}';
   const h = buildDeliveryHeaders('secret-demo', body, 1764000000);
   assert.match(h['X-Aurion-Signature'], /^t=1764000000,v1=[0-9a-f]{64}$/);
@@ -66,7 +67,7 @@ test('unitaire — signature HMAC déterministe, vérifiable, sensible au corps 
 });
 
 test('unitaire — modularité métier : maintenance proposée pour CVC, pas pour coiffure ; profil inconnu = repli sûr', { skip: !featuresPath }, async () => {
-  const { featuresForProfile } = await import(featuresPath);
+  const { featuresForProfile } = await import(pathToFileURL(featuresPath).href);
   const plumbing = featuresForProfile('plumbing');
   assert.equal(plumbing.features.maintenance, true);
   assert.equal(plumbing.features.chantiers, true);
@@ -81,7 +82,7 @@ test('unitaire — modularité métier : maintenance proposée pour CVC, pas pou
 });
 
 test('unitaire — rapport mensuel : facturé ≠ encaissé, sections chartables, camembert réservé aux répartitions', { skip: !reportPath }, async () => {
-  const { buildMonthlyReport } = await import(reportPath);
+  const { buildMonthlyReport } = await import(pathToFileURL(reportPath).href);
   const report = buildMonthlyReport({
     month: '2026-11', caInvoicedTtc: 12000, caCollectedTtc: 9000, expensesTtc: 3000,
     vatCollectedTtc: 0, vatDeductibleTtc: 0, quotesSentCount: 8, quotesAcceptedCount: 5,

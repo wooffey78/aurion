@@ -1,4 +1,12 @@
-/** Moteur de calcul Aurion v2 — source unique des calculs commerciaux. */
+/**
+ * Moteur de calcul Aurion v2 — source unique des calculs commerciaux.
+ *
+ * Invariants :
+ * - aucune dépendance au DOM, à la base ou à l'horloge : fonction pure, testable seule ;
+ * - tous les calculs internes se font en centimes entiers (BigInt), jamais en flottants ;
+ * - arrondis « demi vers le haut » ; résultat identique côté serveur et navigateur
+ *   (assets/js/core/pricing.js est généré depuis ce module).
+ */
 export type Driver = 'ttc' | 'net';
 export type MileageMode = 'margin' | 'client_price';
 export type ContributionBasis = 'ca_ht' | 'gross_margin' | 'profit';
@@ -95,6 +103,9 @@ const UNIT_SCALE = 1_000_000n;
 
 function num(value: unknown, name: string, min: number, max: number): number {
   if (value === undefined || value === null || value === '') return 0;
+  // 15.4.69 — borne de saisie : une chaîne démesurée (appel API, brouillon altéré) est refusée
+  // avant toute analyse numérique, plutôt que de coûter un parsing et une normalisation coûteux.
+  if (typeof value === 'string' && value.length > 64) throw new Error(`Valeur invalide : ${name}`);
   const normalized = typeof value === 'string' ? value.trim().replace(',', '.') : value;
   const n = Number(normalized);
   if (!Number.isFinite(n) || n < min || n > max) throw new Error(`Valeur invalide : ${name}`);
@@ -146,27 +157,19 @@ function contributionBasis(value: unknown): ContributionBasis {
   return normalized === 'gross_margin' ? 'gross_margin' : normalized === 'profit' ? 'profit' : 'ca_ht';
 }
 
-// 15.4.55 — memoïsation pure du dernier appel : l'éditeur de devis/facture recalcule à chaque
-// frappe (input + change déclenchent le même calcul) et le serveur re-calcule à chaque rendu de
-// document. La fonction reste 100 % déterministe et sans effet de bord : entrée identique
-// (sérialisation stable, indépendante de l'ordre des clés) → même objet de résultat.
-// Un seul créneau mémoire : l'entrée courante, jamais une table qui croît.
-let memoKey: string | null = null;
-let memoResult: PricingResult | null = null;
-
-/** Sérialisation STABLE d'une entrée de calcul (clés triées récursivement, indépendante de l'ordre d'insertion). */
-function stableKey(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value ?? null);
-  if (Array.isArray(value)) return `[${value.map(stableKey).join(',')}]`;
-  const entries = Object.entries(value as Record<string, unknown>)
-    .filter(([, v]) => v !== undefined)
-    .sort(([a], [b]) => (a < b ? -1 : 1));
-  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableKey(v)}`).join(',')}}`;
-}
-
+// 15.4.69 — aucun cache de recalcul : chaque appel repart de son entrée et rend un objet
+// indépendant. Une valeur périmée ou une mutation d'un résultat ne peut donc jamais contaminer
+// le calcul suivant, et le coût (arithmétique BigInt en microsecondes) reste négligeable.
+/**
+ * Calcule une pièce commerciale (devis ou facture) à partir des coûts et du prix cible.
+ *
+ * @param input Coûts d'achat, livraison, main-d'œuvre, kilométrage, TVA, cotisations et prix
+ *              cible (driver 'ttc' pour un TTC imposé, 'net' pour une marge nette visée).
+ * @returns Montants HT/TVA/TTC, lignes de cotisation, marge brute et nette, indicateurs de taux.
+ * @throws Error si une valeur est hors bornes, si le cumul des taux atteint 100 % ou si un
+ *         résultat dépasse la précision entière sûre.
+ */
 export function computePricing(input: PricingInput): PricingResult {
-  const key = stableKey(input);
-  if (key === memoKey && memoResult) return memoResult;
   const partValue = num(input.partCost, 'pièce', 0, 1e9);
   const shipValue = num(input.shippingCost, 'livraison', 0, 1e9);
   // Prompt 03 — consommables : coût direct additionnel (hors pièces cataloguées), 0 par défaut.
@@ -231,11 +234,17 @@ export function computePricing(input: PricingInput): PricingResult {
     targetTtc = targetTtc - discount;
   }
   const contributionsInput: ContributionInput[] = Array.isArray(input.contributions) ? [...input.contributions] : [];
+  // 15.4.69 — borne anti-abus : le classeur en accepte 5, le moteur applicatif 32 ; au-delà,
+  // la charge de calcul n'a plus de sens métier et la requête est refusée explicitement.
+  if (contributionsInput.length > 32) throw new Error('Trop de cotisations : 32 au maximum.');
   if (!contributionsInput.length && input.urssafRate !== undefined) {
     contributionsInput.push({ name: 'Cotisations sociales', rate: input.urssafRate, basis: 'ca_ht', mandatory: true });
   }
 
-  const contributions = contributionsInput.map((contribution) => {
+  const contributions = contributionsInput.map((rawContribution) => {
+    // 15.4.68 — une ligne de cotisation nulle ou mal formée (brouillon local, appel API) ne
+    // doit jamais produire une exception technique : elle est traitée comme une cotisation à 0 %.
+    const contribution = (rawContribution && typeof rawContribution === 'object' ? rawContribution : {}) as ContributionInput;
     const rateValue = num(contribution.rate, 'taux de cotisation', 0, 99.99);
     return {
       name: String(contribution.name || 'Cotisation'),
@@ -368,7 +377,10 @@ export function computePricing(input: PricingInput): PricingResult {
     grossMarginRate,
     contributionsTotal: euros(contributionsTotal),
     contributions: contributionRows,
-    urssafEstimate: contributionRows[0]?.amount || 0,
+    // 15.4.69 — l’estimation portait la PREMIÈRE cotisation seulement : un régime à plusieurs
+    // lignes (maladie, retraite, CFP…) sous-estimait le coût social. Elle somme désormais toutes
+    // les lignes retenues, comme la marge nette, et reste nulle sans cotisation.
+    urssafEstimate: euros(contributionsTotal),
     netMargin: euros(safeNetResult),
     netResult: euros(safeNetResult),
     marginRate: netResultRate,
@@ -379,7 +391,5 @@ export function computePricing(input: PricingInput): PricingResult {
     driver,
     mileageMode,
   };
-  memoKey = key;
-  memoResult = result;
   return result;
 }

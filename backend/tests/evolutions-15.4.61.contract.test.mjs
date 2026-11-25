@@ -58,7 +58,8 @@ test('3 — la pièce proposée automatiquement reste modifiable et supprimable'
 test('4 — espacement desktop dans l\'anneau 3D (15.4.63 : écarts réellement visibles)', () => {
   assert.match(other, /const rz=Math\.max\(150,Math\.min\(600,w\*0\.54\)\);/);
   assert.match(other, /const rx=Math\.max\(70,Math\.min\(470,/);
-  assert.match(other, /15\.4\.63 — cartes d'aperçu plus petites/);
+  // V2 — la géométrie de l'anneau est conservée ; seules les faces deviennent des lots.
+  assert.match(other, /const rz=Math\.max\(150,Math\.min\(600,w\*0\.54\)\);/);
 });
 
 test('5 — l\'aperçu taille réelle est débloqué : CSP frame-ancestors self + iframe + ouverture en onglet', () => {
@@ -67,8 +68,10 @@ test('5 — l\'aperçu taille réelle est débloqué : CSP frame-ancestors self 
   assert.doesNotMatch(documents, /frame-ancestors 'none'/);
   assert.match(documents, /frame-ancestors 'self'/);
   // La modale embarque le PDF réel et propose le repli « Ouvrir dans un onglet ».
-  assert.match(other, /template-modal-embed"><iframe src="\.\/assets\/templates\//);
-  assert.match(other, /Ouvrir dans un onglet/);
+  assert.match(other, /template-preview-pair/);
+  assert.match(other, /src="\.\/assets\/templates\/quote-\$\{style\}\.pdf"/);
+  assert.match(other, /src="\.\/assets\/templates\/invoice-\$\{style\}\.pdf"/);
+  assert.match(other, /dans un onglet/);
 });
 
 test('6 — l\'encart d\'invitation (Administration) est au design Aurion', () => {

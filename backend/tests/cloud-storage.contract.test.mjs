@@ -24,7 +24,8 @@ test('toutes les routes cloud (hors retour OAuth) exigent une session et filtren
 
 test('jetons chiffrés, jamais renvoyés ; quota et seuils centralisés ; aucune fausse confirmation', () => {
   assert.match(drive, /encrypt\(tokens\.access_token\)/);
-  assert.doesNotMatch(read('../src/services/cloud-drive.ts').match(/export async function cloudStatus[\s\S]*?\n}\n/)[0], /token/);
+  // Les fichiers sont livrés en CRLF sous Windows : accepter \r?\n sans modifier le contrat.
+  assert.doesNotMatch(read('../src/services/cloud-drive.ts').match(/export async function cloudStatus[\s\S]*?\r?\n}\r?\n/)[0], /token/);
   assert.match(drive, /AURION_CLOUD_QUOTA_THRESHOLDS \|\| '80,90,95,100'/);
   assert.match(drive, /Capacité totale non communiquée|totalKnown/);
   assert.match(drive, /md5Checksum[\s\S]*!== md5/);

@@ -156,6 +156,9 @@ export async function bind(){
       const response=await api.accountAvatar();
       if(!response.ok)throw new Error('Avatar indisponible après enregistrement');
       toast('Avatar enregistré','success');
+      // 15.4.70 — la bulle du header écoute cet événement : sans lui, l'avatar téléversé
+      // n'apparaissait qu'après un rechargement complet de la page.
+      window.dispatchEvent(new Event('aurion:avatar-updated'));
       await hooks.refresh('account');
     }catch(x){toast(x.message,'error')}};
   const pw=$('#new');

@@ -6,6 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 process.env.DATABASE_URL ||= 'postgres://x:y@127.0.0.1:1/z';
 process.env.JWT_SECRET ||= 'x'.repeat(40);
 const read = p => readFileSync(new URL(p, import.meta.url), 'utf8');
@@ -59,7 +60,7 @@ const computePath = existsSync(fileURLToPath(new URL('../dist/services/chantiers
   ? fileURLToPath(new URL('../dist/services/chantiers.js', import.meta.url)) : false;
 
 test('unitaire — indicateurs de gestion (golden)', { skip: !computePath }, async () => {
-  const { computeChantierProfitability } = await import(computePath);
+  const { computeChantierProfitability } = await import(pathToFileURL(computePath).href);
   const base = { quoteTotalHt: 10000, quoteTotalTtc: 12000, invoicedTotalHt: 6667, invoicedTotalTtc: 8000, collectedTtc: 5000, expensesTotalTtc: 4000, savTotalTtc: 1000, totalMinutes: 240, hourlyRateCents: 5000, vatRateBps: 2000 };
   const r = computeChantierProfitability(base);
   assert.equal(r.laborCostTtc, 240);
@@ -118,7 +119,7 @@ const detectPath = existsSync(fileURLToPath(new URL('../dist/services/catalog-de
   ? fileURLToPath(new URL('../dist/services/catalog-detection.js', import.meta.url)) : false;
 
 test('unitaire — splitSuggested : casse, accents, doublons et compte exact', { skip: !detectPath }, async () => {
-  const { splitSuggested } = await import(detectPath);
+  const { splitSuggested } = await import(pathToFileURL(detectPath).href);
   const existing = new Set(['reparation de fuite', 'mitigeur']);
   const r = splitSuggested(['Réparation de fuite', 'réparation de fuite', 'Mitigeur', 'Pose de siphon', '  ', ''], existing);
   assert.deepEqual(r.toAdd, ['Pose de siphon']);
@@ -129,7 +130,7 @@ test('unitaire — splitSuggested : casse, accents, doublons et compte exact', {
 });
 
 test('unitaire — normalizeLabel : accents, casse et espaces', { skip: !detectPath }, async () => {
-  const { normalizeLabel } = await import(detectPath);
+  const { normalizeLabel } = await import(pathToFileURL(detectPath).href);
   assert.equal(normalizeLabel('Réparation de  FUITE '), 'reparation de fuite');
   assert.equal(normalizeLabel('Mécanisme de chasse d\u2019eau'), 'mecanisme de chasse d\u2019eau');
   assert.equal(normalizeLabel(null), '');

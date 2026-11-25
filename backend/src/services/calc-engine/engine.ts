@@ -68,6 +68,7 @@ const concurrencyLimit = () => Math.max(1, Number(process.env.AURION_CALC_CONCUR
 let cachedMappingPath = '';
 let cachedMapping: CalcEngineMapping | null = null;
 let cachedModelPath = '';
+let contractCheckedPath = '';
 let cachedModel: Buffer | null = null;
 
 async function loadMapping(): Promise<CalcEngineMapping> {
@@ -99,6 +100,16 @@ async function loadModel(): Promise<{ zip: AdmZip; workbookVersion: string; mapp
   if (mapping.engineRequires !== ENGINE_VERSION) {
     throw new CalcEngineError('WORKBOOK_INCOMPATIBLE', `Classeur ${mapping.workbookVersion} requiert le moteur ${mapping.engineRequires} ; moteur présent : ${ENGINE_VERSION}`);
   }
+  // 15.4.69 — le contrat est vérifié une seule fois par classeur : une sortie mappée absente
+  // faisait échouer le calcul APRÈS un recalcul LibreOffice complet (20 s perdues) ; elle est
+  // désormais refusée immédiatement, avec la liste des cellules manquantes.
+  if (contractCheckedPath !== modelPath()) {
+    const missing = missingMappedCells(zip, mapping, 'outputs');
+    if (missing.length) {
+      throw new CalcEngineError('WORKBOOK_INCOMPATIBLE', `Classeur incomplet : ${missing.length} sortie(s) du contrat absente(s)`, { missing: missing.slice(0, 8) });
+    }
+    contractCheckedPath = modelPath();
+  }
   return { zip, workbookVersion: mapping.workbookVersion, mapping };
 }
 
@@ -114,7 +125,10 @@ export function findSoffice(): string | null {
 class Semaphore {
   private active = 0;
   private waiters: (() => void)[] = [];
-  constructor(private readonly limit: number) {}
+  // 15.4.69 — champ déclaré puis affecté (et non « parameter property ») : le moteur reste
+  // importable tel quel par le vérificateur de types de Node, sans compilation préalable.
+  private readonly limit: number;
+  constructor(limit: number) { this.limit = limit; }
   async acquire(): Promise<void> {
     if (this.active < this.limit) { this.active++; return; }
     await new Promise<void>(resolve => this.waiters.push(resolve));
@@ -177,6 +191,11 @@ export type CalcInputs = Record<string, CellValue | undefined>;
 
 function round6(value: number): number { return Math.round(value * 1e6) / 1e6; }
 
+/**
+ * Exécute le classeur sur une copie isolée et renvoie les sorties mappées.
+ * Les entrées sont validées contre le contrat (mapping.inputs) : entrée inconnue, non numérique
+ * ou trop longue refusée avant tout lancement de LibreOffice.
+ */
 export async function calculate(rawInputs: CalcInputs, options: { traceId?: string } = {}): Promise<CalcEngineResult> {
   const traceId = options.traceId || `calc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const started = Date.now();
@@ -247,6 +266,45 @@ export async function calculate(rawInputs: CalcInputs, options: { traceId?: stri
     if (workDir) await rm(workDir, { recursive: true, force: true }).catch(() => {});
   }
 }
+/** 15.4.69 — contrôle du contrat classeur : chaque cellule mappée doit exister dans sa feuille. */
+function missingMappedCells(zip: AdmZip, mapping: CalcEngineMapping, kind: 'inputs' | 'outputs' | 'params'): string[] {
+  const bySheet = new Map<string, { name: string; cell: string }[]>();
+  for (const [name, meta] of Object.entries(mapping[kind])) {
+    if (!bySheet.has(meta.sheet)) bySheet.set(meta.sheet, []);
+    bySheet.get(meta.sheet)!.push({ name, cell: meta.cell });
+  }
+  const missing: string[] = [];
+  for (const [sheet, items] of bySheet) {
+    let xml = '';
+    try { xml = zip.readAsText(worksheetPath(zip, sheet)); } catch { /* feuille absente : toutes ses cellules manquent */ }
+    for (const item of items) {
+      if (!xml.includes(`<c r="${item.cell}"`)) missing.push(`${item.name} (${sheet}!${item.cell})`);
+    }
+  }
+  return missing;
+}
+
+function workbookContract(zip: AdmZip, mapping: CalcEngineMapping) {
+  return {
+    inputs: Object.keys(mapping.inputs).length,
+    outputs: Object.keys(mapping.outputs).length,
+    controls: Object.keys(mapping.outputs).filter(name => name.startsWith('CHK_')).length,
+    tables: mapping.tables.length,
+    missingOutputs: missingMappedCells(zip, mapping, 'outputs'),
+    missingInputs: missingMappedCells(zip, mapping, 'inputs'),
+  };
+}
+
+/** Contrat public du classeur (diagnostic) : cellules mappées présentes, contrôles déclarés. */
+export async function inspectWorkbookContract(): Promise<ReturnType<typeof workbookContract>> {
+  const mapping = await loadMapping();
+  if (!existsSync(modelPath())) throw new CalcEngineError('WORKBOOK_MISSING', `Classeur moteur absent : ${modelPath()}`);
+  let zip: AdmZip;
+  try { zip = new AdmZip(await fs.readFile(modelPath())); }
+  catch (error: any) { throw new CalcEngineError('WORKBOOK_CORRUPT', 'Classeur moteur illisible', error?.message); }
+  return workbookContract(zip, mapping);
+}
+
 function trace(payload: Record<string, unknown>): void {
   // Traçabilité : version du classeur, durée, statut — jamais de données métier.
   console.log('[calc-engine]', JSON.stringify({ ts: new Date().toISOString(), engineVersion: ENGINE_VERSION, ...payload }));
@@ -255,9 +313,11 @@ function trace(payload: Record<string, unknown>): void {
 export async function getCalculationStatus(): Promise<{
   engineVersion: string; mode: string; workbookPresent: boolean; workbookVersion: string | null;
   engineRequires: string | null; libreOfficePath: string | null; concurrency: number; timeoutMs: number; modelPath: string;
+  contract: ReturnType<typeof workbookContract> | null;
 }> {
   const modelPresent = existsSync(modelPath());
   let workbookVersion: string | null = null;
+  let contract: ReturnType<typeof workbookContract> | null = null;
   let engineRequires: string | null = null;
   if (modelPresent) {
     try {
@@ -265,6 +325,7 @@ export async function getCalculationStatus(): Promise<{
       engineRequires = mapping.engineRequires;
       const zip = new AdmZip(await fs.readFile(modelPath()));
       const sheet = mapping.sheets[0];
+      contract = workbookContract(zip, mapping);
       const versionCell = Object.values(mapping.outputs).find(o => o.sheet === sheet)?.cell;
       if (versionCell) {
         const values = readCells(zip, sheet, [versionCell]);
@@ -274,6 +335,9 @@ export async function getCalculationStatus(): Promise<{
   }
   return {
     engineVersion: ENGINE_VERSION, mode: calcEngineMode(), workbookPresent: modelPresent, workbookVersion, engineRequires,
-    libreOfficePath: findSoffice(), concurrency: concurrencyLimit(), timeoutMs: timeoutMs(), modelPath: modelPath(),
+    libreOfficePath: findSoffice(), concurrency: concurrencyLimit(), timeoutMs: timeoutMs(),
+    // 15.4.69 — le diagnostic n'expose plus le chemin absolu du serveur : le nom du fichier suffit
+    // à l'exploitant et ne révèle pas l'arborescence de l'hôte à un compte authentifié.
+    modelPath: path.basename(modelPath()), contract,
   };
 }

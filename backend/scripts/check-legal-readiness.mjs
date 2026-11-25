@@ -36,10 +36,10 @@ const seeds = (() => {
 
 // Motifs de blocage identiques à ceux du code applicatif (échec fermé côté application).
 const UNRESOLVED_RE = /\{\{[A-Z0-9_]+\}\}|\[(?:À compléter|À confirmer|À valider|À choisir|À désigner|À renseigner)[^\]]*\]|PROJET DE DOCUMENT|PROJET DE PAGE|PROJET À COMPLÉTER|DOSSIER DE PRÉPARATION|NE PAS PUBLIER/i;
-const APPROVAL_EXPECTED = '5.0';
+const APPROVAL_EXPECTED = '5.1';
 
 const approval = process.env.AURION_LEGAL_PUBLICATION_APPROVAL || '';
-console.log('== Pré-vol juridique (miroir de la porte de publication 5.0 — DPA inclus, 15.4.54) ==');
+console.log('== Pré-vol juridique (miroir de la porte de publication 5.1 — DPA inclus) ==');
 console.log(`AURION_LEGAL_PUBLICATION_APPROVAL = ${approval ? `'${approval}'` : '(absent)'} — valeur attendue : '${APPROVAL_EXPECTED}'`);
 if (approval !== APPROVAL_EXPECTED) console.log(`  ⚠ approbation ${approval === '' ? 'absente' : `'${approval}' incorrecte`} → tous les documents resteraient en brouillon`);
 

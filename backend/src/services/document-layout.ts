@@ -33,13 +33,21 @@ export interface DocModel {
 }
 
 // ---------------------------------------------------------------- utilitaires
+/** Formate un montant en euros à la française (« 1 234,56 € ») ; 0,00 € si non fini. */
 export function formatEuro(n: unknown) {
-  const v = Number(n || 0);
+  // 15.4.68 — toute valeur non numérique (import, colonne vide, instantané ancien) vaut 0 :
+  // jamais « NaN,undefined € » ni « NaN » dans un encart, un total ou une quantité.
+  const parsedValue = Number(n);
+  const v = Number.isFinite(parsedValue) ? parsedValue : 0;
   const [i, d] = Math.abs(v).toFixed(2).split('.');
   return `${v < 0 ? '-' : ''}${i!.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0')},${d}\u00A0€`;
 }
+/** Formate une quantité sans décimales inutiles ; 0 si non fini. */
 export function formatQty(n: unknown) {
-  const v = Number(n || 0);
+  // 15.4.68 — toute valeur non numérique (import, colonne vide, instantané ancien) vaut 0 :
+  // jamais « NaN,undefined € » ni « NaN » dans un encart, un total ou une quantité.
+  const parsedValue = Number(n);
+  const v = Number.isFinite(parsedValue) ? parsedValue : 0;
   return Number.isInteger(v) ? String(v) : String(v).replace('.', ',');
 }
 const totalLabel = (m: DocModel) => (m.kind === 'invoice' ? 'TOTAL TTC À RÉGLER' : 'TOTAL TTC');
@@ -48,6 +56,21 @@ const footerText = (m: DocModel) => m.company.name || 'Aurion';
 /** Logo exploitable par les moteurs PDF/DOCX/ODT : PNG ou JPEG uniquement (le WebP est refusé au téléversement avec message depuis le correctif 078). */
 const rasterLogo = (m: DocModel) => m.logo && (m.logo.mime === 'image/png' || m.logo.mime === 'image/jpeg') ? m.logo : null;
 const signatureText = 'Bon pour accord — date et signature du client';
+
+/**
+ * 15.4.68 — l'encart « Frais kilométriques » ne s'affiche que s'il porte un montant.
+ * L'ancien test comparait le texte formaté à « 0,00 € » avec une espace ORDINAIRE alors que
+ * formatEuro produit une espace INSÉCABLE : la comparaison était toujours fausse et l'encart
+ * apparaissait à 0,00 € sur les documents sans frais kilométriques. Le test est numérique ;
+ * les champs de modèle {{…}} restent affichés pour l'aperçu des modèles.
+ */
+function showsMileage(m: DocModel): boolean {
+  if (m.mileage.visible === false) return false;
+  const text = String(m.mileage.total ?? '').trim();
+  if (!text) return false;
+  const parsed = Number(text.replace(/[\s\u00A0€]/g, '').replace(',', '.'));
+  return !Number.isFinite(parsed) || parsed !== 0;
+}
 
 function imageSize(b: Buffer): { w: number; h: number } {
   try {
@@ -73,6 +96,10 @@ function fitSize(b: Buffer, maxW: number, maxH: number) {
 //  · minimal    : monochrome encre, aucun encart ni fond coloré, filets fins, total aligné à droite ;
 //  · classic    : cartes claires, en-tête de tableau navy, total dans un bloc navy (design historique) ;
 //  · signature  : serif, bandeau d’en-tête foncé chaleureux, encarts crème bordés bronze, total sur fond accent.
+/**
+ * Rend le document en PDF (A4). Contenu utile de 56 à 782 pt, pied de page à 806 pt : chaque
+ * section réserve sa hauteur réelle (need) pour ne jamais chevaucher le pied de page.
+ */
 export async function buildPdf(m: DocModel): Promise<Buffer> {
   const PDFDocument = await pdfkit();
   return new Promise((resolve, reject) => {
@@ -100,7 +127,25 @@ export async function buildPdf(m: DocModel): Promise<Buffer> {
     };
     footer(); doc.on('pageAdded', footer);
     const label = (t: string, x: number, y: number, w: number) => doc.font(FB).fontSize(7.5).fillColor(muted).text(t.toUpperCase(), x, y, { width: w, characterSpacing: 1.3 });
-    const need = (y: number, h: number) => { if (y + h > 770) { doc.addPage(); return 56; } return y; };
+    const need = (y: number, h: number) => { if (y + h > 782) { doc.addPage(); return 56; } return y; };
+    // 15.4.68 — en-tête de tableau réutilisable : une liste de pièces qui continue sur la page
+    // suivante reprend les libellés de colonnes (l'en-tête n'était auparavant dessiné qu'une fois).
+    const itemsHeader = (top: number): number => {
+      if (V === 'minimal') {
+        doc.rect(L, top, W, 0.75).fillColor('#94a3b8').stroke();
+        doc.font(FB).fontSize(7.5).fillColor(muted);
+        doc.text('N°', L + 16, top + 9, { width: 28, characterSpacing: 1.2 });
+        doc.text(m.itemsLabel.toUpperCase(), L + 52, top + 9, { width: W - 150, characterSpacing: 1.2 });
+        doc.text(m.quantityLabel.toUpperCase(), R - 76, top + 9, { width: 60, align: 'right', characterSpacing: 1.2 });
+        return top + 22;
+      }
+      rr(L, top, W, 30, 6).fill(NAVY);
+      doc.font(FB).fontSize(7.5).fillColor(HEADTEXT);
+      doc.text('N°', L + 16, top + 11, { width: 28, characterSpacing: 1.2 });
+      doc.text(m.itemsLabel.toUpperCase(), L + 52, top + 11, { width: W - 150, characterSpacing: 1.2 });
+      doc.text(m.quantityLabel.toUpperCase(), R - 76, top + 11, { width: 60, align: 'right', characterSpacing: 1.2 });
+      return top + 30;
+    };
 
     // 1 — en-tête : trois compositions distinctes.
     // · minimal : nom commercial en petites capitales grises, titre à droite à l’encre, simple filet fin ;
@@ -114,7 +159,7 @@ export async function buildPdf(m: DocModel): Promise<Buffer> {
         doc.image(logo.data, L, 56, { fit: [fit.w, fit.h] });
         bandTop = 56 + fit.h + 12;
       }
-      const bandH = 64;
+      const bandH = 56;
       rr(L, bandTop, W, bandH, 10).fill(NAVY);
       if (!logo) {
         doc.font(FB).fontSize(16).fillColor('#ffffff').text(m.company.name || 'Entreprise', L + 20, bandTop + 12, { width: W - 300, lineBreak: false, ellipsis: true });
@@ -122,12 +167,15 @@ export async function buildPdf(m: DocModel): Promise<Buffer> {
       } else {
         doc.font(FB).fontSize(15).fillColor('#ffffff').text(m.company.name || 'Entreprise', L + 20, bandTop + 10, { width: W - 300, lineBreak: false, ellipsis: true });
       }
-      doc.font(FB).fontSize(14).fillColor(accent).text(m.reminderLabel || m.title, R - 250, bandTop + 12, { width: 230, align: 'right' });
-      doc.font(FB).fontSize(10).fillColor('#ffffff').text(`N° ${m.number}`, R - 250, bandTop + 32, { width: 230, align: 'right' });
-      doc.font(FR).fontSize(8.5).fillColor('#d8c39a').text(`Émis le ${m.date}`, R - 250, bandTop + 46, { width: 230, align: 'right' });
-      var hEnd = bandTop + bandH + 12;
+      // Budget vertical du bandeau (56 pt) : titre 14 pt à +9 (≈ 25), numéro 10 pt à +27 (≈ 38),
+      // date 8,5 pt à +40 (≈ 50) → 6 pt de marge basse. Les trois lignes sont forcées sur UNE ligne
+      // (ellipsis) : un libellé long est tronqué au lieu de recouvrir la ligne suivante.
+      doc.font(FB).fontSize(14).fillColor(accent).text(m.reminderLabel || m.title, R - 250, bandTop + 9, { width: 230, align: 'right', lineBreak: false, ellipsis: true });
+      doc.font(FB).fontSize(10).fillColor('#ffffff').text(`N° ${m.number}`, R - 250, bandTop + 27, { width: 230, align: 'right', lineBreak: false, ellipsis: true });
+      doc.font(FR).fontSize(8.5).fillColor('#d8c39a').text(`Émis le ${m.date}`, R - 250, bandTop + 40, { width: 230, align: 'right', lineBreak: false, ellipsis: true });
+      var hEnd = bandTop + bandH + 10;
       doc.rect(L, hEnd, W, 1).fill(CARDLINE);
-      var y = hEnd + 24;
+      var y = hEnd + 16;
     } else {
       const LEFT_W = W - 270;
       let leftY = 56;
@@ -140,39 +188,40 @@ export async function buildPdf(m: DocModel): Promise<Buffer> {
         doc.font(FB).fontSize(logo ? 13 : 15).fillColor(ink).text((m.company.name || 'Entreprise').toUpperCase(), L, leftY, { width: LEFT_W, characterSpacing: 2, lineBreak: false, ellipsis: true });
         doc.font(FB).fontSize(13).fillColor(ink).text(m.reminderLabel || m.title, R - 250, 58, { width: 250, align: 'right' });
         doc.font(FR).fontSize(9.5).fillColor(muted).text(`N° ${m.number} · émis le ${m.date}`, R - 250, 78, { width: 250, align: 'right' });
-        var hEnd = Math.max(doc.y, 100);
+        var hEnd = Math.max(doc.y, 92);
         doc.rect(L, hEnd + 14, W, 0.75).fillColor('#94a3b8').stroke();
-        var y = hEnd + 40;
+        var y = hEnd + 34;
       } else {
         doc.font(FB).fontSize(logo ? 15 : 17).fillColor(ink).text(m.company.name || 'Entreprise', L, leftY, { width: LEFT_W });
-        var hEnd = Math.max(doc.y, 112);
+        var hEnd = Math.max(doc.y, 96);
         doc.font(FB).fontSize(14).fillColor(accent).text(m.reminderLabel || m.title, R - 250, 56, { width: 250, align: 'right' });
         doc.font(FB).fontSize(11).fillColor(ink).text(`N° ${m.number}`, R - 250, 78, { width: 250, align: 'right' });
         doc.font(FR).fontSize(9.5).fillColor(muted).text(`Émis le ${m.date}`, R - 250, 94, { width: 250, align: 'right' });
         doc.rect(L, hEnd + 14, W, 3).fill(accent);
-        var y = hEnd + 44;
+        var y = hEnd + 30;
       }
     }
 
     // 2 — carte Client : classic = carte claire pleine largeur · signature = encart crème bordé ·
     // minimal = libellé + contenu à l’encre, sans encart.
-    const clientLines = [m.client.name || '—', ...(m.client.address ? ['Facturation :', ...m.client.address.split(/\r?\n/)] : []), ...(m.client.interventionAddress ? [`Adresse d’intervention :`, ...m.client.interventionAddress.split(/\r?\n/)] : [])];
+    const sameAddress = sameClientAddress(m);
+    const clientLines = [m.client.name || '—', ...(m.client.address ? ['Facturation :', ...m.client.address.split(/\r?\n/)] : []), ...(!sameAddress && m.client.interventionAddress ? [`Adresse d’intervention :`, ...m.client.interventionAddress.split(/\r?\n/)] : [])];
     if (V === 'minimal') {
       y = need(y, 60);
       label('Client', L, y, W);
       doc.font(FB).fontSize(12).fillColor(ink).text(String(clientLines[0] || '—'), L, y + 14, { width: W, lineBreak: false, ellipsis: true });
       doc.font(FR).fontSize(9.5).fillColor(muted).text(clientLines.slice(1).join('\n'), L, y + 32, { width: W, lineGap: 2 });
-      y = Math.max(doc.y, y + 44);
+      y = Math.max(doc.y, y + 40);
       doc.moveTo(L, y).lineTo(R, y).lineWidth(0.5).strokeColor(line).stroke();
-      y += 22;
+      y += 18;
     } else {
-      const ch = Math.max(74, 52 + clientLines.length * 13);
+      const ch = Math.max(60, 34 + clientLines.length * 11);
       y = need(y, ch + 8);
       rr(L, y, W, ch, 8).fillAndStroke(CARD, CARDLINE);
       label('Client', L + 16, y + 14, W - 32);
       doc.font(FB).fontSize(12).fillColor(ink).text(String(clientLines[0] || '—'), L + 16, y + 30, { width: W - 32, lineBreak: false, ellipsis: true });
       doc.font(FR).fontSize(9.5).fillColor(muted).text(clientLines.slice(1).join('\n'), L + 16, y + 48, { width: W - 32, height: ch - 52, lineGap: 2 });
-      y += ch + 26;
+      y += ch + 16;
     }
 
     // 3 — prestation : minimal sans barre, classic barre accent, signature barre bronze + serif.
@@ -180,23 +229,23 @@ export async function buildPdf(m: DocModel): Promise<Buffer> {
     if (V !== 'minimal') doc.rect(L, y, 3, 40).fill(accent);
     label(m.interventionLabel, L + (V === 'minimal' ? 0 : 16), y + 2, W - 16);
     doc.font(FB).fontSize(V === 'minimal' ? 14 : 16).fillColor(ink).text(m.intervention || '—', L + (V === 'minimal' ? 0 : 16), y + 16, { width: W - (V === 'minimal' ? 0 : 16) });
-    y = Math.max(doc.y, y + 44) + 30;
+    y = Math.max(doc.y, y + 36) + 12;
     const deviceLines = [
       m.device?.serialNumber ? `N° de série : ${m.device.serialNumber}` : '',
       m.device?.imei ? `IMEI : ${m.device.imei}` : '',
     ].filter(Boolean);
     if (deviceLines.length) {
-      y = need(y, 42);
+      y = need(y, 36);
       label('Identification de l’appareil', L, y, W);
       doc.font(FR).fontSize(10.5).fillColor(ink).text(deviceLines.join(' · '), L, y + 14, { width: W });
-      y = Math.max(doc.y, y + 34) + 18;
+      y = Math.max(doc.y, y + 26) + 6;
     }
 
     // 4 — tableau des pièces : N° · désignation · quantité.
     // minimal : filets horizontaux uniquement, en-tête à l’encre sans fond ; signature : en-tête
     // brun doré, lignes zébrées crème ; classic : en-tête navy, zébrage gris clair.
     if (m.items.length) {
-      y = need(y, 90);
+      y = need(y, 80);
       if (V === 'minimal') {
         doc.rect(L, y, W, 0.75).fillColor('#94a3b8').stroke();
         doc.font(FB).fontSize(7.5).fillColor(muted);
@@ -214,8 +263,8 @@ export async function buildPdf(m: DocModel): Promise<Buffer> {
       }
       m.items.forEach((it, i) => {
         doc.font(FR).fontSize(11.5);
-        const h = Math.max(42, doc.heightOfString(it.label, { width: W - 150 }) + 26);
-        if (y + h > 762) { doc.addPage(); y = 56; }
+        const h = Math.max(30, doc.heightOfString(it.label, { width: W - 150 }) + 16);
+        if (y + h > 776) { doc.addPage(); y = itemsHeader(56); }
         if (ROWFILL && i % 2 === 0) doc.rect(L, y, W, h).fill(ROWFILL);
         doc.fillColor(muted).font(FB).fontSize(10).text(String(i + 1).padStart(2, '0'), L + 16, y + 14, { width: 28 });
         doc.fillColor(ink).font(FR).fontSize(11.5).text(it.label, L + 52, y + 14, { width: W - 150 });
@@ -224,20 +273,20 @@ export async function buildPdf(m: DocModel): Promise<Buffer> {
         y += h;
       });
       if (V === 'minimal') { doc.rect(L, y, W, 0.75).fillColor('#94a3b8').stroke(); }
-      y += 32;
+      y += 18;
     }
 
     // 5 — frais kilométriques (si renseignés) + garantie + total : chaque encart s’adapte au texte qu’il contient.
-    if (m.mileage.visible !== false && m.mileage.total !== '0,00 €' && m.mileage.total !== '0 €') {
-      y = need(y, 48);
+    if (showsMileage(m)) {
+      y = need(y, 42);
       const kmText = `${m.mileage.km} km × ${m.mileage.rate}/km`;
       doc.font(FR).fontSize(10.5);
-      const bh = Math.max(44, doc.heightOfString(kmText, { width: W - 200 }) + 30);
+      const bh = Math.max(36, doc.heightOfString(kmText, { width: W - 200 }) + 22);
       if (V === 'minimal') {
         label('Frais kilométriques', L, y + 8, W - 32);
         doc.font(FR).fontSize(10.5).fillColor(ink).text(kmText, L, y + 23, { width: W - 200, lineGap: 1 });
         doc.font(FB).fontSize(11).fillColor(ink).text(m.mileage.total, R - 140, y + 22, { width: 124, align: 'right' });
-        y += bh + 12;
+        y += bh + 8;
         doc.moveTo(L, y).lineTo(R, y).lineWidth(0.5).strokeColor(line).stroke();
         y += 16;
       } else {
@@ -245,20 +294,20 @@ export async function buildPdf(m: DocModel): Promise<Buffer> {
         label('Frais kilométriques', L + 16, y + 8, W - 32);
         doc.font(FR).fontSize(10.5).fillColor(ink).text(kmText, L + 16, y + 23, { width: W - 200, lineGap: 1 });
         doc.font(FB).fontSize(11).fillColor(ink).text(m.mileage.total, R - 140, y + 22, { width: 124, align: 'right' });
-        y += bh + 16;
+        y += bh + 8;
       }
     }
 
-    y = need(y, 110);
+    y = need(y, 96);
     if (m.reminderPenalty) {
       doc.font(FB).fontSize(11);
       const bh = Math.max(44, doc.heightOfString(m.reminderPenalty, { width: 224 }) + 26);
       rr(L, y, W, bh, 8).fillAndStroke(CARD, CARDLINE);
       label('Majoration de retard', L + 16, y + 8, W - 32);
       doc.font(FB).fontSize(11).fillColor(ink).text(m.reminderPenalty, R - 240, y + 16, { width: 224, align: 'right', lineGap: 1 });
-      y += bh + 16;
+      y += bh + 8;
     }
-    let rowH = 88;
+    let rowH = 72;
     if (m.warranty) {
       doc.font(FR).fontSize(10.5);
       rowH = Math.max(rowH, doc.heightOfString(m.warranty, { width: 170, lineGap: 2 }) + 44);
@@ -279,7 +328,7 @@ export async function buildPdf(m: DocModel): Promise<Buffer> {
         label('Garantie', L, y + 14, 200);
         doc.font(FR).fontSize(10.5).fillColor(ink).text(m.warranty, L, y + 30, { width: W - tw - 30, height: rowH, lineGap: 2 });
       }
-      y += rowH + 36;
+      y += rowH + 16;
     } else if (V === 'signature') {
       // Total sur fond accent doré, texte brun : signature chaleureuse.
       if (m.warranty) {
@@ -293,7 +342,7 @@ export async function buildPdf(m: DocModel): Promise<Buffer> {
       doc.font(FB).fontSize(tSize);
       while (tSize > 13 && doc.widthOfString(m.totalTtc) > 214) { tSize -= 2; doc.fontSize(tSize); }
       doc.fillColor('#2b1f14').text(m.totalTtc, R - 258 + 22, y + 40, { width: 214 });
-      y += rowH + 36;
+      y += rowH + 16;
     } else {
       if (m.warranty) {
         rr(L, y, 200, rowH, 8).fillAndStroke(CARD, CARDLINE);
@@ -307,46 +356,51 @@ export async function buildPdf(m: DocModel): Promise<Buffer> {
       doc.font(FB).fontSize(tSize);
       while (tSize > 13 && doc.widthOfString(m.totalTtc) > 214) { tSize -= 2; doc.fontSize(tSize); }
       doc.fillColor('#ffffff').text(m.totalTtc, R - 258 + 22, y + 40, { width: 214 });
-      y += rowH + 36;
+      y += rowH + 16;
     }
 
     // 6 — signature (devis) : minimal filet simple, classic encart gris, signature double bordure bronze.
     if (m.kind === 'quote') {
-      y = need(y, 110);
+      y = need(y, 92);
       label('Bon pour accord', L, y, 200);
       doc.font(FR).fontSize(9).fillColor(muted).text('Date, mention « bon pour accord » et signature du client', L, y + 13, { width: 300 });
       if (V === 'minimal') {
-        doc.moveTo(L, y + 98).lineTo(L + 280, y + 98).lineWidth(0.75).strokeColor('#64748b').stroke();
+        doc.moveTo(L, y + 86).lineTo(L + 280, y + 86).lineWidth(0.75).strokeColor('#64748b').stroke();
       } else if (V === 'signature') {
-        rr(L, y + 32, 280, 66, 8).lineWidth(1.4).strokeColor(accent).stroke();
-        rr(L + 3, y + 35, 274, 60, 6).lineWidth(0.5).strokeColor(CARDLINE).stroke();
+        rr(L, y + 28, 280, 58, 8).lineWidth(1.4).strokeColor(accent).stroke();
+        rr(L + 3, y + 31, 274, 52, 6).lineWidth(0.5).strokeColor(CARDLINE).stroke();
       } else {
-        rr(L, y + 32, 280, 66, 8).lineWidth(0.7).strokeColor('#cbd5e1').stroke();
+        rr(L, y + 28, 280, 58, 8).lineWidth(0.7).strokeColor('#cbd5e1').stroke();
       }
-      y += 98 + 30;
+      y += 72 + 8;
     }
 
     // 7 — mentions légales puis conditions (discrètes)
     if (m.legal.length) {
       doc.font(FR).fontSize(7.5);
       const lt = m.legal.join('\n');
-      const h = doc.heightOfString(lt, { width: W, lineGap: 1.5 }) + 24;
+      const h = doc.heightOfString(lt, { width: W, lineGap: 1.5 }) + 18;
       y = need(y, h);
       doc.moveTo(L, y).lineTo(R, y).lineWidth(0.5).strokeColor(line).stroke();
-      label('Mentions légales', L, y + 10, 200);
-      doc.font(FR).fontSize(7.5).fillColor(muted).text(lt, L, y + 24, { width: W, lineGap: 1.5 });
-      y = doc.y + 16;
+      label('Mentions légales', L, y + 8, 200);
+      doc.font(FR).fontSize(7.5).fillColor(muted).text(lt, L, y + 19, { width: W, lineGap: 1.5 });
+      y = doc.y + 10;
     }
     if (m.cgv) {
       doc.font(FR).fontSize(7.5);
-      const h = doc.heightOfString(m.cgv, { width: W, lineGap: 1.5 }) + 24;
+      const h = doc.heightOfString(m.cgv, { width: W, lineGap: 1.5 }) + 18;
       y = need(y, h);
       doc.moveTo(L, y).lineTo(R, y).lineWidth(0.5).strokeColor(line).stroke();
-      label('Conditions', L, y + 10, 200);
-      doc.font(FR).fontSize(7.5).fillColor(muted).text(m.cgv, L, y + 24, { width: W, lineGap: 1.5 });
+      label('Conditions', L, y + 8, 200);
+      doc.font(FR).fontSize(7.5).fillColor(muted).text(m.cgv, L, y + 19, { width: W, lineGap: 1.5 });
     }
     doc.end();
   });
+}
+
+/** 15.4.69 — vrai quand l’adresse d’intervention recopie la facturation : on ne la répète pas. */
+function sameClientAddress(m: DocModel): boolean {
+  return !!m.client.address && !!m.client.interventionAddress && m.client.address.trim() === m.client.interventionAddress.trim();
 }
 
 /** Activité affichée sous le nom commercial dans le bandeau Signature. */
@@ -360,6 +414,7 @@ const noBorders = { top: NONE, bottom: NONE, left: NONE, right: NONE } as const;
 const hair = { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' } as const;
 const boxed = { top: hair, bottom: hair, left: hair, right: hair } as const;
 
+/** Rend le document en DOCX (Word), même modèle et mêmes variantes que le PDF. */
 export async function buildDocx(m: DocModel): Promise<Buffer> {
   const V = m.theme.variant || 'classic';
   const ACC = m.theme.accent.slice(1).toUpperCase(), INK = '0F172A', MUTED = '64748B', NAVY = m.theme.dark.slice(1).toUpperCase();
@@ -434,7 +489,7 @@ export async function buildDocx(m: DocModel): Promise<Buffer> {
 
   // 2 — carte Client : minimal = libellé + contenu sans encart ; classic = carte claire ;
   // signature = encart crème bordé bronze.
-  const addr = [...(m.client.address ? ['Facturation :', ...m.client.address.split(/\r?\n/)] : []), ...(m.client.interventionAddress ? ['Adresse d’intervention :', ...m.client.interventionAddress.split(/\r?\n/)] : [])];
+  const addr = [...(m.client.address ? ['Facturation :', ...m.client.address.split(/\r?\n/)] : []), ...(!sameClientAddress(m) && m.client.interventionAddress ? ['Adresse d’intervention :', ...m.client.interventionAddress.split(/\r?\n/)] : [])];
   if (PLAIN) {
     kids.push(label('Client'));
     kids.push(p(m.client.name || '—', { size: 24, bold: true }));
@@ -492,7 +547,7 @@ export async function buildDocx(m: DocModel): Promise<Buffer> {
 
   // 5 — frais kilométriques + garantie + total : minimal = lignes droites alignées à droite ;
   // classic = encarts clairs + bloc navy ; signature = encarts crème + bloc accent doré.
-  if (m.mileage.visible !== false && m.mileage.total !== '0,00 €' && m.mileage.total !== '0 €') {
+  if (showsMileage(m)) {
     if (PLAIN) {
       kids.push(label('Frais kilométriques'));
       kids.push(table([6500, CW - 6500], [new TableRow({ cantSplit: true, children: [
@@ -560,6 +615,7 @@ export async function buildDocx(m: DocModel): Promise<Buffer> {
 const x = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const NS = 'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"';
 
+/** Rend le document en ODT (LibreOffice), accents de thème appliqués aux trois variantes. */
 export function buildOdt(m: DocModel): Buffer {
   const V = m.theme.variant || 'classic';
   const PLAIN = V === 'minimal';                       // aucun encart ni fond coloré
@@ -632,7 +688,7 @@ export function buildOdt(m: DocModel): Buffer {
   const cell = (style: string, inner: string) => `<table:table-cell table:style-name="${style}" office:value-type="string">${inner}</table:table-cell>`;
   const tbl = (name: string, cols: string[], rows: string) => `<table:table table:name="${name}" table:style-name="Tfull">${cols.map(c => `<table:table-column table:style-name="Col${c}"/>`).join('')}${rows}</table:table>`;
   const tr = (cells: string) => `<table:table-row>${cells}</table:table-row>`;
-  const addr = [...(m.client.address ? ['Facturation :', ...m.client.address.split(/\r?\n/)] : []), ...(m.client.interventionAddress ? ['Adresse d’intervention :', ...m.client.interventionAddress.split(/\r?\n/)] : [])].map(l => P('Pbody', l)).join('');
+  const addr = [...(m.client.address ? ['Facturation :', ...m.client.address.split(/\r?\n/)] : []), ...(!sameClientAddress(m) && m.client.interventionAddress ? ['Adresse d’intervention :', ...m.client.interventionAddress.split(/\r?\n/)] : [])].map(l => P('Pbody', l)).join('');
 
   const headerCell = V === 'signature' ? 'Cband' : 'Cplain';
   let body = tbl('Entete', ['H1', 'H2'], tr(cell(headerCell, logoXml + P('Pcompany', m.company.name || 'Entreprise')) + cell(headerCell, P('Ptitle', m.reminderLabel || m.title) + P('Pnum', `N° ${m.number}`) + P('Pdate', `Émis le ${m.date}`))));
@@ -651,11 +707,11 @@ export function buildOdt(m: DocModel): Buffer {
       m.items.map((it, i) => { const st = i % 2 === 0 ? 'Crowz' : 'Crow'; return tr(cell(st, P('Pnumr', String(i + 1).padStart(2, '0'))) + cell(st, P('Pitem', it.label)) + cell(st, P('Pqty', it.quantity))); }).join(''));
     body += P('Pspace', '');
   }
-  if (m.mileage.visible !== false && m.mileage.total !== '0,00 €' && m.mileage.total !== '0 €') body += tbl('Kilometrage', ['S1', 'S2'], tr(cell('Ccard', P('Plabel', 'Frais kilométriques') + P('Pwarr', `${m.mileage.km} km × ${m.mileage.rate}/km`)) + cell('Ccard', P('Pqty', m.mileage.total))));
+  if (showsMileage(m)) body += tbl('Kilometrage', ['S1', 'S2'], tr(cell('Ccard', P('Plabel', 'Frais kilométriques') + P('Pwarr', `${m.mileage.km} km × ${m.mileage.rate}/km`)) + cell('Ccard', P('Pqty', m.mileage.total))));
   body += P('Pspace', '');
   if(m.reminderPenalty) body += tbl('Majoration', ['S1','S2'], tr(cell('Ccard', P('Plabel','Majoration de retard')) + cell('Ccard', P('Pqty',m.reminderPenalty))));
   if (PLAIN) {
-    body += tbl('Total', ['W1', 'W2', 'W3'], tr(cell('Cplain', m.warranty ? `<text:p text:style-name="Plabel">Garantie</text:p>${P('Pwarr', m.warranty)}` : P('Pbody', '')) + cell('Cplain', `<text:p text:style-name="Pdouble"/>${P('Ptotlabel', totalLabel(m))}${P('Ptotalplain', m.totalTtc)}`)));
+    body += tbl('Total', ['W1', 'W2', 'W3'], tr(cell('Cplain', m.warranty ? `<text:p text:style-name="Plabel">Garantie</text:p>${P('Pwarr', m.warranty)}` : P('Pbody', '')) + cell('Cplain', P('Pbody', '')) + cell('Cplain', `<text:p text:style-name="Pdouble"/>${P('Ptotlabel', totalLabel(m))}${P('Ptotalplain', m.totalTtc)}`)));
   } else {
     body += tbl('Total', ['W1', 'W2', 'W3'], tr(cell('Cplain', m.warranty ? `<text:p text:style-name="Plabel">Garantie</text:p>${P('Pwarr', m.warranty)}` : P('Pbody', '')) + cell('Cplain', P('Pbody', '')) + cell('Cnavy', P('Ptotlabel', totalLabel(m)) + P('Ptotal', m.totalTtc))));
   }
@@ -670,7 +726,10 @@ export function buildOdt(m: DocModel): Buffer {
   if (m.legal.length) body += P('Pspace', '') + P('Plabel', 'Mentions légales') + m.legal.map(l => P('Psmall', l)).join('');
   if (m.cgv) body += P('Pspace', '') + P('Plabel', 'Conditions') + P('Psmall', m.cgv);
 
-  const themed = styles.replaceAll('#0b63cd', m.theme.accent).replaceAll('#0b1220', m.theme.dark);
+  // 15.4.68 — les encarts de la variante Signature suivaient un bronze codé en dur : l'accent
+  // et le fond foncé choisis dans les paramètres (Orchidée, Horizon…) s'appliquent aussi à l'ODT.
+  const themed = styles.replaceAll('#0b63cd', m.theme.accent).replaceAll('#0b1220', m.theme.dark)
+    .replaceAll('#a16207', m.theme.accent).replaceAll('#2b1f14', m.theme.dark);
   const content = `<?xml version="1.0" encoding="UTF-8"?><office:document-content ${NS} office:version="1.2"><office:automatic-styles>${themed}</office:automatic-styles><office:body><office:text>${body}</office:text></office:body></office:document-content>`;
   const stylesXml = `<?xml version="1.0" encoding="UTF-8"?><office:document-styles ${NS} office:version="1.2"><office:font-face-decls><style:font-face style:name="${FN}" svg:font-family="${FN}" style:font-family-generic="${m.theme.font === 'serif' ? 'roman' : 'swiss'}"/></office:font-face-decls><office:styles><style:default-style style:family="paragraph"><style:paragraph-properties fo:line-height="135%"/><style:text-properties ${FONT} fo:font-size="10.5pt" fo:color="#0f172a" fo:language="fr" fo:country="FR"/></style:default-style><style:style style:name="Standard" style:family="paragraph" style:class="text"/><style:style style:name="Footer" style:family="paragraph"><style:paragraph-properties fo:text-align="center"/><style:text-properties ${FONT} fo:font-size="8pt" fo:color="#94a3b8"/></style:style></office:styles><office:automatic-styles><style:page-layout style:name="pm1"><style:page-layout-properties fo:page-width="21cm" fo:page-height="29.7cm" fo:margin-top="2cm" fo:margin-bottom="1.9cm" fo:margin-left="2.2cm" fo:margin-right="2.2cm"/><style:footer-style><style:header-footer-properties fo:min-height="0.6cm" fo:margin-top="0.4cm"/></style:footer-style></style:page-layout></office:automatic-styles><office:master-styles><style:master-page style:name="Standard" style:page-layout-name="pm1"><style:footer><text:p text:style-name="Footer">${x(footerText(m))}</text:p></style:footer></style:master-page></office:master-styles></office:document-styles>`;
   const meta = `<?xml version="1.0" encoding="UTF-8"?><office:document-meta ${NS} office:version="1.2"><office:meta><dc:title xmlns:dc="http://purl.org/dc/elements/1.1/">${x(`${m.title} ${m.number}`)}</dc:title></office:meta></office:document-meta>`;

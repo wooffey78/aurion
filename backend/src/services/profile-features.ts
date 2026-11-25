@@ -47,7 +47,11 @@ export function featuresForProfile(profileCode: string): ProfileFeatures {
   // activité « était finalement une bonne chose »). Chantiers est pertinent dès qu'il y a
   // déplacement/installation/chantier (matériel, installations, véhicules, projets) — pas
   // pour une prestation purement de bureau (ex. comptable démo).
-  const chantiers = has('installation') || has('véhicule') || has('materiel') || has('matériel') || has('chantier') || has('projets') || has('dossier') || has('appareil');
+  // 15.4.70 — un appareil, un dossier ou du matériel ne sont pas des chantiers : la réparation
+  // smartphone (module « Appareils / Dossiers ») et le dépannage informatique (module
+  // « Matériel ») affichaient Chantiers à tort. Seuls les métiers d'installation, de travaux,
+  // de projet ou de déplacement gardent cette entrée.
+  const chantiers = has('installation') || has('véhicule') || has('chantier') || has('projets') || has('travaux');
   // Maintenance : métiers d'entretien récurrent identifiés par mots-clés du libellé.
   const maintenance = /chauffage|plomberie|clim|cvc|entretien|jardin|piscine|serrure|vitrerie|nettoyage|informatique|domotique|bronch|ramonage/.test(title);
   const stockLocations = has('pièce') || has('piece') || has('matériel') || has('materiel') || has('composant');

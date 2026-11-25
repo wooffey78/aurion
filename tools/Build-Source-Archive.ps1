@@ -4,6 +4,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# 15.4.68 — Windows PowerShell ne charge pas System.IO.Compression.FileSystem par défaut :
+# sans cette ligne, la vérification finale du ZIP échoue (« Type [IO.Compression.ZipFile]
+# introuvable ») après la création de l'archive, qui reste alors non contrôlée.
+try { Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop } catch { }
 if (-not $Root) { $Root = Split-Path -Parent $PSScriptRoot }
 $Root = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
 $rootName = Split-Path -Leaf $Root

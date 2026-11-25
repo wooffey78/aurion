@@ -1,4 +1,11 @@
-// Nouveau devis / modification : lignes de pièces avec quantités + calculateur (le prix TTC voulu fixe la marge).
+/**
+ * Éditeur de devis et de factures.
+ *
+ * Flux : lignes de pièces (quantité + coût) → inputs() (unités et arrondis au centime) →
+ * computePricing (moteur pur, sans cache) → rendu du panneau de calcul et du brouillon.
+ * Le prix TTC saisi pilote la marge ; en mode « marge nette visée », c'est le prix qui est
+ * retrouvé. Aucune valeur calculée n'est conservée entre deux saisies.
+ */
 import{api}from'../../core/api.js';
 import{computePricing}from'../../core/pricing.js';
 import{S,e,money,toast,prof,active,hooks,emailToast,askConfirm}from'./core.js';
@@ -11,6 +18,10 @@ let lines=[],driver='ttc',catalogPricing=true;
 // recalcul. Remise TTC : configurée en € ou en %, appliquée via bouton dédié — le moteur la
 // déduit du TTC cible (règle comptable : HT = TTC ÷ (1 + taux), aucun arrondi intermédiaire).
 let baseTtcMain=null,discountTtc=0;
+// V2 — dernière main-d’œuvre facturée intégrée au TTC (TVA comprise). Le champ « Main-d’œuvre
+// facturée HT » n'est plus décoratif : toute modification ajuste le TTC client du delta exact,
+// sans jamais compter deux fois le montant lors d'un rechargement ou d'une édition.
+let lastLabourTtc=0;
 // Bloc 8 — référentiel des catégories d'activité micro (chargé une fois par vue, repli local si indisponible).
 let microRef={version:null,rates:[],categories:[]};
 const FALLBACK_CATEGORIES=[['vente_bic','Vente de marchandises (BIC)'],['services_bic','Prestations de services BIC'],['services_bnc','Autres prestations de services (BNC)'],['services_bnc_cipav','Professions libérales réglementées CIPAV'],['specific','Activité à règles spécifiques']];
@@ -73,9 +84,9 @@ export const view=()=>{
    <label class="field"><span>Frais kilométriques <em class="tag">visible client</em></span><select id="mileageMode"><option value="margin" ${mileageMode==='margin'?'selected':''}>Déduire de la marge</option><option value="client_price" ${mileageMode==='client_price'?'selected':''}>Ajouter au prix client TTC</option></select><input id="mileageKm" type="number" min="0" step="0.1" inputmode="decimal" value="${Number(q?.mileage_km||0)>0?e(q.mileage_km):''}" placeholder="Kilomètres à parcourir (ex. 12)"><div class="grid-2"><input id="mileageInternalRate" type="number" min="0" step="0.001" value="${mileageInternalRate?e(mileageInternalRate):''}" placeholder="Coût interne €/km"><input id="mileageClientRate" type="number" min="0" step="0.001" value="${mileageClientRate?e(mileageClientRate):''}" placeholder="Tarif client €/km"></div><small class="help">Aurion distingue le coût interne et le tarif facturé. Montant appliqué : <strong id="mileageTotal">${Number(q?.mileage_total||0)>0?money(Number(q.mileage_total)):'à renseigner'}</strong>.</small></label>
    <div class="field"><span>Coefficient Aurion · appliqué au coût des pièces</span><input id="coefficientBasis" type="hidden" value="purchase"><div class="grid-2"><label class="field"><span>Unité</span><select id="coefficientUnit"><option value="percent" ${coefficientUnit==='percent'?'selected':''}>%</option><option value="euro" ${coefficientUnit==='euro'?'selected':''}>€</option></select></label></div><label class="field"><span>Coefficient</span><input id="coefficientValue" type="number" min="0" step="0.01" value="${coefficientValue?e(coefficientValue):''}" placeholder="Coefficient"></label><small class="help">Le coefficient reste modifiable pour chaque devis. En €, le montant est ajouté à chaque unité de pièce ; en %, il majore le coût d’achat des pièces.</small></div>
    <h2>${c.items===false?'2':'3'} · Prix client</h2>
-   <label class="field"><span>Prix de vente main-d’œuvre HT</span><input id="laborSellingHt" type="number" min="0" step="0.01" value="${editing?'':(q?.labor_selling_ht!=null?e(q.labor_selling_ht):'')}" placeholder="Prix HT"><small class="help">Vous pouvez saisir directement le prix de vente de la main-d’œuvre. Le coût interne reste séparé.</small></label>
-   <label class="field"><span>Coût interne main-d’œuvre HT <em class="tag internal">interne</em></span><input id="laborInternalCostHt" type="number" min="0" step="0.01" value="${q?.labor_internal_cost_ht!=null?e(q.labor_internal_cost_ht):''}" placeholder="Coût réel HT"><small class="help">Coût réel de la main-d’œuvre pour votre entreprise. Il réduit la marge et n’est jamais ajouté au prix client.</small></label>
-   <label class="field"><span>Prix TTC facturé au client</span><input id="targetTtc" type="number" min="0" step="0.01" value="${q?e(targetTtcValue):''}" class="big-input" placeholder="Prix TTC voulu"><small class="help">Le champ affiche le TOTAL : prestation principale + prestations complémentaires, cumulées automatiquement en temps réel.</small></label>
+   <label class="field"><span>Main-d’œuvre facturée HT <em class="tag">intégrée au TTC</em></span><input id="laborSellingHt" type="number" min="0" step="0.01" value="${q?.labor_selling_ht!=null&&q?.driver!=='net'?e(q.labor_selling_ht):''}" placeholder="Prix HT"><small class="help">Ce montant est ajouté au TTC facturé au client (TVA comprise) : le modifier ajuste le total du même écart. Le coût interne reste séparé et ne change jamais le prix client.</small></label>
+   <details class="advanced"><summary>Coûts internes (facultatif)</summary><label class="field"><span>Coût interne main-d’œuvre HT <em class="tag internal">interne</em></span><input id="laborInternalCostHt" type="number" min="0" step="0.01" value="${q?.labor_internal_cost_ht!=null?e(q.labor_internal_cost_ht):''}" placeholder="Coût réel HT"><small class="help">Coût réel de la main-d’œuvre pour votre entreprise. Il réduit la marge et n’est jamais ajouté au prix client.</small></label></details>
+   <label class="field"><span>Prix TTC facturé au client</span><input id="targetTtc" type="number" min="0" step="0.01" value="${q?e(targetTtcValue):''}" class="big-input" placeholder="Prix TTC voulu"><small class="help">Le champ affiche le TOTAL : prestation principale + prestations complémentaires + matériel vendu, cumulés automatiquement en temps réel.</small></label>
    <div class="field discount-row"><span>Remise sur le TTC facturé au client</span><div class="grid-2"><input id="discountValue" type="number" min="0" step="0.01" placeholder="Montant de la remise"><select id="discountUnit" aria-label="Unité de la remise"><option value="eur">€ (montant)</option><option value="pct">% (pourcentage)</option></select></div><div class="button-row"><button type="button" class="btn secondary small" id="apply-discount">Appliquer la remise</button><button type="button" class="link-btn" id="clear-discount" hidden>Retirer la remise</button></div><small class="help" id="discount-status" role="status"></small></div>
    <details class="advanced"><summary>Calcul inverse : bénéfice minimum indicatif</summary><label class="field"><span>Bénéfice minimum indicatif (€)</span><input id="minimumProfit" type="number" min="0" step="0.01" value="${q?.targetNet??''}" placeholder="0"><small class="help">Aurion calcule immédiatement le TTC nécessaire pour atteindre ce bénéfice minimum. Vous pouvez définir librement cette valeur.</small></label></details>
    <details class="advanced"><summary>Paramètres fiscaux : TVA ${Number(q?.vat_rate??a.vat_rate??20)} % · règles détectées</summary><div class="grid-2"><label class="field"><span>TVA %</span><input id="vat" type="number" min="0" max="100" step="0.01" value="${q?.vat_rate!=null?e(q.vat_rate):(a.vat_rate!=null?e(a.vat_rate):(orgFiscal.vat_rate!=null?e(orgFiscal.vat_rate):''))}"></label><label class="field"><span>TVA achats</span><select id="purchaseVatMode"><option value="auto" ${(q?.purchase_vat_mode||'auto')==='auto'?'selected':''}>Détectée automatiquement</option><option value="manual" ${q?.purchase_vat_mode==='manual'?'selected':''}>Taux personnalisé</option><option value="exempt" ${q?.purchase_vat_mode==='exempt'?'selected':''}>Exonéré</option></select></label></div><label class="field"><span>Taux TVA achats (%)</span><input id="purchaseVatRate" type="number" min="0" max="100" step="0.01" value="${q?.purchase_vat_rate??orgPricing.purchase_vat_rate??''}"></label><label class="field"><span>Catégorie d’activité par défaut du document (bloc 8 · activité mixte)</span><select id="activityCategory"><option value="">Non renseigné (activité unique ou à préciser)</option>${catOptions(q?.activity_category||q?.activityCategory||'')}</select><small class="help">Ventilation du chiffre d’affaires par catégorie (vente, services BIC, BNC, CIPAV) avec les taux officiels datés de l’URSSAF. Chaque ligne peut redéfinir cette catégorie ; la proposition issue de l’APE détecté n’est jamais appliquée sans votre accord.</small></label><div class="stack"><span class="help">Cotisations détectées selon la forme juridique — modifiables pour ce document.</span>${(a.contributions||[]).map((c,i)=>`<label class="field"><span>${e(c.name||'Cotisation')} (${e(c.basis||'CA HT')})</span><input class="contrib-rate" data-name="${e(c.name||'Cotisation')}" data-basis="${e(c.basis||'ca_ht')}" data-mandatory="${c.mandatory===false?'false':'true'}" type="number" min="0" max="99.99" step="0.001" value="${q?.contribution_snapshot?.[i]?.rate??c.rate??''}"></label>`).join('')}</div></details>
@@ -87,6 +98,7 @@ export const view=()=>{
   <aside class="panel calculation"><span class="eyebrow">CALCULATEUR</span><h2>Résultat</h2><div id="calc"></div></aside></form>`;
 };
 
+/** Point d'entrée de la vue : rend l'éditeur, branche la saisie, le brouillon et l'enregistrement. */
 export async function bind(){
   const $=s=>document.querySelector(s),num=s=>{const raw=String($(s)?.value??'').trim();if(!raw)return 0;const n=Number(raw.replace(',','.'));if(!Number.isFinite(n))throw new Error(`Valeur invalide : ${s.replace(/^#/,'')}`);return n};
   const editing=S.editing;
@@ -110,7 +122,13 @@ export async function bind(){
     // baseTtcMain = prestation principale seule ; la remise TTC enregistrée est restaurée depuis
     // l'instantané du document (listPriceTtc = TTC avant remise, discountTtc = remise).
     const extrasTotal=()=>serviceExtras.reduce((t,x)=>t+(Number(x.price)||0),0);
-    const applyTargetTtc=()=>{if(baseTtcMain==null)return;const el=document.querySelector('#targetTtc');if(el)el.value=(baseTtcMain+extrasTotal()).toFixed(2)};
+    // 15.4.70 — le matériel vendu entre dans le TTC cumulé : chaque ligne de pièce dont le prix
+    // de vente HT est renseigné ajoute quantité × prix × (1 + TVA). Les lignes sans prix de
+    // vente restent des coûts internes et ne changent pas le total client.
+    const partsSaleTtc=()=>lines.reduce((t,l)=>{const sale=Number(l.unitPrice);return t+(Number.isFinite(sale)&&sale>0?(Number(l.quantity)||0)*sale*(1+Number(document.querySelector('#vat')?.value||0)/100):0)},0);
+    // Main-d’œuvre facturée : HT saisi × (1 + TVA). Elle fait partie du TTC client.
+    const labourTtc=()=>Math.round((Number(document.querySelector('#laborSellingHt')?.value||0)*(1+Number(document.querySelector('#vat')?.value||0)/100))*100)/100;
+    const applyTargetTtc=()=>{if(baseTtcMain==null)return;const el=document.querySelector('#targetTtc');if(el)el.value=(baseTtcMain+extrasTotal()+partsSaleTtc()+labourTtc()).toFixed(2);lastLabourTtc=labourTtc()};
     if(q){
       const snap=q?.calculation_snapshot?.result||{};
       const listPrice=Number(snap.listPriceTtc||0);
@@ -119,11 +137,14 @@ export async function bind(){
       const isDraft=!editing&&q===S.quoteDraft;
       const rb=isDraft?Number(q.total_ttc||0):savedBaseTtc(q);
       const ttcInput=document.querySelector('#targetTtc');
-      const baseFrom=total=>Math.max(0,Number(total)-extrasTotal());
+      const baseFrom=total=>Math.max(0,Number(total)-extrasTotal()-partsSaleTtc());
       if(listPrice>0){baseTtcMain=baseFrom(listPrice);discountTtc=r2(Number(snap.discountTtc||0));if(ttcInput)ttcInput.value=listPrice.toFixed(2)}
-      else if(rb!==''&&Number(rb)>0){baseTtcMain=baseFrom(rb);discountTtc=r2(Number(q.discountTtc||0));if(ttcInput)ttcInput.value=(baseTtcMain+extrasTotal()).toFixed(2)}
+      else if(rb!==''&&Number(rb)>0){baseTtcMain=baseFrom(rb);discountTtc=r2(Number(q.discountTtc||0));if(ttcInput)ttcInput.value=(baseTtcMain+extrasTotal()+partsSaleTtc()).toFixed(2)}
       else baseTtcMain=null;
     }else{baseTtcMain=null;discountTtc=0}
+    // Le TTC enregistré contient déjà la main-d’œuvre : on mémorise sa part pour que la
+    // prochaine modification du champ n'ajoute que l'écart, jamais le montant complet.
+    lastLabourTtc=q?Math.round((Number(q.labor_selling_ht||0)*(1+vatReload/100))*100)/100:0;
   if(q&&!lines.length&&q.product)lines=[{label:q.product,quantity:1,unitCost:Number(q.part_cost)||0,unitPrice:'',partId:null}];
   if(!lines.length&&!serviceExtras.length)lines=[blank()];
 
@@ -179,7 +200,7 @@ export async function bind(){
   };
   const recalc=()=>{
     let r;try{r=computePricing(inputs())}catch(x){$('#calc').innerHTML=`<p class="error">${e(x.message)}</p>`;return null}
-    if(driver==='ttc')$('#minimumProfit').value=r.netMargin.toFixed(2);else {$('#targetTtc').value=r.baseTtc.toFixed(2);baseTtcMain=Math.max(0,r.baseTtc-extrasTotal())}
+    if(driver==='ttc'){$('#minimumProfit').value=r.netMargin.toFixed(2);baseTtcMain=Math.max(0,num('#targetTtc')-extrasTotal()-partsSaleTtc())}else {$('#targetTtc').value=(r.baseTtc+extrasTotal()+partsSaleTtc()).toFixed(2);baseTtcMain=r.baseTtc}
     const mileageRateEl=$('#mileageMode')?.value==='client_price'?$('#mileageClientRate'):$('#mileageInternalRate');const mt=Number($('#mileageKm')?.value||0)*Number(mileageRateEl?.value||0);if($('#mileageTotal')){const kmKnown=String($('#mileageKm')?.value??'').trim()!=='',rateKnown=String(mileageRateEl?.value??'').trim()!=='';
       // Aucune donnée saisie ⇒ placeholder explicite, jamais un faux « 0,00 € ».
       $('#mileageTotal').textContent=kmKnown&&rateKnown?money(mt):'à renseigner';}
@@ -187,9 +208,11 @@ export async function bind(){
     // remise : r.totalTtc / r.totalHt englobent déjà tout — HT = TTC ÷ (1 + TVA), règle du
     // classeur de référence, aucun arrondi intermédiaire (arithmétique exacte BigInt côté
     // moteur, présentation à deux décimales).
-    const extras=extrasTotal();const totalTtcAll=r.totalTtc;const totalHtAll=r.totalHt;
-    $('#calc').classList.toggle('quote-loss',!!r.loss);$('#calc').classList.toggle('quote-profit',!r.loss);$('#calc').innerHTML=`<div class="calc-total"><span>Total TTC ${extras>0?'(prestations cumulées + frais km)':'(frais km inclus)'}</span><strong>${money(totalTtcAll)}</strong></div>
+    const extras=extrasTotal();const partsSale=partsSaleTtc();const totalTtcAll=r.totalTtc;const totalHtAll=r.totalHt;
+    $('#calc').classList.toggle('quote-loss',!!r.loss);$('#calc').classList.toggle('quote-profit',!r.loss);$('#calc').innerHTML=`<div class="calc-total"><span>Total TTC ${[extras>0?'prestations':null,partsSale>0?'matériel':null,'frais km'].filter(Boolean).join(' + ')}</span><strong>${money(totalTtcAll)}</strong></div>
       ${extras>0?`<div class="calc-line"><span>Prestations complémentaires (TTC)</span><b>${money(extras)}</b></div>`:''}
+      ${Number($('#laborSellingHt')?.value||0)>0?`<div class="calc-line"><span>dont main-d’œuvre facturée (TTC)</span><b>${money(Number($('#laborSellingHt').value)*(1+num('#vat')/100))}</b></div>`:''}
+      ${partsSale>0?`<div class="calc-line"><span>Matériel vendu (TTC)</span><b>${money(partsSale)}</b></div>`:''}
       ${discountTtc>0?`<div class="calc-line calc-discount"><span>Remise appliquée sur le TTC</span><b>−${money(discountTtc)}</b></div>`:''}
       ${r.loss?'<div class="alert-loss">⚠ Vente à perte : le prix ne couvre pas les coûts directs.</div>':(r.belowMinimumPrice?'<div class="alert-loss">⚠ Le prix est inférieur au minimum calculé avec le coefficient.</div>':'')}
       <div class="calc-net ${r.loss?'neg':''}"><span>Résultat net</span><strong>${money(r.netResult)}</strong><small>${r.netResultRate.toLocaleString('fr-FR')} % du HT</small></div>
@@ -239,8 +262,10 @@ export async function bind(){
   const partItems=()=>{const ranked=rankRelevantParts(detectedService,S.parts,learnedParts);const rest=S.parts.filter(x=>!ranked.includes(x));const list=[...ranked,...rest];return list.map(x=>({value:x.name,hint:`Achat ${money(cheapest(x))} HT · Vente ${money(Number(x.selling_price||0))} HT`,partId:x.id}))};
   const drawExtras=()=>{
     const box=document.querySelector('#service-extras');if(!box)return;
-    box.innerHTML=serviceExtras.map((x,i)=>`<div class="line-row service-extra-row" data-xi="${i}"><input class="sx-label" placeholder="Prestation complémentaire (ex. réparation supplémentaire)" value="${e(x.label)}"><input class="sx-price" type="number" min="0" step="0.01" placeholder="Prix TTC" value="${x.price??''}"><button type="button" class="btn danger small sx-del">Retirer</button></div>`).join('')||'<p class="help">Aucune prestation complémentaire — ajoutez-en une si la réparation le nécessite.</p>';
-    box.querySelectorAll('.service-extra-row').forEach(row=>{
+    // 15.4.70 — chaque prestation ajoutée reprend la présentation de l'encart de la première
+    // prestation (champ libellé pleine largeur + champ prix TTC), au lieu d'une ligne compacte.
+    box.innerHTML=serviceExtras.map((x,i)=>`<div class="service-extra-card" data-xi="${i}"><label class="field"><span>Prestation complémentaire</span><input class="sx-label" placeholder="Prestation complémentaire (ex. réparation supplémentaire)" value="${e(x.label)}"></label><label class="field"><span>Prix TTC</span><input class="sx-price" type="number" min="0" step="0.01" placeholder="Prix TTC" value="${x.price??''}"></label><button type="button" class="btn danger small sx-del">Retirer</button></div>`).join('')||'<p class="help">Aucune prestation complémentaire — ajoutez-en une si la réparation le nécessite.</p>';
+    box.querySelectorAll('.service-extra-card').forEach(row=>{
       const xi=Number(row.dataset.xi);
       row.querySelector('.sx-label').addEventListener('input',ev=>{serviceExtras[xi].label=ev.target.value;persistDraft()});
       row.querySelector('.sx-price').addEventListener('input',ev=>{serviceExtras[xi].price=ev.target.value;applyTargetTtc();recalc();persistDraft()});
@@ -248,8 +273,8 @@ export async function bind(){
       attachSuggest(row.querySelector('.sx-label'),()=>S.interventions.map(iv=>({value:iv.name,hint:Number(iv.default_price)?money(iv.default_price)+' TTC':''})),{title:'Suggestions · prestations',onPick:item=>{const iv2=S.interventions.find(z=>z.name===item.value);serviceExtras[xi].label=item.value;if(iv2&&Number(iv2.default_price)>0&&!Number(serviceExtras[xi].price))serviceExtras[xi].price=Number(iv2.default_price);drawExtras();applyTargetTtc();recalc();persistDraft()}});
     });
   };
-  const addServiceExtra=()=>{serviceExtras.push({label:'',price:''});drawExtras();applyTargetTtc();const rows=document.querySelectorAll('#service-extras .service-extra-row');rows[rows.length-1]?.querySelector('.sx-label')?.focus()};
-  const suggestLines=()=>document.querySelectorAll('.ln-label').forEach(i=>attachSuggest(i,partItems,{title:`Suggestions · ${prof().itemLabel||'catalogue'}`,onPick:item=>{const row=i.closest('.line-row');if(!row)return;const l=lines[Number(row.dataset.i)];const part=S.parts.find(x=>x.id===item.partId)||S.parts.find(x=>x.name.toLowerCase()===String(item.value).trim().toLowerCase());if(!l||!part)return;l.label=part.name;l.partId=part.id;l.unitCost=cheapest(part);l.unitPrice=Number(part.selling_price||0)>0?Number(part.selling_price):'';l.saleCoefficientPercent=null;catalogPricing=true;row.querySelector('.ln-cost').value=String(l.unitCost);row.querySelector('.ln-sale').value=l.unitPrice===''?'':Number(l.unitPrice).toFixed(2);syncCatalogTarget();recalc();persistDraft();}}));
+  const addServiceExtra=()=>{serviceExtras.push({label:'',price:''});drawExtras();applyTargetTtc();const rows=document.querySelectorAll('#service-extras .service-extra-card');rows[rows.length-1]?.querySelector('.sx-label')?.focus()};
+  const suggestLines=()=>document.querySelectorAll('.ln-label').forEach(i=>attachSuggest(i,partItems,{title:`Suggestions · ${prof().itemLabel||'catalogue'}`,onPick:item=>{const row=i.closest('.line-row');if(!row)return;const l=lines[Number(row.dataset.i)];const part=S.parts.find(x=>x.id===item.partId)||S.parts.find(x=>x.name.toLowerCase()===String(item.value).trim().toLowerCase());if(!l||!part)return;l.label=part.name;l.partId=part.id;l.unitCost=cheapest(part);l.unitPrice=Number(part.selling_price||0)>0?Number(part.selling_price):'';l.saleCoefficientPercent=null;catalogPricing=true;row.querySelector('.ln-cost').value=String(l.unitCost);row.querySelector('.ln-sale').value=l.unitPrice===''?'':Number(l.unitPrice).toFixed(2);syncCatalogTarget();applyTargetTtc();recalc();persistDraft();}}));
   attachSuggest($('#intervention'),()=>S.interventions.map(i=>({value:i.name,hint:Number(i.default_price)?money(i.default_price)+' TTC':(i.default_duration_minutes?i.default_duration_minutes+' min':'')})),{title:`Suggestions · ${prof().serviceLabel||'prestations'}`});
   const warrantyScopeLabel=g=>g.scope_type==='parts'?'Pièces uniquement':g.scope_type==='labor'?'Main-d’œuvre uniquement':g.scope_type==='both'?'Pièces et main-d’œuvre':'';
   attachSuggest($('#warrantyText'),()=>[...S.policies.map(g=>({value:g.name,scopeType:g.scope_type,hint:warrantyScopeLabel(g)})),...(prof().warranty||[]).map(v=>({value:v}))],{title:'Suggestions · garanties',onPick:item=>{const scope=warrantyScopeLabel(item);if(scope&&!/pi[eè]ces?|main.?d.?oeuvre/i.test(item.value))$('#warrantyText').value=`${item.value} · ${scope}`;}});
@@ -273,7 +298,7 @@ export async function bind(){
     if(ev.target.classList.contains('ln-cost'))l.unitCost=ev.target.value;
     if(ev.target.classList.contains('ln-sale'))l.unitPrice=ev.target.value;
     if(ev.target.classList.contains('ln-cat')){l.activityCategory=ev.target.value||null;l.categoryAuto=false}
-    syncCatalogTarget();recalc();persistDraft();
+    syncCatalogTarget();applyTargetTtc();recalc();persistDraft();
   };
   $('#lines').addEventListener('input',updateLine);$('#lines').addEventListener('change',updateLine);
   $('#lines').addEventListener('click',ev=>{
@@ -282,7 +307,7 @@ export async function bind(){
     
     lines.splice(idx,1);if(!lines.length)lines=[blank()];drawAll();recalc();persistDraft();
   });
-  $('#add-line').onclick=()=>{lines.push(blank());drawAll();syncCatalogTarget();recalc();persistDraft();$('#lines').lastElementChild?.querySelector('input')?.focus()};
+  $('#add-line').onclick=()=>{lines.push(blank());drawAll();syncCatalogTarget();applyTargetTtc();recalc();persistDraft();$('#lines').lastElementChild?.querySelector('input')?.focus()};
   // 15.4.63 — prestations complémentaires : ajout/retrait manuel, intégrés aux calculs et au document.
   const addServiceBtn=document.querySelector('#add-service');if(addServiceBtn)addServiceBtn.onclick=addServiceExtra;
   drawExtras();
@@ -312,7 +337,7 @@ export async function bind(){
   document.querySelector('#apply-discount')?.addEventListener('click',applyDiscount);
   document.querySelector('#clear-discount')?.addEventListener('click',()=>{discountTtc=0;const v=document.querySelector('#discountValue');if(v)v.value='';syncDiscountUi();recalc();persistDraft();toast('Remise retirée.','success')});
   syncDiscountUi();
-  $('#deviceSerialNumber')?.addEventListener('input',persistDraft);$('#deviceImei')?.addEventListener('input',persistDraft);$('#targetTtc').addEventListener('input',()=>{catalogPricing=false;driver='ttc';baseTtcMain=Math.max(0,num('#targetTtc')-extrasTotal());recalc();persistDraft()});$('#laborSellingHt').addEventListener('input',()=>{if($('#laborSellingHt').value!==''){catalogPricing=false;driver='ttc';}recalc();persistDraft()});$('#laborInternalCostHt').addEventListener('input',()=>{recalc();persistDraft()});
+  $('#deviceSerialNumber')?.addEventListener('input',persistDraft);$('#deviceImei')?.addEventListener('input',persistDraft);$('#targetTtc').addEventListener('input',()=>{catalogPricing=false;driver='ttc';baseTtcMain=Math.max(0,num('#targetTtc')-extrasTotal()-partsSaleTtc());recalc();persistDraft()});$('#laborSellingHt').addEventListener('input',()=>{const next=Math.round((Number($('#laborSellingHt').value||0)*(1+num('#vat')/100))*100)/100;const target=num('#targetTtc');if(target>0){const adjusted=Math.max(0,target+next-lastLabourTtc);$('#targetTtc').value=adjusted.toFixed(2)}else{const base=lines.reduce((t,l)=>t+(Number(l.quantity)||0)*(Number(l.unitPrice)||0)*(1+num('#vat')/100),0);$('#targetTtc').value=(base+serviceExtras.reduce((t,x)=>t+(Number(x.price)||0),0)+next).toFixed(2)}lastLabourTtc=next;if($('#laborSellingHt').value!==''){catalogPricing=false;driver='ttc';}recalc();persistDraft()});$('#laborInternalCostHt').addEventListener('input',()=>{recalc();persistDraft()});
   ['#shipping','#mileageKm','#mileageInternalRate','#mileageClientRate','#mileageMode','#laborSellingHt','#vat','#urssaf','#purchaseVatMode','#purchaseVatRate','#coefficientValue','#qclient','#warrantyText','#billingAddress'].forEach(s=>{const el=$(s);if(!el)return;const update=()=>{if(s!=='#qclient'&&s!=='#warrantyText')syncCatalogTarget();recalc();persistDraft()};el.addEventListener('input',update);if(el.tagName==='SELECT')el.addEventListener('change',update)});
   $('#minimumProfit')?.addEventListener('input',()=>{driver='net';if(discountTtc>0){discountTtc=0;syncDiscountUi();toast('Remise retirée : le calcul inverse (bénéfice minimum) ne combine pas de remise TTC.','info')}recalc();persistDraft()});
   $('#billingAddress')?.addEventListener('input',()=>{const field=$('#billingAddress');if(field)delete field.dataset.autofilled});

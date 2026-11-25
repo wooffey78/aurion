@@ -40,8 +40,8 @@ Document créé en 15.4.51 (PROMPT A7 du document « PROMPTS 70 vers 100 »). Il
 | Item | Statut | Preuve datée |
 |---|---|---|
 | Mentions bloquantes à l'émission + snapshot + référentiel docs/MENTIONS-OBLIGATOIRES.md | FAIT (code + tests) | v52-emission-guards.test.mjs |
-| Documents contractuels 5.0 (CGU, confidentialité, cookies, mentions, DPA) + registre + sous-traitants | FAIT (contenu) — **validation juridique externe à obtenir avant publication** | — |
-| Publication effective (AURION_LEGAL_PUBLICATION_APPROVAL=5.0 + variables d'identité) + re-acceptation | BLOQUÉ-éditeur (`npm --prefix backend run check:legal` liste les blocages) | — |
+| Documents contractuels 5.1 (CGU, confidentialité, cookies, mentions, DPA) + registre + sous-traitants | FAIT (contenu) — **validation juridique externe à obtenir avant publication** | — |
+| Publication effective (AURION_LEGAL_PUBLICATION_APPROVAL=5.1 + variables d'identité) + re-acceptation | BLOQUÉ-éditeur (`npm --prefix backend run check:legal` liste les blocages) | — |
 | Contrat plateforme agréée (e-facture) | BLOQUÉ-éditeur / externe | — |
 
 ## Commercial (PROMPT E)
@@ -55,4 +55,4 @@ Document créé en 15.4.51 (PROMPT A7 du document « PROMPTS 70 vers 100 »). Il
 
 ## Décision de commercialisation (PROMPT F5)
 
-À la fin du pilote 10 clients (12 semaines), les 7 critères chiffrés de docs/PILOTE-SUIVI.md sont mesurés et la décision GO/NO-GO est consignée ici avec ses données. Aucune commercialisation ouverte avant : restauration prouvée (A3), publication légale 5.0 validée, Stripe testé.
+À la fin du pilote 10 clients (12 semaines), les 7 critères chiffrés de docs/PILOTE-SUIVI.md sont mesurés et la décision GO/NO-GO est consignée ici avec ses données. Aucune commercialisation ouverte avant : restauration prouvée (A3), publication légale 5.1 validée, Stripe testé.

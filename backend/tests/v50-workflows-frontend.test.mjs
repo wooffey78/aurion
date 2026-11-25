@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 process.env.DATABASE_URL ||= 'postgres://x:y@127.0.0.1:1/z';
 process.env.JWT_SECRET ||= 'x'.repeat(40);
 const read = p => readFileSync(new URL(p, import.meta.url), 'utf8');
@@ -41,7 +42,7 @@ test('routes agenda : occurrences dérivées en lecture seule (aucun rendez-vous
 });
 
 test('unitaire — configuration des nouveaux déclencheurs : préavis borné, réactions pures acceptées', { skip: !wfPath }, async () => {
-  const { normalizeRuleConfig, WorkflowError, TRIGGER_LABELS } = await import(wfPath);
+  const { normalizeRuleConfig, WorkflowError, TRIGGER_LABELS } = await import(pathToFileURL(wfPath).href);
   for (const t of ['quote_accepted', 'intervention_completed', 'document_shared']) {
     const cfg = normalizeRuleConfig(t, { actions: [{ type: 'create_task', title: 'Tâche {client}' }] });
     assert.equal(cfg.actions.length, 1);

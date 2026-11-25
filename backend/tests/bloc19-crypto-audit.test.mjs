@@ -35,7 +35,8 @@ test('bloc19: primitives modernes uniquement — argon2id, AES-256-GCM versionn�
 });
 
 test('bloc19: aucun algorithme obsolète à des fins de sécurité (le md5 reste limité au checksum Drive non cryptographique)', () => {
-  const srcDir = new URL('../src', import.meta.url).pathname;
+  // `URL.pathname` produit « /C:/… » sous Windows : utiliser fileURLToPath pour un chemin valide.
+  const srcDir = fileURLToPath(new URL('../src', import.meta.url));
   const hits = [];
   const walk = (dir) => { for (const f of readdirSync(dir)) { const p = path.join(dir, f); if (p.includes('node_modules')) continue; try { if (require('node:fs').statSync(p).isDirectory()) { walk(p); continue; } } catch {} if (!p.endsWith('.ts')) continue; const src = readFileSync(p, 'utf8'); if (/createHash\('(md5|sha1)'|createCipheriv\('(des|rc4|bf)/.test(src)) hits.push(path.relative(srcDir, p)); } };
   walk(srcDir);

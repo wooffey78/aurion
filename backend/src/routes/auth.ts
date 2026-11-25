@@ -8,7 +8,7 @@ import { hashPassword, verifyPassword } from "../services/passwords.js";
 import { registerSchema, loginSchema } from "../services/validation.js";
 import { signAccessToken } from "../plugins/auth.js";
 import { createInitialSubscription, legalDocumentsReadyForContracts, localEvaluationSignupAllowed, recordAcceptances } from "../services/account.js";
-import { createRefreshSession, rotateRefreshSession, revokeRefreshSession, revokeAllRefreshSessions, REFRESH_SECONDS } from '../services/native-sessions.js';
+import { createRefreshSession, rotateRefreshSession, revokeRefreshSession, revokeAllRefreshSessions, REFRESH_SECONDS, ACCESS_SECONDS } from '../services/native-sessions.js';
 import { registrationOptions, verifyRegistration, authenticationOptions, verifyAuthentication, issueWebAuthnSession } from '../services/webauthn.js';
 
 function configuredWebAuthnOrigin(request:any): string | null {
@@ -363,7 +363,7 @@ async function googleLoginClient(){
         user: { id, email },
         organization: { id: orgId },
         accessToken: token,
-        expiresIn: 30*60,
+        expiresIn: ACCESS_SECONDS,
       });
     },
   );
@@ -421,7 +421,7 @@ async function googleLoginClient(){
       const refresh=await createRefreshSession({userId:row.id,organizationId:row.organization_id,role:row.role,sessionVersion:Number(row.session_version||0)},request);
       app.setRefreshSession(reply,refresh.token);
 
-      return { user:{id:row.id,email:row.email}, organizationId:row.organization_id, accessToken:token, expiresIn:30*60 }; 
+      return { user:{id:row.id,email:row.email}, organizationId:row.organization_id, accessToken:token, expiresIn:ACCESS_SECONDS };
     },
   );
 
@@ -471,7 +471,7 @@ async function googleLoginClient(){
     if(!rotated) return reply.code(401).send({error:'UNAUTHENTICATED'});
     const token=await signAccessToken(rotated.identity);
     app.setSession(reply,token); app.setRefreshSession(reply,rotated.token);
-    return {accessToken:token,expiresIn:30*60,organizationId:rotated.identity.organizationId};
+    return {accessToken:token,expiresIn:ACCESS_SECONDS,organizationId:rotated.identity.organizationId};
   });
 
   app.post('/auth/logout', async (request, reply) => { await revokeRefreshSession(request.cookies?.aurion_refresh||''); app.clearSession(reply); app.clearRefreshSession(reply); return {ok:true}; });

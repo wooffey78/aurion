@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 process.env.DATABASE_URL ||= 'postgres://x:y@127.0.0.1:1/z';
 process.env.JWT_SECRET ||= 'x'.repeat(40);
 const dist = (p) => { try { return existsSync(fileURLToPath(new URL(p, import.meta.url))) ? fileURLToPath(new URL(p, import.meta.url)) : false; } catch { return false; } };
@@ -15,7 +16,7 @@ const gate = dist('../dist/services/mention-gate.js');
 const chain = dist('../dist/services/integrity-chain.js');
 
 test('unitaire — porte des mentions (révisé 15.4.54) : seules identity/insurance bloquent ; le médiateur devient un rappel non bloquant', { skip: !gate }, async () => {
-  const { blockingMentionGaps, mentionReminders } = await import(gate);
+  const { blockingMentionGaps, mentionReminders } = await import(pathToFileURL(gate).href);
   const M = (key, source) => ({ key, text: source === 'auto' ? 'x' : '', source });
   const gaps = blockingMentionGaps([
     M('identity', 'needs_confirmation'), M('insurance', 'needs_confirmation'),
@@ -33,7 +34,7 @@ test('unitaire — porte des mentions (révisé 15.4.54) : seules identity/insur
 });
 
 test('unitaire — contenu canonique de facture : stable, sensible aux montants et aux lignes', { skip: !chain }, async () => {
-  const { canonicalInvoiceContent, sha256Hex } = await import(chain);
+  const { canonicalInvoiceContent, sha256Hex } = await import(pathToFileURL(chain).href);
   const base = { documentId: 'd1', number: 'FAC-1', clientId: 'c1', totalHt: '100.00', totalVat: '20.00', totalTtc: '120.00', dueAt: '2026-12-01', items: [{ label: 'Main d’œuvre', quantity: 2, unitPrice: '50.00' }] };
   const a = sha256Hex(canonicalInvoiceContent(base));
   assert.match(a, /^[0-9a-f]{64}$/);

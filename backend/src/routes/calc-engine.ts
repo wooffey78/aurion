@@ -12,9 +12,21 @@ import { getCalculationStatus, CalcEngineError } from "../services/calc-engine/e
  */
 export async function calcEngineRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', app.requireAuth);
+  /** Diagnostic en lecture seule : versions, disponibilité de LibreOffice, mode actif et contrat. */
   app.get('/calc-engine/status', async () => getCalculationStatus());
-  app.post('/calc-engine/preview', async (request: any, reply: any) => {
-    const input = request.body || {};
+  // 15.4.69 — diagnostic coûteux (recalcul LibreOffice en mode xlsx) : débit limité par compte
+  // et corps strictement vérifié avant tout calcul.
+  /**
+   * Double calcul de diagnostic : moteur historique vs classeur recalculé, divergence par
+   * divergence. Réservé à la validation, jamais utilisé pour servir un écran ou un document.
+   * Réponse 400 si le corps n'est pas un objet, 503 si le classeur est indisponible.
+   */
+  app.post('/calc-engine/preview', { config: { rateLimit: { max: 12, timeWindow: '1 minute' } } }, async (request: any, reply: any) => {
+    const input = request.body;
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      reply.code(400);
+      return { error: 'INVALID_INPUT', message: 'Corps de requête invalide : objet JSON attendu.' };
+    }
     const legacy = computePricing(input);
     try {
       const { result, raw } = await calculatePricingXlsx(input);

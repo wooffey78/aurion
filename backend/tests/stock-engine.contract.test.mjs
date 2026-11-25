@@ -6,6 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 process.env.NODE_ENV ||= 'test';
 process.env.JWT_SECRET ||= 'integration-test-jwt-secret-0123456789abcdef0123456789';
@@ -67,7 +68,7 @@ const appPath = fileURLToPath(new URL('../dist/services/stock.js', import.meta.u
 const skippable = existsSync(appPath) ? false : 'dist/ absente : lancer le build (npm test le fait)';
 
 test('unitaire — signes de mouvement par type et refus des quantités invalides', { skip: skippable }, async () => {
-  const { validateMovementQuantity, computeStockAfter, StockError, MOVEMENT_SIGNS } = await import(appPath);
+  const { validateMovementQuantity, computeStockAfter, StockError, MOVEMENT_SIGNS } = await import(pathToFileURL(appPath).href);
   assert.equal(MOVEMENT_SIGNS.receipt, 1);
   assert.equal(MOVEMENT_SIGNS.consumption, -1);
   assert.equal(MOVEMENT_SIGNS.adjustment, 0);
@@ -85,7 +86,7 @@ test('unitaire — signes de mouvement par type et refus des quantités invalide
 });
 
 test('unitaire — propositions de réapprovisionnement : seuil − disponible − déjà commandé', { skip: skippable }, async () => {
-  const { normalizeOrderLines, orderTotal, PurchaseError } = await import(new URL('../dist/services/purchases.js', import.meta.url).pathname);
+  const { normalizeOrderLines, orderTotal, PurchaseError } = await import(new URL('../dist/services/purchases.js', import.meta.url).href);
   // Lignes normalisées : quantité positive exigée, prix nul autorisé, libellé obligatoire.
   assert.throws(() => normalizeOrderLines([{ label: '', quantity: 1 }]), PurchaseError);
   assert.throws(() => normalizeOrderLines([{ label: 'x', quantity: 0 }]), PurchaseError);
@@ -100,7 +101,7 @@ test('unitaire — propositions de réapprovisionnement : seuil − disponible �
 });
 
 test('unitaire — catégories et sécurité documentaire (bloc 16)', { skip: skippable }, async () => {
-  const { sniffMime, decideUpload, sha256Hex, DOCUMENT_CATEGORIES, isKnownCategory } = await import(new URL('../dist/services/doc-security.js', import.meta.url).pathname);
+  const { sniffMime, decideUpload, sha256Hex, DOCUMENT_CATEGORIES, isKnownCategory } = await import(new URL('../dist/services/doc-security.js', import.meta.url).href);
   // PDF réel détecté, EXE renommé en .pdf refusé, contenu inconnu refusé.
   const pdf = sniffMime(Buffer.from('%PDF-1.7 contenu de test'));
   assert.equal(pdf.mime, 'application/pdf');

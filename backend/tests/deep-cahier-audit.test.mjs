@@ -49,8 +49,10 @@ test('deep: organization sync returns fresh persisted organization data', () => 
 test('deep: document renderer propagates custom activity precisely', () => {
   const s = read('backend/src/services/document-renderer.ts');
   assert.match(s, /company_custom_activity/);
-  assert.match(s, /effectiveCompanyActivity\s*=\s*x\.company_custom_activity/);
-  assert.match(s, /COMPANY_ACTIVITY:\s*effectiveCompanyActivity/);
+  // V2 — la valeur reste déduite de l'activité personnalisée puis nettoyée des artefacts
+  // « null » avant tout rendu : le contrat vérifie les deux étapes.
+  assert.match(s, /effectiveCompanyActivity\s*=\s*cleanText\(x\.company_custom_activity/);
+  assert.match(s, /COMPANY_ACTIVITY:\s*cleanText\(effectiveCompanyActivity\)/);
 });
 
 test('deep: catalog-driven quote state survives drafts and rejects cross-activity catalog parts', () => {

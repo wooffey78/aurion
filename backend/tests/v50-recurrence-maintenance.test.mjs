@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 process.env.DATABASE_URL ||= 'postgres://x:y@127.0.0.1:1/z';
 process.env.JWT_SECRET ||= 'x'.repeat(40);
 const read = p => readFileSync(new URL(p, import.meta.url), 'utf8');
@@ -19,7 +20,7 @@ test('migration 112 : contrats additifs, RLS et réplication', () => {
 });
 
 test('unitaire — expansion hebdomadaire : intervalle, fenêtre et borne par défaut', { skip: !recPath }, async () => {
-  const { parseRecurrenceRule, expandRecurrence } = await import(recPath);
+  const { parseRecurrenceRule, expandRecurrence } = await import(pathToFileURL(recPath).href);
   const rule = parseRecurrenceRule({ freq: 'weekly', interval: 2 });
   assert.equal(rule.interval, 2);
   assert.equal(rule.count, 26); // borne par défaut documentée
@@ -33,7 +34,7 @@ test('unitaire — expansion hebdomadaire : intervalle, fenêtre et borne par d�
 });
 
 test('unitaire — occurrences de contrat : pas mensuels, report au jour demandé, fenêtre bornée', { skip: !mcPath }, async () => {
-  const { generateContractOccurrences, FREQUENCY_MONTHS, contractLabel } = await import(mcPath);
+  const { generateContractOccurrences, FREQUENCY_MONTHS, contractLabel } = await import(pathToFileURL(mcPath).href);
   assert.deepEqual(FREQUENCY_MONTHS.quarterly, 3);
   const spec = { frequency: 'quarterly', weekday: 1, firstOccurrence: '2026-01-05', durationMinutes: 120 };
   const occurrences = generateContractOccurrences(spec, '2026-01-01', '2026-08-01');

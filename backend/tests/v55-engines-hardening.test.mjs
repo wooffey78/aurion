@@ -6,13 +6,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 process.env.DATABASE_URL ||= 'postgres://x:y@127.0.0.1:1/z';
 process.env.JWT_SECRET ||= 'x'.repeat(40);
 
-const dist = (p) => { try { return existsSync(fileURLToPath(new URL(p, import.meta.url))) ? fileURLToPath(new URL(p, import.meta.url)) : false; } catch { return false; } };
+const dist = (p) => { try { const file = fileURLToPath(new URL(p, import.meta.url)); return existsSync(file) ? pathToFileURL(file).href : false; } catch { return false; } };
 
-test('unitaire — computePricing : mémoïsation pure (même entrée → même objet, ordre de clés insensible)', { skip: !dist('../dist/services/pricing.js') }, async () => {
+test('unitaire — computePricing : pureté (même entrée → mêmes valeurs, ordre de clés insensible, aucun cache partagé)', { skip: !dist('../dist/services/pricing.js') }, async () => {
   const { computePricing } = await import(dist('../dist/services/pricing.js'));
   const base = { partCost: 100, partQuantity: 2, vatRate: 20, targetTtc: '240,00', driver: 'ttc', coefficientValue: 10, coefficientUnit: 'percent', coefficientBasis: 'purchase' };
   const a = computePricing(base);
@@ -20,7 +20,12 @@ test('unitaire — computePricing : mémoïsation pure (même entrée → même 
   const b = computePricing(reordered);
   assert.deepEqual(b, a, 'l’ordre des clés ne doit pas influencer le résultat');
   const c = computePricing(base);
-  assert.equal(c, a, 'le même appel consécutif est servi depuis le cache');
+  assert.deepEqual(c, a, 'le même appel consécutif rend les mêmes valeurs');
+  // 15.4.69 — le moteur ne mémoïse plus : chaque calcul est indépendant, une mutation du
+  // résultat précédent ne peut pas contaminer le suivant (exigence du test 15.4.68).
+  assert.notEqual(c, a, 'aucun objet résultat n’est partagé entre deux calculs');
+  c.totalTtc = -1;
+  assert.equal(computePricing(base).totalTtc, a.totalTtc, 'une mutation ne contamine pas le calcul suivant');
   const d = computePricing({ ...base, targetTtc: '260,00' });
   assert.notEqual(d, a, 'une entrée différente recalcule');
   assert.ok(Math.abs(d.totalTtc - 260) < 0.001);
@@ -54,7 +59,7 @@ test('contrat — placeholders : chaque champ annoncé est alimenté ; STATUS et
   assert.match(renderer, /STATUS:isInvoice\?\(/);
   assert.match(renderer, /Devis émis — en attente de décision du client/);
   // DOCUMENT_TITLE : titre profilé réel du document natif (model.title), pas l'étiquette générique :
-  assert.match(renderer, /DOCUMENT_TITLE:model\.title/);
+  assert.match(renderer, /DOCUMENT_TITLE:cleanText\(model\.title\)/);
 });
 
 test('contrat — accueil : le HTML de la page publique est mis en cache mémoire (aucune lecture disque par requête)', () => {

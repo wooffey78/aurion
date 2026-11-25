@@ -9,7 +9,8 @@ const dir = path.join(here, '..', 'src', 'routes');
 const src = readdirSync(dir).filter(f => f.endsWith('.ts')).map(f => readFileSync(path.join(dir, f), 'utf8')).join('\n');
 const now = new Set([...src.matchAll(/app\.(get|post|put|patch|delete)\(['"`]([^'"`]*)/g)].map(m => `${m[1].toUpperCase()} ${m[2]}`));
 const intentionallyRemoved = new Set(['POST /documents/logo','GET /document-templates','POST /document-templates/upload','DELETE /document-templates/:id','GET /document-templates/status']);
-const expected = readFileSync(path.join(here, 'routes-13.0.txt'), 'utf8').split('\n').filter(Boolean).map(route => route.replace(/^(get|post|put|patch|delete)/i, method => method.toUpperCase())).filter(route => !intentionallyRemoved.has(route));
+// Le fichier de référence peut être en CRLF : retirer les \r avant de comparer les routes.
+const expected = readFileSync(path.join(here, 'routes-13.0.txt'), 'utf8').replace(/\r/g, '').split('\n').filter(Boolean).map(route => route.replace(/^(get|post|put|patch|delete)/i, method => method.toUpperCase())).filter(route => !intentionallyRemoved.has(route));
 
 test(`les ${expected.length} routes historiques conservées existent toujours`, () => {
   const missing = expected.filter(r => !now.has(r));

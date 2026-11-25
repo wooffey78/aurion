@@ -183,14 +183,14 @@ test('config GitHub/Render : autodeploy activé et CI conservée', () => {
   assert.match(ci, /npm audit/);
 });
 
-test('documents juridiques : révision technique tracée sur les cinq documents publiés (4.0 technique ; CGU et confidentialité en 5.0 contractuelle — 15.4.54)', () => {
-  // 15.4.54 : CGU-CGV et POLITIQUE-CONFIDENTIALITE portent la version contractuelle 5.0
-  // (portail, webhooks, e-facture préparatoire, DPA) — la révision 4.0 du 20 novembre reste
-  // citée dans leur historique ; les trois documents techniques restent en révision 4.0.
-  assert.match(read('docs/CGU-CGV.md'), /Version \*\*5\.1\*\*, révision du 25 novembre 2026 pour Aurion 15\.4\.67 \(mise à jour de la version 5\.0 du 23 novembre 2026/);
-  assert.match(read('docs/POLITIQUE-CONFIDENTIALITE.md'), /Version \*\*5\.1\*\*, révision du 25 novembre 2026 pour Aurion 15\.4\.67 \(mise à jour de la version 5\.0 du 23 novembre 2026/);
+test('documents juridiques : révision technique tracée sur les cinq documents publiés (5.1 contractuelle — 15.5.0)', () => {
+  // 15.5.0 : CGU-CGV, POLITIQUE-CONFIDENTIALITE, COOKIES, LEGAL-NOTICE et
+  // DECLARATION-ACCESSIBILITE portent tous la révision courante 5.1 et la version produit 15.5.0.
+  // L'historique 4.0/5.0 reste cité dans leur corps, sans être la version applicative.
+  assert.match(read('docs/CGU-CGV.md'), /Version \*\*5\.1\*\*, révision du 25 novembre 2026 pour Aurion 15\.5\.0/);
+  assert.match(read('docs/POLITIQUE-CONFIDENTIALITE.md'), /Version \*\*5\.1\*\*, révision du 25 novembre 2026 pour Aurion 15\.5\.0/);
   for (const doc of ['docs/COOKIES.md', 'docs/LEGAL-NOTICE.md', 'docs/DECLARATION-ACCESSIBILITE.md']) {
-    assert.match(read(doc), /révision du 25 novembre 2026 pour Aurion 15\.4\.67/);
+    assert.match(read(doc), /révision du 25 novembre 2026 pour Aurion 15\.5\.0/);
   }
   assert.match(read('docs/POLITIQUE-CONFIDENTIALITE.md'), /Droit à l'effacement en ligne \(15\.4\.35\)/);
   assert.match(read('docs/POLITIQUE-CONFIDENTIALITE.md'), /legal\/suppression-compte/);

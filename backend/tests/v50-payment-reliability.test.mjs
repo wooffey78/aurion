@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 process.env.DATABASE_URL ||= 'postgres://x:y@127.0.0.1:1/z';
 process.env.JWT_SECRET ||= 'x'.repeat(40);
 const dist = p => existsSync(fileURLToPath(new URL(p, import.meta.url))) ? fileURLToPath(new URL(p, import.meta.url)) : false;
@@ -12,7 +13,7 @@ const path = dist('../dist/services/payment-reliability.js');
 const obs = (issued, due, settled) => ({ totalTtc: 100, issuedAt: issued, dueAt: due, settledAt: settled });
 
 test('unitaire — client toujours à l\u2019heure : score maximal, bande « fiable », raisons explicites', { skip: !path }, async () => {
-  const { computePaymentReliability } = await import(path);
+  const { computePaymentReliability } = await import(pathToFileURL(path).href);
   const r = computePaymentReliability([
     obs('2026-01-01', '2026-01-31', '2026-01-05'),
     obs('2026-02-01', '2026-02-28', '2026-02-04'),
@@ -26,7 +27,7 @@ test('unitaire — client toujours à l\u2019heure : score maximal, bande « fia
 });
 
 test('unitaire — retards systématiques : pénalités cumulées, bande dégradée, médiane robuste', { skip: !path }, async () => {
-  const { computePaymentReliability } = await import(path);
+  const { computePaymentReliability } = await import(pathToFileURL(path).href);
   const r = computePaymentReliability([
     obs('2026-01-01', '2026-01-31', '2026-03-15'), // 59 j après émission, ~43 j de retard
     obs('2026-02-01', '2026-02-28', '2026-04-10'), // ~41 j de retard
@@ -39,7 +40,7 @@ test('unitaire — retards systématiques : pénalités cumulées, bande dégrad
 });
 
 test('unitaire — aucune facture réglée : « inconnu », jamais une supposition', { skip: !path }, async () => {
-  const { computePaymentReliability } = await import(path);
+  const { computePaymentReliability } = await import(pathToFileURL(path).href);
   const r = computePaymentReliability([obs('2026-10-01', '2026-11-30', null)]);
   assert.equal(r.score, null);
   assert.equal(r.band, 'inconnu');

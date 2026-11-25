@@ -9,10 +9,11 @@ import{S,e,money,toast,modalForm,confirmDelete,openDoc,calendarToast,prof,active
 import{renderMailbox}from'../mailbox.js';
 import{openClientSheet,initials}from'./clientsheet.js';
 import{mergeRegistryFields}from'../../core/registry-fill.js';
-import{deriveAutomaticForecastAssumptions,calculateForecast}from'../../core/forecast.js';// 15.4.50 — Analyse visuelle : représentation AU CHOIX de l'utilisateur (barres, courbe,
-// bougies, camembert) selon la nature des données — jamais un type mensonger.
-// 15.4.66 — l'import des diagrammes (renderChart) est retiré : seul l'encart admin les
-// utilisait, et cet encart de l'administration est supprimé complètement (consigne éditeur).
+import{deriveAutomaticForecastAssumptions,calculateForecast}from'../../core/forecast.js';
+// V2 — Analyse visuelle de l'administration : l'utilisateur CHOISIT la représentation
+// (barres, courbe, bougies, camembert). Aucun type mensonger : le module charts.js refuse
+// le camembert sur une série temporelle et affiche un message explicite.
+import{chartToolbar,bindChartToolbar,renderChart,CHART_TYPES}from'../../core/charts.js';
 
 const F=(id,label,val='',extra='')=>{const value=val==null?'':val;return`<label class="field"><span>${label}</span><input id="${id}" value="${e(value)}" ${extra}${/placeholder=/.test(extra)?'':` placeholder="Saisissez ${e(label.toLowerCase())}…"`}></label>`};
 const v=(m,id)=>m.querySelector('#'+id)?.value.trim()??'';
@@ -43,7 +44,9 @@ function horizonChartSvg(p){
     svg+='<line x1="'+(pad+pi*gw+gw/2).toFixed(1)+'" y1="'+(base+2)+'" x2="'+(pad+pi*gw+gw/2).toFixed(1)+'" y2="'+(base+8)+'" stroke="#94a3b8"/>';
   });
   svg+='<line x1="'+pad+'" y1="'+base+'" x2="'+(W-pad)+'" y2="'+base+'" stroke="#94a3b8"/>';
-  const legend='<div class="forecast-chart-legend">'+series.map(([k,l,c])=>'<span><i style="background:'+c+'"></i>'+l+'</span>').join('')+'</div>';
+  // CSP stricte (`style-src 'self'`) : aucune couleur en attribut style. Les trois séries sont
+  // fixes (entrées, sorties, solde) et portent une classe dédiée définie dans app.css.
+  const legend='<div class="forecast-chart-legend">'+series.map(([k,l])=>'<span><i class="legend-'+k+'"></i>'+l+'</span>').join('')+'</div>';
   return '<svg class="forecast-chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Horizon de facturation en graphique">'+svg+'</svg>'+legend;
 }
 
@@ -107,11 +110,11 @@ export const home={view(){
   // journal de bord avec un bouton « Envoyer » qui tente l'envoi immédiat de toute la file.
   const pendingEmails=Number(S.dashboardCounters?.pendingEmails||0);
   const emailRow=pendingEmails>0?`<div class="list-row journal-yellow" id="journal-emails-pending"><div><b>E-mails en attente d’envoi (${pendingEmails})</b><small>Boîte d’envoi Aurion : les documents dont l’e-mail n’a pas pu partir immédiatement. Ils partent seuls dès que la messagerie redevient opérationnelle — ou immédiatement via « Envoyer ».</small><div class="button-row"><button type="button" class="btn primary small" id="journal-send-emails">Envoyer</button></div></div><span>✉️</span></div>`:'';
-  return`<div class="page-head"><div><span class="eyebrow">ACTIVITÉ ACTIVE</span><h1>${e(p.title||active()?.name||'Activité')}</h1><p>${e(active()?.description||'Pilotez cette activité avec un espace de travail adapté à ses prestations.')}</p></div><div class="button-row"><button class="btn primary" data-go="quote">+ Nouveau devis</button><button class="btn secondary" data-go="clients">+ Nouveau client</button></div></div>${configPanel}<section class="panel journal-board"><div class="section-title"><h2>Journal de bord</h2></div><div class="list" role="region" aria-label="Journal de bord">${emailRow}${(S.dashboardCounters?.journal||[]).map(i=>`<div class="list-row journal-${e(i.severity||'yellow')} ${i.isRead?'journal-read':''}"><div><b>${e(i.title)}</b><small>${e(i.detail||'')}</small>${i.action==='settings'?'<button class="link-btn" data-go="settings">Configurer maintenant</button>':''}${i.persisted&&i.internalPath?`<a class="link-btn" href="#${e(String(i.internalPath).replace(/^\//,''))}">${String(i.eventType||'').startsWith('cloud_')?'Ouvrir les paramètres de stockage':'Reprendre l’étape'}</a>`:''}${i.persisted?`<div class="journal-actions"><span>${i.isRead?'Lu':'Nouvelle information'}</span><button type="button" class="link-btn journal-read-action" data-journal-id="${e(i.journalId)}" data-read="${i.isRead?'false':'true'}">${i.isRead?'Marquer non lu':'Marquer lu'}</button><button type="button" class="link-btn journal-resolve-action" data-journal-id="${e(i.journalId)}">${String(i.eventType||'').startsWith('fiscal_deadline')?'Supprimer l’alerte':'Résoudre'}</button></div>`:''}</div><span>${i.severity==='red'?'🔴':i.severity==='yellow'?'🟡':i.severity==='green'?'✅':'ℹ️'}</span></div>`).join('')||(emailRow?'':'<p class="muted">Aucune action urgente ou en attente.</p>')}</div></section>${trialAlert}
+  return`<div class="page-head"><div><span class="eyebrow">ACTIVITÉ ACTIVE</span><h1>${e(p.title||active()?.name||'Activité')}</h1><p>${e(active()?.description||'Pilotez cette activité avec un espace de travail adapté à ses prestations.')}</p></div><div class="button-row"><button class="btn primary" data-go="quote">+ Nouveau devis</button><button class="btn secondary" data-go="clients">+ Nouveau client</button></div></div>${configPanel}<section class="panel journal-board"><div class="section-title"><h2>Journal de bord</h2></div><div class="list" role="region" aria-label="Journal de bord">${emailRow}${(S.dashboardCounters?.journal||[]).map(i=>`<div class="list-row journal-${e(i.severity||'yellow')} ${i.isRead?'journal-read':''}"><div><b>${e(i.title)}</b><small>${e(i.detail||'')}</small><div class="journal-links">${i.action==='settings'?'<button class="link-btn" data-go="settings">Configurer maintenant</button>':''}${i.persisted&&i.internalPath?`<a class="link-btn" href="#${e(String(i.internalPath).replace(/^\//,''))}">${String(i.eventType||'').startsWith('cloud_')?'Ouvrir les paramètres de stockage':'Reprendre l’étape'}</a>`:''}</div>${i.persisted?`<div class="journal-actions"><span class="journal-state">${i.isRead?'Lu':'Nouvelle information'}</span><div class="journal-action-links"><button type="button" class="link-btn journal-read-action" data-journal-id="${e(i.journalId)}" data-read="${i.isRead?'false':'true'}">${i.isRead?'Marquer non lu':'Marquer lu'}</button><button type="button" class="link-btn journal-resolve-action" data-journal-id="${e(i.journalId)}">${String(i.eventType||'').startsWith('fiscal_deadline')?'Supprimer l’alerte':'Résoudre'}</button></div></div>`:''}</div><span>${i.severity==='red'?'🔴':i.severity==='yellow'?'🟡':i.severity==='green'?'✅':'ℹ️'}</span></div>`).join('')||(emailRow?'':'<p class="muted">Aucune action urgente ou en attente.</p>')}</div></section>${trialAlert}
   ${Number(S.dashboardCounters?.fourthReminderCount||0)>0?'<div class="notice warn-notice">⚠ Une 4e relance est nécessaire pour une facture impayée. <button class="link-btn" data-go="invoices">Ouvrir Devis & factures</button></div>':''}
-  <div class="metrics"><article><span>Encaissements HT du mois</span><b id="home-month-revenue">${money(revenue)}</b><small>paiements reçus, majorations comprises</small></article><article><span>Rendez-vous à venir</span><b id="home-rdv">${Number(S.dashboardCounters?.upcomingAppointments??S.appointments.filter(a=>new Date(a.starts_at)>now&&!['canceled','cancelled','deleted','completed'].includes(String(a.status||'').toLowerCase())).length)}</b><small>hors rendez-vous passés ou annulés</small></article></div>
-  <section class="quick-grid"><button class="action-card" data-go="support"><strong>?</strong><span>Tickets</span><small id="home-tickets-caption">${Number(S.dashboardCounters?.tickets||0)} ticket(s) non traité(s)</small></button></section><div id="home-forecast-root"></div><section class="panel" id="time-saved-panel"><div class="section-title"><h2>Temps économisé avec Aurion</h2><button class="btn secondary small" id="reset-time-metrics">Remettre à zéro</button></div><div class="metrics"><article><span>Temps manuel estimé</span><b id="tm-manual">${Number(S.timeMetrics?.manualMinutes||0).toFixed(0)} min</b><small>Estimation fixe de chaque client consulté, comptée une seule fois</small></article><article><span>Temps réel avec Aurion</span><b id="tm-actual">${Number(S.timeMetrics?.actualMinutes||0).toFixed(0)} min</b><small>Durée cumulée des sessions terminées</small></article><article><span>Temps économisé</span><b id="tm-saved">${Number(S.timeMetrics?.savedMinutes||0).toFixed(0)} min</b><small>Manuel − réel</small></article><article><span>Moyenne économisée</span><b id="tm-average">${Number(S.timeMetrics?.averageSavedMinutes||0).toFixed(1)} min</b><small>Par session terminée</small></article></div></section>
-  <section class="panel"><div class="section-title"><h2>Derniers documents</h2><button class="link-btn" data-go="invoices">Tout voir</button></div><div class="doc-groups">${(()=>{const invoices=S.quotes.filter(q=>q.document_type==='invoice').slice(0,5),quotes=S.quotes.filter(q=>q.document_type!=='invoice').slice(0,5);const rows=list=>list.map(q=>`<div class="list-row"><div><b>${e(q.number)}</b><small>${e(q.client_name||'Client')} · ${new Date(q.created_at).toLocaleDateString('fr-FR')}</small></div><strong>${money(q.total_ttc)}</strong></div>`).join('')||'<p class="muted">Aucun document.</p>';return`<div class="doc-group"><button type="button" class="doc-group-toggle" data-doc-group="factures" aria-expanded="false">Factures <span class="pill">${invoices.length}</span><small class="doc-group-caret">▾</small></button><div class="doc-group-list" hidden>${rows(invoices)}</div></div><div class="doc-group"><button type="button" class="doc-group-toggle" data-doc-group="devis" aria-expanded="false">Devis <span class="pill">${quotes.length}</span><small class="doc-group-caret">▾</small></button><div class="doc-group-list" hidden>${rows(quotes)}</div></div>`})()}</div></section>`},async bind(){
+  <div class="home-kpi-row"><div class="metrics"><article><span>Encaissements HT du mois</span><b id="home-month-revenue">${money(revenue)}</b><small>paiements reçus, majorations comprises</small></article><article><span>Rendez-vous à venir</span><b id="home-rdv">${Number(S.dashboardCounters?.upcomingAppointments??S.appointments.filter(a=>new Date(a.starts_at)>now&&!['canceled','cancelled','deleted','completed'].includes(String(a.status||'').toLowerCase())).length)}</b><small>hors rendez-vous passés ou annulés</small></article></div>
+  <section class="quick-grid"><button class="action-card" data-go="support"><strong>?</strong><span>Tickets</span><small id="home-tickets-caption">${Number(S.dashboardCounters?.tickets||0)} ticket(s) non traité(s)</small></button></section></div><div id="home-forecast-root"></div><details class="panel compact-details" id="time-saved-panel"><summary><span>Temps économisé avec Aurion</span><small>4 indicateurs — cliquez pour ouvrir</small></summary><div class="section-title"><h2>Temps économisé avec Aurion</h2><button class="btn secondary small" id="reset-time-metrics">Remettre à zéro</button></div><div class="metrics"><article><span>Temps manuel estimé</span><b id="tm-manual">${Number(S.timeMetrics?.manualMinutes||0).toFixed(0)} min</b><small>Estimation fixe de chaque client consulté, comptée une seule fois</small></article><article><span>Temps réel avec Aurion</span><b id="tm-actual">${Number(S.timeMetrics?.actualMinutes||0).toFixed(0)} min</b><small>Durée cumulée des sessions terminées</small></article><article><span>Temps économisé</span><b id="tm-saved">${Number(S.timeMetrics?.savedMinutes||0).toFixed(0)} min</b><small>Manuel − réel</small></article><article><span>Moyenne économisée</span><b id="tm-average">${Number(S.timeMetrics?.averageSavedMinutes||0).toFixed(1)} min</b><small>Par session terminée</small></article></div></details>
+  <section class="panel"><div class="section-title"><h2>Derniers documents</h2><button class="link-btn" data-go="invoices">Tout voir</button></div><div class="doc-groups">${(()=>{const invoices=S.quotes.filter(q=>q.document_type==='invoice').slice(0,5),quotes=S.quotes.filter(q=>q.document_type!=='invoice').slice(0,5);const rows=list=>list.map(q=>`<button type="button" class="list-row doc-recent" data-recent-doc="${e(q.id)}" data-recent-kind="${q.document_type==='invoice'?'invoice':'quote'}" aria-label="Consulter le PDF du document ${e(q.number)}"><div><b>${e(q.number)}</b><small>${e(q.client_name||'Client')} · ${new Date(q.created_at).toLocaleDateString('fr-FR')}</small></div><span class="doc-recent-side"><strong>${money(q.total_ttc)}</strong><small>Consulter →</small></span></button>`).join('')||'<p class="muted">Aucun document.</p>';return`<div class="doc-group"><button type="button" class="doc-group-toggle" data-doc-group="factures" aria-expanded="false">Factures <span class="pill">${invoices.length}</span><small class="doc-group-caret">▾</small></button><div class="doc-group-list" hidden>${rows(invoices)}</div></div><div class="doc-group"><button type="button" class="doc-group-toggle" data-doc-group="devis" aria-expanded="false">Devis <span class="pill">${quotes.length}</span><small class="doc-group-caret">▾</small></button><div class="doc-group-list" hidden>${rows(quotes)}</div></div>`})()}</div></section>`},async bind(){
 document.querySelector('#trial-download')?.addEventListener('click',()=>api.downloadAll().catch(x=>toast(x.message,'error')));
 // 15.4.50 — Analyse visuelle de l'accueil : données réelles des documents, représentation au choix.
 {
@@ -137,6 +140,10 @@ document.querySelectorAll('[data-horizon-toggle]').forEach(btn=>btn.addEventList
   btn.textContent=showChart?'Tableau':'Graphique';
   btn.setAttribute('aria-pressed',String(showChart));
 }));
+// 15.4.67 — « Derniers documents » : factures et devis regroupés, sous-menus dépliables au clic.
+// V2 — « Derniers documents » : chaque ligne ouvre directement le PDF du devis ou de la facture
+// dans la visionneuse intégrée, sans passer par la page Documents.
+document.querySelectorAll('[data-recent-doc]').forEach(btn=>btn.addEventListener('click',()=>openDoc(btn.dataset.recentKind,btn.dataset.recentDoc,'pdf','view')));
 // 15.4.67 — « Derniers documents » : factures et devis regroupés, sous-menus dépliables au clic.
 document.querySelectorAll('.doc-group-toggle').forEach(btn=>btn.addEventListener('click',()=>{
   const list=btn.nextElementSibling;if(!list)return;
@@ -287,10 +294,15 @@ bind(){
 
 // ------------------------------------------------------------------ archives de documents
 // ------------------------------------------------------------------ modèles de documents
-// 15.4.56 — huit modèles natifs présentés en carrousel 3D (défilement horizontal, transformation
-// « coverflow » pilotée par le défilement, aperçu visuel par style plutôt qu'un descriptif texte).
+// V2 — vingt modèles natifs présentés en carrousel 3D par lots devis + facture (chaque carte
+// réunit les deux aperçus du même modèle, numérotée, avec compteur de tours).
 // Les PDF d'aperçu de chaque modèle sont générés par le même moteur de mise en page que les
 // documents réels : l'aperçu correspond au rendu final.
+// V2 — vingt modèles natifs, présentés par LOT : chaque carte montre le devis ET la facture
+// du même modèle. Le choix du lot s'applique aux deux types de documents et à l'ensemble des
+// PDF Aurion (fiches client, fournisseur, produit), pour une identité visuelle cohérente.
+// Les cartes sont numérotées 01 → 20 : le compteur live indique le lot affiché et le nombre
+// de tours effectués, ce qui permet de savoir quand on a fait le tour complet.
 const TEMPLATE_STYLES=[
  ['aurion-minimal','Minimal','Monochrome encre · filets fins, aucun encart · total aligné à droite'],
  ['aurion-classic','Classique','Cartes claires · en-tête de tableau navy · total dans un bloc bleu marine'],
@@ -300,44 +312,49 @@ const TEMPLATE_STYLES=[
  ['aurion-encre','Encre','Graphite carré · minimal · aucun encart · total sobre aligné à droite'],
  ['aurion-corail','Corail','Chaleur corail · cartes carrées · en-tête de tableau coloré · total dans un bloc accent'],
  ['aurion-glacier','Glacier','Bleu glacier · minimal · filets fins · total sobre sur fond accent'],
+ ['aurion-ardoise','Ardoise','Graphite élégant · cartes carrées · total sobre, contraste doux'],
+ ['aurion-azur','Azur','Bleu vif · cartes claires · total affirmé sur fond profond'],
+ ['aurion-terracotta','Terracotta','Terre cuite · typographie serif · encarts chaleureux'],
+ ['aurion-foret','Forêt','Vert profond · minimal · filets fins · total discret'],
+ ['aurion-ivoire','Ivoire','Ivoire chaud · serif · élégance discrète'],
+ ['aurion-ocean','Océan','Bleu profond · arrondi · professionnel'],
+ ['aurion-menthe','Menthe','Vert menthe · angles nets · frais'],
+ ['aurion-bordeaux','Bordeaux','Bordeaux profond · serif · prestige'],
+ ['aurion-indigo','Indigo','Indigo · angles nets · contemporain'],
+ ['aurion-ambre','Ambre','Ambre chaud · serif · artisanal'],
+ ['aurion-rubis','Rubis','Rubis · arrondi · affirmé'],
+ ['aurion-carbone','Carbone','Carbone · angles nets · technique'],
 ];
+
 export const templates={view(){
  const ch=S.templateChoices||{quote:'aurion-classic',invoice:'aurion-classic'};
- // 15.4.60 — anneau 3D circulaire : chaque carte EST l'aperçu du modèle (face générée depuis le
- // même PDF que celui servi), plus aucun bouton « Aperçu » sur la carte. L'anneau démarre sur le
- // modèle actif (data-start) et tourne au clic ; après un tour complet il revient à la carte
- // d'origine (angle normalisé modulo 360°). Un clic sur la face avant ouvre l'aperçu taille
- // réelle avec le bouton de validation du modèle.
- const carousel=type=>{
-  const sel=TEMPLATE_STYLES.findIndex(([id])=>ch[type]===id);
-  return`<div class="template-carousel" data-carousel="${type}" data-start="${sel>0?sel:0}"><button type="button" class="template-carousel-arrow" data-carousel-dir="-1" aria-label="Tourner l'anneau vers le modèle précédent">‹</button><div class="template-stage"><div class="template-ring" role="group" aria-label="Anneau 3D des modèles">${TEMPLATE_STYLES.map(([id,n,d],i)=>`<article class="template-card${ch[type]===id?' selected':''}" data-style="${id}" data-name="${e(n)}" data-desc="${e(d)}" data-index="${i}" style="--i:${i}" tabindex="0" role="button" aria-label="Modèle ${e(n)} — ${e(d)}"><span class="template-face"><img src="./assets/templates/previews/${type}-${id}.png" alt="Aperçu du modèle ${e(n)}" loading="lazy" draggable="false"></span><span class="template-back" aria-hidden="true"><img src="./assets/templates/previews/${type}-${id}.png" alt="" loading="lazy" draggable="false"></span><span class="template-ribbon"><b>${e(n)}</b><i>${ch[type]===id?'Modèle utilisé':''}</i></span></article>`).join('')}</div></div><button type="button" class="template-carousel-arrow" data-carousel-dir="1" aria-label="Tourner l'anneau vers le modèle suivant">›</button><p class="template-hint">Cliquez sur l'anneau ou les flèches pour le faire tourner — les cartes du fond tournent derrière. Cliquez sur la carte de face pour l'aperçu taille réelle et valider le modèle.</p></div>`;
- };
- return`<div class="page-head"><div><span class="eyebrow">BIBLIOTHÈQUE</span><h1>Modèles de documents</h1><p>Huit modèles natifs Aurion pour les devis et les factures, présentés en anneau 3D : chaque carte affiche directement l'aperçu du modèle, tourne au clic, revient à son point de départ après un tour complet — et un clic sur la carte de face ouvre l'aperçu taille réelle où le choix se valide.</p></div></div>
- <section class="panel stack"><div class="section-title"><h2>Devis</h2><span class="pill">Choix indépendant</span></div>${carousel('quote')}
- <div class="section-title"><h2>Factures</h2><span class="pill">Choix indépendant</span></div>${carousel('invoice')}<p id="template-choice-status" class="help">Le choix est appliqué aux prochains documents et peut être modifié à tout moment.</p></section>`},
+ const selectedId=ch.quote===ch.invoice&&TEMPLATE_STYLES.some(([id])=>id===ch.quote)?ch.quote:(TEMPLATE_STYLES.some(([id])=>id===ch.quote)?ch.quote:'aurion-classic');
+ const start=Math.max(0,TEMPLATE_STYLES.findIndex(([id])=>id===selectedId));
+ const pair=id=>`<span class="template-half"><img src="./assets/templates/previews/quote-${id}.png" alt="" loading="lazy" draggable="false"><i>Devis</i></span><span class="template-half"><img src="./assets/templates/previews/invoice-${id}.png" alt="" loading="lazy" draggable="false"><i>Facture</i></span>`;
+ const cards=TEMPLATE_STYLES.map(([id,n,d],i)=>`<article class="template-card${id===selectedId?' selected':''}" data-style="${id}" data-name="${e(n)}" data-desc="${e(d)}" data-index="${i}" tabindex="0" role="button" aria-label="Lot ${i+1} sur ${TEMPLATE_STYLES.length} — ${e(n)} : devis et facture"><span class="template-face"><span class="template-pair">${pair(id)}</span></span><span class="template-back" aria-hidden="true"><span class="template-pair">${pair(id)}</span></span><span class="template-index">${String(i+1).padStart(2,'0')}</span><span class="template-ribbon"><b>${e(n)}</b><i>${id===selectedId?'Lot utilisé':''}</i></span></article>`).join('');
+ return `<div class="page-head"><div><span class="eyebrow">BIBLIOTHÈQUE</span><h1>Modèles de documents</h1><p>${TEMPLATE_STYLES.length} modèles natifs Aurion, présentés par lot : chaque carte réunit le <b>devis</b> et la <b>facture</b> du même modèle. Le choix du lot s'applique aux deux documents et à toutes les fiches PDF (client, fournisseur, produit), pour une identité visuelle unique.</p></div></div>
+ <section class="panel stack"><div class="section-title"><div><h2>Lot devis + facture</h2><span class="pill">${TEMPLATE_STYLES.length} modèles numérotés</span></div><p class="template-counter" aria-live="polite">Lot <b id="template-current">${start+1}</b> / ${TEMPLATE_STYLES.length} · <span id="template-current-name">${e(TEMPLATE_STYLES[start][1])}</span><small id="template-turns">Tour 1</small></p></div>
+ <p class="help">Cliquez sur l'anneau ou les flèches pour le faire tourner — les cartes du fond tournent derrière. Cliquez sur la carte de face pour l'aperçu taille réelle du devis et de la facture, puis validez le lot.</p>
+ <div class="template-carousel" data-carousel="lot" data-start="${start}"><button type="button" class="template-carousel-arrow" data-carousel-dir="-1" aria-label="Lot précédent">‹</button><div class="template-stage"><div class="template-ring" role="group" aria-label="Anneau 3D des lots devis et facture">${cards}</div></div><button type="button" class="template-carousel-arrow" data-carousel-dir="1" aria-label="Lot suivant">›</button><p class="template-hint">Chaque carte numérotée présente le devis (haut) et la facture (bas) du même modèle. Un tour complet ramène au lot de départ : le compteur affiche « Tour 2 ».</p></div>
+ <p id="template-choice-status" class="help">Le lot choisi est appliqué aux prochains devis, factures et fiches PDF ; il peut être modifié à tout moment.</p></section>`},
  async bind(){
-  // 15.4.60 — anneau 3D circulaire des modèles : les cartes (faces = aperçus réels, même page
-  // que le PDF servi) sont posées sur un cylindre elliptique ; un clic sur une flèche ou sur une
-  // carte du fond fait tourner l'anneau (les cartes tournent visiblement derrière) ; après un
-  // tour complet, l'angle normalisé modulo 360° ramène exactement à la carte d'origine. Un clic
-  // sur la carte de face ouvre l'aperçu taille réelle (PDF intégré) où « Utiliser ce modèle »
-  // valide le choix — aucun bouton d'aperçu sur les cartes elles-mêmes.
+  // V2 — anneau 3D unique : un lot = un devis + une facture. La sélection enregistre les DEUX
+  // styles côté serveur ; l'aperçu montre les deux PDF réels côte à côte. Le compteur est mis à
+  // jour à chaque rotation (numéro de lot, nom, nombre de tours).
   const carousels=[...document.querySelectorAll('[data-carousel]')];
-  const applyTemplateChoice=async(type,style,name)=>{
-    const next={quote:S.templateChoices?.quote||'aurion-classic',invoice:S.templateChoices?.invoice||'aurion-classic'};
-    next[type]=style;
-    try{S.templateChoices=await api.saveDocumentTemplateChoices(next);toast(`Modèle « ${name} » enregistré : appliqué aux prochains ${type==='invoice'?'factures':'devis'}.`,'success');hooks.show('templates')}
+  const applyTemplateChoice=async(style,name)=>{
+    try{S.templateChoices=await api.saveDocumentTemplateChoices({quote:style,invoice:style});toast(`Lot « ${name} » enregistré : appliqué aux prochains devis, factures et fiches PDF.`,'success');hooks.show('templates')}
     catch(x){toast(x.message,'error')}
   };
-  const openTemplatePreview=(type,style,name,desc)=>{
+  const openTemplatePreview=(style,name,desc)=>{
     const back=document.createElement('div');back.className='modal-backdrop';back.id='template-preview-modal';
-    back.insertAdjacentHTML('beforeend',`<div class="modal glass template-modal" role="dialog" aria-modal="true" aria-label="Aperçu taille réelle du modèle ${e(name)}"><div class="section-title"><h2>Modèle ${e(name)}</h2><button type="button" class="icon-btn modal-close" aria-label="Fermer">×</button></div><p class="help">${e(desc||'')}</p><p class="template-modal-embed"><iframe src="./assets/templates/${type}-${style}.pdf" type="application/pdf" title="Aperçu PDF du modèle ${e(name)}"></iframe></p><div class="button-row"><button type="button" class="btn secondary modal-close">Fermer</button><a class="btn secondary" href="./assets/templates/${type}-${style}.pdf" target="_blank" rel="noopener">Ouvrir dans un onglet</a><a class="btn secondary" href="./assets/templates/${type}-${style}.pdf" download="aurion-${type}-${style}.pdf">Télécharger le PDF</a><button type="button" class="btn primary template-modal-validate" data-type="${type}" data-style="${style}">Utiliser ce modèle</button></div></div>`);
+    back.insertAdjacentHTML('beforeend',`<div class="modal glass template-modal" role="dialog" aria-modal="true" aria-label="Aperçu du lot ${e(name)}"><div class="section-title"><h2>Lot ${e(name)}</h2><button type="button" class="icon-btn modal-close" aria-label="Fermer">×</button></div><p class="help">${e(desc||'')} — le même modèle est appliqué au devis et à la facture.</p><div class="template-preview-pair"><figure><figcaption>Devis</figcaption><iframe src="./assets/templates/quote-${style}.pdf" title="Aperçu PDF du devis ${e(name)}"></iframe></figure><figure><figcaption>Facture</figcaption><iframe src="./assets/templates/invoice-${style}.pdf" title="Aperçu PDF de la facture ${e(name)}"></iframe></figure></div><div class="button-row"><button type="button" class="btn secondary modal-close">Fermer</button><a class="btn secondary" href="./assets/templates/quote-${style}.pdf" target="_blank" rel="noopener">Devis dans un onglet</a><a class="btn secondary" href="./assets/templates/invoice-${style}.pdf" target="_blank" rel="noopener">Facture dans un onglet</a><button type="button" class="btn primary template-modal-validate" data-style="${style}">Utiliser ce lot</button></div></div>`);
     document.body.appendChild(back);
     back.querySelectorAll('.modal-close').forEach(x=>x.onclick=()=>back.remove());
     back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
     const onKey=ev=>{if(ev.key==='Escape'){back.remove();document.removeEventListener('keydown',onKey)}};
     document.addEventListener('keydown',onKey);
-    back.querySelector('.template-modal-validate').addEventListener('click',()=>{back.remove();applyTemplateChoice(type,style,name)});
+    back.querySelector('.template-modal-validate').addEventListener('click',()=>{back.remove();applyTemplateChoice(style,name)});
   };
   const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
   const resizers=[];
@@ -345,14 +362,12 @@ export const templates={view(){
     const ring=carousel.querySelector('.template-ring'),stage=carousel.querySelector('.template-stage');
     if(!ring||!stage)return;
     const cards=[...ring.querySelectorAll('.template-card')],N=cards.length,STEP=360/N;
-    let angle=-Number(carousel.dataset.start||0)*STEP; // le modèle actif démarre face avant.
+    const start=Number(carousel.dataset.start||0);
+    let angle=-start*STEP; // le lot actif démarre face avant.
+    const counter=document.querySelector('#template-current'),nameEl=document.querySelector('#template-current-name'),turnsEl=document.querySelector('#template-turns');
     const layout=()=>{
       const w=stage.clientWidth||360;
       const cardW=parseFloat(getComputedStyle(cards[0]).width)||210;
-      // 15.4.63 — cartes d'aperçu plus petites (anneau rétréci) mais écarts RÉELLEMENT
-      // visibles : rx est calculé pour garantir ≥ ~40px entre la carte de face et ses voisines
-      // à ±45° (demi-largeurs projetées), l'anneau est plus profond (rz ≤ 600px, 54% de la
-      // scène) et les planchers mobiles restent conservés.
       const rz=Math.max(150,Math.min(600,w*0.54));
       const mag=1600/(1600-(rz+36));
       const rx=Math.max(70,Math.min(470,((cardW*1.05+cardW*0.94*0.707)*mag/2+40)/0.707));
@@ -360,10 +375,6 @@ export const templates={view(){
         const i=Number(card.dataset.index);
         const rel=((i*STEP+angle)%360+360)%360; // 0° = face avant.
         const front=rel===0;
-        // Chaque carte est posée DIRECTEMENT à son angle monde (i·45° + angle, continu et non
-        // borné : les transitions CSS tournent toujours dans le bon sens) — l'anneau parent ne
-        // tourne pas, donc la carte de face reste exactement centrée même sur une ellipse
-        // (rx≠rz) : un anneau parent tourné décalerait l'avant de ½(rz−rx) sur mobile.
         const a=i*STEP+angle;
         const rad=a*Math.PI/180;
         const boost=front?36:0;
@@ -373,6 +384,10 @@ export const templates={view(){
         card.style.filter=front?'none':`brightness(${(1-Math.min(rel,360-rel)/180*0.5).toFixed(3)})`;
       });
       ring.style.transition=reducedMotion?'none':'';
+      const frontIndex=((Math.round(-angle/STEP)%N)+N)%N;
+      if(counter)counter.textContent=String(frontIndex+1);
+      if(nameEl)nameEl.textContent=cards[frontIndex]?.dataset.name||'';
+      if(turnsEl)turnsEl.textContent=`Tour ${Math.floor((Math.abs(angle)+start*STEP)/360)+1}`;
     };
     const rotate=dir=>{angle+=dir*STEP;layout()};
     carousel.querySelectorAll('.template-carousel-arrow').forEach(btn=>btn.addEventListener('click',()=>rotate(Number(btn.dataset.carouselDir||1))));
@@ -380,9 +395,7 @@ export const templates={view(){
       const act=()=>{
         const i=Number(card.dataset.index);
         const rel=((i*STEP+angle)%360+360)%360;
-        if(rel===0){openTemplatePreview(carousel.dataset.carousel,card.dataset.style,card.dataset.name,card.dataset.desc);return;}
-        // Cartes du fond : un clic les amène à la face avant par le chemin le plus court —
-        // l'anneau tourne, la carte visée passe devant, les autres tournent derrière.
+        if(rel===0){openTemplatePreview(card.dataset.style,card.dataset.name,card.dataset.desc);return;}
         let diff=Math.round(rel/STEP);if(diff>N/2)diff-=N;
         angle-=diff*STEP;layout();
       };
@@ -393,9 +406,6 @@ export const templates={view(){
     resizers.push(layout);
   });
   window.addEventListener('resize',()=>resizers.forEach(f=>f()));
-  // 15.4.61 — le téléversement de modèles personnels (Word/ODT) est retiré : les huit modèles
-  // natifs de l'anneau sont la seule mise en page proposée. Les modèles déjà téléversés avant
-  // cette version restent rendus côté serveur (table document_templates conservée).
   if(!S.templateChoices){try{S.templateChoices=await api.documentTemplateChoices();if(S.view==='templates')hooks.show('templates')}catch{}}
  }};
 
@@ -487,6 +497,23 @@ export const admin = {
     const formatAverage = value => Number(value || 0).toFixed(1);
     const tiime = adminCache.values.tiime || { configured: false, environment: 'test', apiIdentifier: '', apiUrl: '', oauthUrl: '', redirectUri: '', scopes: '', apiSecretConfigured: false, webhookSecretConfigured: false };
     const tiimeReady = !!adminCache.values.tiime;
+    // V2 — analyse visuelle : mêmes indicateurs, représentation AU CHOIX de l'administrateur.
+    // Le choix est mémorisé localement (aucune donnée serveur supplémentaire).
+    const adminChartType = localStorage.getItem('aurion.adminChartType') || 'bar';
+    const adminDataset = {
+      kind: 'distribution',
+      title: 'Répartition des accès et abonnements',
+      unit: 'comptes',
+      series: [
+        { label: 'Entreprises', value: Number(s.organizations || 0) },
+        { label: 'Comptes', value: Number(s.users || 0) },
+        { label: 'Essais', value: Number(s.trial || 0) },
+        { label: 'Mensuels', value: Number(s.monthly || 0) },
+        { label: 'Annuels', value: Number(s.yearly || 0) },
+        { label: 'Expirés', value: Number(s.expired || 0) },
+        { label: 'Sans facturation', value: Number(s.noBilling || 0) },
+      ],
+    };
 
     root.innerHTML = `
       <section class="panel" data-admin-section="stats">
@@ -506,7 +533,11 @@ export const admin = {
           <article><span>Créations d’entreprises / mois</span><b>${formatAverage(s.averages?.month)}</b></article>
           <article><span>Créations d’entreprises / semaine</span><b>${formatAverage(s.averages?.week)}</b></article>
           <article><span>Créations d’entreprises / jour</span><b>${formatAverage(s.averages?.day)}</b></article>
-        </div><div class="section-title"><h2>Estimation des créations d’entreprises</h2></div>
+        </div>
+        <div class="section-title"><div><h2>Analyse visuelle</h2><small>Choisissez le diagramme : les mêmes données, lues autrement — aucune valeur inventée.</small></div></div>
+        ${chartToolbar('admin-chart', CHART_TYPES.map(t => t.id), adminChartType)}
+        <div id="admin-chart" class="admin-chart"></div>
+        <div class="section-title"><h2>Estimation des créations d’entreprises</h2></div>
         <p>À partir des deux derniers mois complets : <b>${Number(s.predictions?.nextMonth || 0)}</b> créations estimées le mois prochain et <b>${Number(s.predictions?.nextYear || 0)}</b> sur douze mois. Cette estimation est indicative.</p>
         <small class="muted">${e(s.note || '')}</small>` : '<p class="muted">Les indicateurs ne sont pas disponibles.</p>'}
       </section>
@@ -570,6 +601,14 @@ export const admin = {
         <div class="list">${deletions.history.map(h => `<div class="list-row"><div><b>${e(h.auditReference)}</b><small>${h.finalStatus === 'processed' ? 'Suppression traitée' : 'Demande rejetée'} · ${h.processedAt ? new Date(h.processedAt).toLocaleString('fr-FR') : '—'} · ${Number(h.organizationsClosed || 0)} espace(s) fermé(s) · ${Number(h.sessionsRevoked || 0)} session(s) révoquée(s)</small></div><span class="pill">${h.finalStatus === 'processed' ? 'Traitée' : 'Rejetée'}</span></div>`).join('')}</div>` : ''}` : '<p class="muted">Les demandes de suppression ne sont pas disponibles.</p>'}
       </section>`;
 
+    // V2 — rendu du diagramme choisi et bascule instantanée entre les quatre représentations.
+    if (statsReady) {
+      renderChart('admin-chart', adminDataset, adminChartType);
+      bindChartToolbar(root, 'admin-chart', adminDataset, (id, data, type) => {
+        localStorage.setItem('aurion.adminChartType', type);
+        renderChart(id, data, type);
+      });
+    }
     root.querySelectorAll('.admin-section-retry').forEach(button => {
       button.onclick = () => admin.bind(button.dataset.section);
     });

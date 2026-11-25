@@ -127,7 +127,11 @@ function stepCompany(slot){
     ${nav()}</form>`;
   const map={name:'ob-name',siren:'ob-siren',siret:'ob-siret',legal_form:'ob-legal',address:'ob-address',postal_code:'ob-postal',city:'ob-city',activity:'ob-activity',naf_code:'ob-naf',vat_number:'ob-vat',website:'ob-website'};
   const current=()=>Object.fromEntries(Object.entries(map).map(([k,id])=>[k,val(id)]));
-  const apply=(key,value)=>{const el=document.getElementById(map[key]);if(!el)return;if(el.tagName==='SELECT'&&![...el.options].some(o=>o.value===value))el.add(new Option(value,value));el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}))};
+  // V2 — numéro de TVA intracommunautaire calculé depuis le SIREN (clé officielle 97).
+  // Un champ déjà rempli n'est jamais écrasé ; le calcul ne s'applique qu'aux 9 chiffres valides.
+  const autoVat=()=>{const siren=String(document.getElementById('ob-siren')?.value||'').replace(/\D/g,'');const vat=document.getElementById('ob-vat');if(!vat||vat.value.trim()||siren.length!==9)return;const key=(12+3*(Number(siren)%97))%97;vat.value=`FR${String(key).padStart(2,'0')}${siren}`;vat.dispatchEvent(new Event('input',{bubbles:true}))};
+  document.getElementById('ob-siren')?.addEventListener('blur',autoVat);
+  const apply=(key,value)=>{const el=document.getElementById(map[key]);if(!el)return;if(el.tagName==='SELECT'&&![...el.options].some(o=>o.value===value))el.add(new Option(value,value));el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));if(key==='siren')setTimeout(autoVat,0)};
   slot.querySelector('#ob-detect').addEventListener('click',async()=>{
     // Bloc 7 : détection du compte de l'entrepreneur — une société détectée est refusée sans conversion.
     const r=await detectCompany(val('ob-identifier'),{button:slot.querySelector('#ob-detect'),status:slot.querySelector('#ob-detect-status')},{owner:true});
@@ -153,7 +157,21 @@ function stepCompany(slot){
 }
 
 // ---------------------------------------------------------------- 3 · Votre activité
+// V2 — cinq questions cœur restent visibles ; les fonctions avancées sont regroupées dans un
+// panneau dépliable pour garder un parcours digeste. Toutes sont proposées, y compris celles
+// qui étaient absentes (chantiers, contrats d’entretien, garanties/SAV, temps, appareils,
+// portail client, facturation électronique, prévisionnel).
 const QUESTIONS=[['parts','Utilisez-vous des pièces ou fournitures dans vos devis ?'],['stock','Souhaitez-vous suivre vos stocks ?'],['support','Souhaitez-vous afficher les fonctions SAV ?'],['agenda','Souhaitez-vous utiliser l’agenda ?'],['accounting','Souhaitez-vous utiliser la comptabilité, la trésorerie et les notes de frais ?']];
+const ADVANCED_QUESTIONS=[
+ ['chantiers','Suivre mes chantiers et leur rentabilité réelle'],
+ ['maintenance','Gérer des contrats d’entretien récurrents'],
+ ['warranty','Suivre les garanties et le SAV'],
+ ['time','Mesurer le temps passé par intervention'],
+ ['device','Suivre les appareils ou véhicules de mes clients'],
+ ['portal','Proposer un portail client (acceptation de devis en ligne)'],
+ ['einvoice','Préparer la facturation électronique'],
+ ['forecast','Activer l’horizon de facturation prévisionnel'],
+];
 function stepActivity(slot){
   const c=state.company,q=c.configuration_data?.questionnaire||{};const a=state.activities[0]||{};
   slot.innerHTML=`<form class="stack" novalidate><h2>Votre activité</h2>
@@ -162,6 +180,8 @@ function stepActivity(slot){
     ${field('ob-custom','Activité précise',c.custom_activity||'','maxlength="240"','Ex. réparation de smartphones, plomberie, création de sites web')}
     <label class="field" for="ob-secondary"><span>Activités secondaires ou complémentaires</span><textarea id="ob-secondary" name="ob-secondary" rows="3" maxlength="600" aria-describedby="ob-secondary-help">${esc(c.configuration_data?.secondary_activities||'')}</textarea><small class="help" id="ob-secondary-help">Facultatif — une par ligne (ex. vente d’accessoires) ; elles affinent les propositions de métier.</small></label>
     <fieldset class="ob-modules"><legend>Modules Aurion</legend>${QUESTIONS.map(([k,l])=>`<label class="field" for="ob-q-${k}"><span>${esc(l)}</span><select id="ob-q-${k}"><option value="">Votre choix</option><option ${q[k]==='Oui'?'selected':''}>Oui</option><option ${q[k]==='Non'?'selected':''}>Non</option></select></label>`).join('')}</fieldset>
+    <div class="button-row ob-auto-row"><button type="button" class="btn secondary" id="ob-auto-modules">Détecter les modules recommandés</button><small class="help" id="ob-auto-status" role="status" aria-live="polite">Aurion peut déduire les modules utiles de votre métier et de votre activité — vous gardez la main sur chaque choix.</small></div>
+    <details class="advanced ob-advanced-modules"><summary>Fonctions avancées (${ADVANCED_QUESTIONS.length})</summary><p class="help">Ces fonctions étaient absentes du parcours d’accueil. Elles s’activent uniquement si vous le décidez.</p><fieldset class="ob-modules">${ADVANCED_QUESTIONS.map(([k,l])=>`<label class="field" for="ob-q-${k}"><span>${esc(l)}</span><select id="ob-q-${k}"><option value="">Votre choix</option><option ${q[k]==='Oui'?'selected':''}>Oui</option><option ${q[k]==='Non'?'selected':''}>Non</option></select></label>`).join('')}</fieldset></details>
     ${nav()}</form>`;
   // Préremplissage déterministe du métier à partir de l'activité (aucune IA) : proposé, jamais imposé.
   // V2 — la liste classée est affichée avec son niveau de confiance et ses raisons ; chaque
@@ -185,10 +205,27 @@ function stepActivity(slot){
   }).catch(()=>{});
   if(!a.profile_code)runDetection();
   let obTimer;['ob-custom','ob-secondary'].forEach(id=>{const el=document.getElementById(id);el?.addEventListener('input',()=>{clearTimeout(obTimer);obTimer=setTimeout(runDetection,600)})});
+  // V2 — recommandation automatique des modules : le métier détecté (ou choisi) et ses modules
+  // pilotent une proposition que l'utilisateur applique d'un clic. Aucun module n'est activé
+  // silencieusement : la proposition remplit les sélecteurs, l'enregistrement reste explicite.
+  slot.querySelector('#ob-auto-modules')?.addEventListener('click',async()=>{
+    const status=slot.querySelector('#ob-auto-status'),btn=slot.querySelector('#ob-auto-modules');
+    if(btn){btn.disabled=true;btn.textContent='Détection…'}
+    try{
+      const r=await api.detectProfile({name:c.activity||c.name||'',description:document.getElementById('ob-custom')?.value?.trim()||c.custom_activity||c.activity||'',nafCode:c.configuration_data?.naf_code||'',secondaryActivities:secList(),activityId:a.id||undefined});
+      const mods=(r?.modules||[]).map(x=>String(x).toLowerCase()).join(' '),title=String(r?.title||'').toLowerCase();
+      const has=(...xs)=>xs.some(x=>mods.includes(x)||title.includes(x));
+      const rec={parts:has('pièce','piece','matériel','composant','catalogue','produit'),stock:has('pièce','piece','matériel','composant','catalogue'),support:has('garantie','sav','appareil','véhicule','installation'),agenda:true,accounting:true,chantiers:has('chantier','installation','projet','travaux','véhicule'),maintenance:/entretien|maintenance|chauffage|plomberie|clim|jardin|piscine|nettoyage|serrure|vitrerie/.test(title),warranty:has('garantie'),time:has('intervention','installation','prestation','projet'),device:has('appareil','véhicule','installation','matériel','ordinateur'),portal:true,einvoice:true,forecast:true};
+      let enabled=0;
+      for(const [k,v] of Object.entries(rec)){const el=document.getElementById(`ob-q-${k}`);if(!el)continue;el.value=v?'Oui':'Non';if(v)enabled++}
+      if(status)status.textContent=`${enabled} module${enabled>1?'s':''} recommandé${enabled>1?'s':''} pour « ${r?.title||'votre métier'} ». Vérifiez puis enregistrez : chaque choix reste modifiable.`;
+    }catch(x){if(status)status.textContent=x?.message||'Détection impossible : choisissez vos modules manuellement.'}
+    finally{if(btn){btn.disabled=false;btn.textContent='Détecter les modules recommandés'}}
+  });
   bindForm(slot,async()=>{
-    const answers=Object.fromEntries(QUESTIONS.map(([k])=>[k,val(`ob-q-${k}`)]));
+    const answers=Object.fromEntries([...QUESTIONS,...ADVANCED_QUESTIONS].map(([k])=>[k,val(`ob-q-${k}`)]));
     state.company=await api.updateOrganization(orgBody({customActivity:val('ob-custom')},{questionnaire:{...(state.company.configuration_data?.questionnaire||{}),...answers},completed:true,secondary_activities:val('ob-secondary')}));
-    const modules={support:'support',agenda:'agenda',accounting:'accounting',parts:'easyfixit',stock:'stock'};
+    const modules={support:'support',agenda:'agenda',accounting:'accounting',parts:'easyfixit',stock:'stock',chantiers:'chantiers',maintenance:'maintenance',warranty:'warranty',time:'time_tracking',device:'devices',portal:'portal',einvoice:'einvoice',forecast:'forecast'};
     for(const [k,v] of Object.entries(answers))if(v&&modules[k]){try{await api.setModule(modules[k],v==='Oui')}catch{}}
     const profileCode=val('ob-profile');
     if(a.id&&profileCode&&profileCode!==a.profile_code){

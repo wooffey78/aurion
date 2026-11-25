@@ -29,9 +29,10 @@ test('les références appareil sont persistées sur le devis ou la facture sans
 });
 
 test('les documents natifs et les modèles personnalisés prennent en charge le numéro de série et l’IMEI', () => {
-  assert.ok(renderer.includes("device:{serialNumber:x.serial_number||'',imei:x.imei||''}"));
-  assert.ok(renderer.includes("SERIAL_NUMBER:x.serial_number||''"));
-  assert.ok(renderer.includes("IMEI:x.imei||''"));
+  // V2 — les identifiants sont nettoyés : un champ vide ne doit jamais afficher « null ».
+  assert.ok(renderer.includes("device:{serialNumber:cleanText(x.serial_number),imei:cleanText(x.imei)}"));
+  assert.ok(renderer.includes("SERIAL_NUMBER:cleanText(x.serial_number)"));
+  assert.ok(renderer.includes("IMEI:cleanText(x.imei)"));
   assert.ok(renderer.includes("'SERIAL_NUMBER','IMEI'"));
   assert.ok(layout.includes('N° de série :'));
   assert.ok(layout.includes('IMEI :'));

@@ -13,8 +13,8 @@ import*as settings from'./dash/settings.js';
 import*as account from'./dash/account.js';
 import{home,clients,agenda,accounting,treasury,support,templates,admin}from'./dash/other.js';
 import{chantiers}from'./dash/chantiers.js';
-import{loadProfileFeatures,cachedFlags}from'../core/profile-features.js';
 import{setCloudOwner}from'../core/cloud-sync.js';
+import{loadProfileFeatures,cachedFlags}from'../core/profile-features.js';
 
 const VIEWS={home,clients,chantiers,catalog,suppliers,quote,invoices:docs,templates,agenda,accounting,treasury,support,settings,account,admin};
 
@@ -222,6 +222,7 @@ async function refreshShellAvatar(){
     const name=String(acc?.user?.fullName||acc?.user?.email||'');
     const init=name.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]?.toUpperCase()||'').join('')||'·';
     el.textContent=init;el.dataset.initials=init;el.classList.remove('has-photo');
+    if(!acc?.user?.avatarUrl)return;
     const res=await api.authFetch('/account/avatar');
     if(token!==shellAvatarToken)return;
     if(res.ok){
@@ -390,6 +391,6 @@ function openActivityPicker(){
   root.innerHTML=`<div class="modal-backdrop" id="activity-modal"><div class="modal glass"><div class="section-title"><h2>Changer d’activité</h2><button class="icon-btn modal-close">×</button></div><p class="muted">Vous restez connecté au même compte Aurion.</p>${S.activities.map(a=>`<button class="activity-choice ${a.id===getActiveActivity()?'selected':''}" data-id="${a.id}"><span>${a.id===getActiveActivity()?'✓':'○'}</span><div><b>${e(a.name)}</b><small>${e(a.description||'')}</small></div></button>`).join('')}<button class="btn secondary" id="manage-activities">⚙ Gérer les activités</button></div></div>`;
   const m=root.querySelector('#activity-modal');
   m.querySelector('.modal-close').onclick=()=>m.remove();
-  m.querySelectorAll('.activity-choice').forEach(x=>x.onclick=async()=>{setActiveActivity(x.dataset.id);m.remove();S.editing=null;await refresh('home')});
+  m.querySelectorAll('.activity-choice').forEach(x=>x.onclick=async()=>{setActiveActivity(x.dataset.id);m.remove();S.editing=null;await loadProfileFeatures(true).catch(()=>{});await refresh('home')});
   m.querySelector('#manage-activities').onclick=()=>{m.remove();show('settings')};
 }

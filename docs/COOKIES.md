@@ -1,6 +1,6 @@
 # Politique relative aux cookies et stockages du navigateur — Aurion
 
-Version **5.1**, révision du 25 novembre 2026 pour Aurion 15.4.67 (mise à jour de la version 4.0 du 20 novembre 2026 ; les coordonnées et engagements du propriétaire sont inchangés ; révision technique compatible : droit à l'effacement en ligne depuis l'application et depuis la page publique).
+Version **5.1**, révision du 25 novembre 2026 pour Aurion 15.5.0 (mise à jour de la version 4.0 du 20 novembre 2026 ; les coordonnées et engagements du propriétaire sont inchangés ; révision technique compatible : droit à l'effacement en ligne depuis l'application et depuis la page publique).
 
 Éditeur : Coulibaly Damien, EI, nom commercial Easyweb-dev. Contact : [easyfixit.reparation@gmail.com](mailto:easyfixit.reparation@gmail.com).
 

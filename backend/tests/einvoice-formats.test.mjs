@@ -13,6 +13,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 const ublPath = fileURLToPath(new URL('../dist/services/electronic-invoice-ubl.js', import.meta.url));
 const ciiPath = fileURLToPath(new URL('../dist/services/electronic-invoice-cii.js', import.meta.url));
@@ -20,9 +21,9 @@ const validatePath = fileURLToPath(new URL('../dist/services/electronic-invoice-
 const ready = existsSync(ublPath) && existsSync(ciiPath) && existsSync(validatePath);
 const skip = ready ? false : 'dist/ absent : exécuter après « npm run build »';
 
-const { generateUblInvoice, VAT_ON_PAYMENT_NOTICE, VAT_EXEMPTION_REASON, OPERATION_CATEGORIES } = await import(ublPath);
-const { generateCiiInvoice, CII_GUIDELINE_ID } = await import(ciiPath);
-const { validateUbl, validateCii } = await import(validatePath);
+const { generateUblInvoice, VAT_ON_PAYMENT_NOTICE, VAT_EXEMPTION_REASON, OPERATION_CATEGORIES } = await import(pathToFileURL(ublPath).href);
+const { generateCiiInvoice, CII_GUIDELINE_ID } = await import(pathToFileURL(ciiPath).href);
+const { validateUbl, validateCii } = await import(pathToFileURL(validatePath).href);
 
 // SIREN de test (format 9 chiffres ; la validité du registre SIRENE est affaire de PA/INSEE).
 const SIREN_SELLER = '123456789';

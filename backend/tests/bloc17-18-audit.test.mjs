@@ -53,7 +53,8 @@ test('bloc17: toute suppression métier passe par une confirmation Aurion (confi
 });
 
 test('bloc18: migrations 042/044 non renumérotées, Dependabot actif, audit npm dans la CI, e-mail désactivé volontairement', () => {
-  const migrations = readdirSync(new URL('../migrations', import.meta.url).pathname).sort();
+  // `URL.pathname` produit « /C:/… » sous Windows : utiliser fileURLToPath pour un chemin valide.
+  const migrations = readdirSync(fileURLToPath(new URL('../migrations', import.meta.url))).sort();
   assert.ok(migrations.includes('042_migration_prefixes_fix.sql') || migrations.some(m => m.startsWith('042_')));
   assert.ok(migrations.some(m => m.startsWith('044_')));
   // Aucune renumérotation : les 77 premières migrations gardent leur numéro d'origine.

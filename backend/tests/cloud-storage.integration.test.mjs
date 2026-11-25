@@ -6,18 +6,23 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { startFakeGoogle } from './helpers/fake-google.mjs';
+// Le double Google est chargé dynamiquement : son absence ne doit pas faire échouer la collecte
+// des tests unitaires, et l'intégration reste explicitement ignorée tant qu'il n'est pas livré.
+let startFakeGoogle;
 
 const distDrive = process.env.AURION_CLOUD_TEST_MODULE || fileURLToPath(new URL('../dist/services/cloud-drive.js', import.meta.url));
 const distDb = process.env.AURION_CLOUD_TEST_DB_MODULE || fileURLToPath(new URL('../dist/db.js', import.meta.url));
-const ready = existsSync(distDrive) && existsSync(distDb) && Boolean(process.env.DATABASE_URL);
-const skip = ready ? false : 'dist/ absent ou DATABASE_URL non défini : exécuter après « npm run build » sur une base de test migrée';
+const helperPath = fileURLToPath(new URL('./helpers/fake-google.mjs', import.meta.url));
+const ready = existsSync(distDrive) && existsSync(distDb) && existsSync(helperPath)
+  && Boolean(process.env.DATABASE_URL) && process.env.AURION_INTEGRATION_TESTS === '1';
+const skip = ready ? false : 'dist/ ou double Google absent, AURION_INTEGRATION_TESTS≠1 ou DATABASE_URL non défini';
 
 let google, drive, db, orgA, orgB, userA, userB;
 const uuid = () => crypto.randomUUID();
 
 test.before(async () => {
   if (!ready) return;
+  ({ startFakeGoogle } = await import('./helpers/fake-google.mjs'));
   google = await startFakeGoogle();
   process.env.AURION_GOOGLE_API_BASE_FOR_TESTS = google.base;
   process.env.AURION_GOOGLE_TOKEN_URL_FOR_TESTS = `${google.base}/token`;

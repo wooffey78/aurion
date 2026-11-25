@@ -7,6 +7,8 @@ test('étape 17: détecte la prestation et classe les pièces pertinentes', () =
   const services=[{name:'Réparation écran iPhone',description:'remplacement vitre et écran'},{name:'Nettoyage informatique',description:'entretien logiciel'}];
   const detected=detectService('remplacement écran iphone 13',services);
   assert.equal(detected?.name,'Réparation écran iPhone');
+  // 15.4.70 — un mot générique seul ne doit pas déclencher une prestation à plusieurs mots.
+  assert.equal(detectService('remplacement',services),null);
   const parts=[{id:'1',name:'Écran iPhone 13',category:'Écrans',model:'iPhone 13',reference:'IP13-SCR'},{id:'2',name:'Pâte thermique',category:'Informatique',model:'Universel',reference:'PASTE'}];
   assert.equal(rankRelevantParts(detected,parts,[])[0]?.id,'1');
   assert.equal(rankRelevantParts(detected,parts,["écran iphone 13|||||ip13-scr"])[0]?.id,'1');

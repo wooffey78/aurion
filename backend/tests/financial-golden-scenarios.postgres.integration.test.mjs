@@ -22,8 +22,9 @@ process.env.AURION_SUPPORT_EMAIL ||= 'support@example.invalid';
 
 const distDir = fileURLToPath(new URL('../dist/', import.meta.url));
 const databaseUrl = process.env.DATABASE_URL || process.env.AURION_INTEGRATION_DATABASE_URL;
-const ready = existsSync(distDir) && Boolean(databaseUrl);
-const skip = ready ? false : 'dist/ absent ou DATABASE_URL non défini : exécuter après « npm run build » sur une base de test migrée';
+// Scénario PostgreSQL : exécution uniquement sur demande explicite (jamais sur une URL factice).
+const ready = existsSync(distDir) && Boolean(databaseUrl) && process.env.AURION_INTEGRATION_TESTS === '1';
+const skip = ready ? false : 'dist/ absent, AURION_INTEGRATION_TESTS≠1 ou DATABASE_URL non défini : exécuter après « npm run build » sur une base de test migrée';
 
 const euro = value => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const money = (actual, expected, label) => assert.equal(euro(actual), euro(expected), `${label} (${actual} ≠ ${expected})`);

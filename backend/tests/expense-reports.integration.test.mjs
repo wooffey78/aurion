@@ -8,8 +8,10 @@ import { fileURLToPath } from 'node:url';
 
 const accPath = process.env.AURION_ACCOUNTING_TEST_MODULE || fileURLToPath(new URL('../dist/services/accounting.js', import.meta.url));
 const dbPath = process.env.AURION_CLOUD_TEST_DB_MODULE || fileURLToPath(new URL('../dist/db.js', import.meta.url));
-const ready = existsSync(accPath) && existsSync(dbPath) && Boolean(process.env.DATABASE_URL);
-const skip = ready ? false : 'dist/ absent ou DATABASE_URL non défini : exécuter après « npm run build » sur une base de test migrée';
+// Les tests PostgreSQL ne s'exécutent que sur demande explicite : une URL factice ne doit jamais
+// transformer une absence de base en échec de connexion (et masquer les vrais contrats unitaires).
+const ready = existsSync(accPath) && existsSync(dbPath) && Boolean(process.env.DATABASE_URL) && process.env.AURION_INTEGRATION_TESTS === '1';
+const skip = ready ? false : 'dist/ absent, AURION_INTEGRATION_TESTS≠1 ou DATABASE_URL non défini : exécuter après « npm run build » sur une base de test migrée';
 
 test('les notes de frais alimentent les achats HT et la TVA déductible du mois de la dépense', { skip }, async () => {
   const { monthlyAccounting } = await import(accPath); const db = await import(dbPath);

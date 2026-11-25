@@ -1095,6 +1095,9 @@ input:-webkit-autofill,textarea:-webkit-autofill,select:-webkit-autofill{box-sha
 .forecast-chart{width:100%;height:auto;max-height:300px}
 .forecast-chart-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;color:var(--muted);font-size:.8rem}
 .forecast-chart-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+.forecast-chart-legend .legend-entries{background:#0b63ce}
+.forecast-chart-legend .legend-outputs{background:#e11d48}
+.forecast-chart-legend .legend-net{background:#16a34a}
 /* 15.4.67 — remise TTC dans l'éditeur de devis/facture. */
 .discount-row .grid-2{align-items:center}
 .calc-discount b{color:#f87171}
@@ -1256,3 +1259,90 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="
 .ob-recap li{display:flex;align-items:center;gap:10px}
 .ob-recap li .ob-recap-goto{white-space:nowrap}
 @media (max-width:640px){.template-carousel-arrow{width:36px;height:36px;font-size:1.25rem}.template-hint{font-size:.78rem}.template-stage{height:clamp(260px,64vw,340px)}}
+
+/* 15.4.70 — Accueil : les deux indicateurs + l'encart Tickets forment une seule rangée de
+   trois encarts sur ordinateur (auparavant le troisième passait sous les deux premiers alors
+   que la largeur disponible permettait de l'aligner). Les cartes conservent une hauteur
+   égale et leur contenu est centré verticalement. */
+.home-kpi-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:18px 0;align-items:stretch}
+.home-kpi-row>.metrics,.home-kpi-row>.quick-grid{display:contents;margin:0}
+.home-kpi-row .metrics article,.home-kpi-row .action-card{margin:0;height:100%;min-height:145px}
+@media(max-width:700px){.home-kpi-row{grid-template-columns:1fr}.home-kpi-row .action-card{grid-column:auto}}
+
+/* 15.4.70 — Centrage vertical des textes dans les encarts (indicateurs, actions, modules).
+   On ne touche ni aux paddings ni aux largeurs existantes : seule la répartition verticale
+   du contenu change. */
+.metrics article{display:flex;flex-direction:column;justify-content:center}
+.action-card{display:flex;flex-direction:column;justify-content:center}
+.module-card{align-items:center}
+
+/* 15.4.70 — Prestations complémentaires : chaque ajout reprend l'encart de la première
+   prestation (libellé pleine largeur, prix TTC, bouton Retirer) au lieu d'une ligne étroite. */
+#service-extras{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.service-extra-card{display:grid;grid-template-columns:minmax(0,1fr) minmax(140px,.55fr) auto;gap:10px;align-items:end;width:100%;padding:12px;border:1px solid var(--line);border-radius:14px;background:rgba(201,220,244,.03)}
+.service-extra-card .field{min-width:0}
+.service-extra-card .field span{font-size:.78rem}
+.service-extra-card .sx-del{align-self:end}
+@media(max-width:700px){.service-extra-card{grid-template-columns:minmax(0,1fr)}.service-extra-card .sx-del{width:100%}}
+
+/* 15.4.70 — Matériel : les lignes occupent toute la largeur utile, comme les prestations,
+   au lieu de se tasser au centre de la colonne. */
+.lines-scroll,#lines,.line-row{width:100%;max-width:none}
+
+/* 15.4.70 — « Derniers documents » : le style .doc-group-list (display:flex) écrasait
+   l'attribut HTML hidden ; les listes restaient donc visibles malgré le pli par défaut.
+   Le sélecteur rétablit le masquage, et le clic sur l'en-tête déplie/replie réellement. */
+.doc-group-list[hidden]{display:none}
+
+/* ===== V2 — Journal de bord : actions sur des lignes distinctes, alignées et espacées =====
+   Les liens « Reprendre l’étape », « Configurer maintenant », « Marquer lu » et
+   « Supprimer l’alerte / Résoudre » ne sont plus collés les uns aux autres : chaque action
+   occupe sa propre ligne, alignée à gauche, avec un espacement vertical régulier. */
+.journal-board .list-row>div{min-width:0;flex:1 1 auto}
+.journal-links,.journal-actions{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:8px}
+.journal-action-links{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+.journal-actions .journal-state{color:var(--muted);font-size:.78rem;line-height:1.2}
+.journal-board .link-btn{display:inline-flex;align-items:center;min-height:26px;padding:2px 0;text-align:left;line-height:1.35}
+.journal-board .link-btn:hover{text-decoration:underline}
+
+/* ===== V2 — « Derniers documents » : consultation directe du PDF depuis l’accueil ===== */
+.doc-recent{display:flex;width:100%;background:transparent;border:0;border-bottom:1px solid rgba(185,196,190,.1);color:inherit;text-align:left;cursor:pointer;padding:11px 6px;border-radius:9px;transition:.18s ease}
+.doc-recent:last-child{border-bottom:0}
+.doc-recent:hover,.doc-recent:focus-visible{background:color-mix(in srgb,var(--accent) 8%,transparent);outline:none}
+.doc-recent:focus-visible{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 45%,transparent)}
+.doc-recent-side{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:0 0 auto}
+.doc-recent-side small{color:var(--accent);font-weight:650}
+
+/* ===== V2 — Carrousel : lots devis + facture, cartes numérotées, compteur de tours ===== */
+.template-carousel .template-pair{display:grid;grid-template-rows:1fr 1fr;width:100%;height:100%;gap:2px;background:#dbe4ef}
+.template-carousel .template-half{position:relative;overflow:hidden;background:#fff}
+.template-carousel .template-half img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
+.template-half i{position:absolute;left:6px;bottom:5px;font-style:normal;font-size:.57rem;letter-spacing:.09em;text-transform:uppercase;background:rgba(15,23,42,.8);color:#fff;padding:2px 5px;border-radius:4px;pointer-events:none}
+.template-index{position:absolute;top:6px;right:6px;z-index:2;background:rgba(15,23,42,.84);color:#fff;font-size:.66rem;font-weight:800;letter-spacing:.08em;padding:3px 6px;border-radius:6px;pointer-events:none}
+.template-counter{display:flex;align-items:baseline;gap:6px;margin:0;font-size:.88rem;color:var(--muted);flex-wrap:wrap}
+.template-counter b{color:var(--text);font-size:1.2rem;line-height:1}
+.template-counter small{color:var(--accent);font-weight:650;margin-left:4px}
+.template-modal{width:min(1180px,96vw)}
+.template-preview-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.template-preview-pair figure{margin:0;display:grid;gap:6px;min-width:0}
+.template-preview-pair figcaption{font-weight:700;font-size:.85rem;color:var(--text)}
+.template-preview-pair iframe{display:block;width:100%;height:min(56vh,540px);border:1px solid var(--line);border-radius:10px;background:#fff}
+@media(max-width:780px){.template-preview-pair{grid-template-columns:1fr}.template-preview-pair iframe{height:min(48vh,420px)}}
+.admin-chart{margin:12px 0 18px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:rgba(201,220,244,.02)}
+
+/* ===== V2 — Encarts repliables : même niveau de détail, encombrement réduit ===== */
+.compact-details{padding:0;overflow:hidden}
+.compact-details>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;cursor:pointer;list-style:none;font-weight:700;color:var(--text)}
+.compact-details>summary::-webkit-details-marker{display:none}
+.compact-details>summary small{color:var(--muted);font-weight:500;font-size:.8rem}
+.compact-details>summary::after{content:'▾';color:var(--muted);transition:transform .2s}
+.compact-details[open]>summary::after{transform:rotate(180deg)}
+.compact-details>.section-title,.compact-details>.metrics{padding-left:20px;padding-right:20px}
+.compact-details>.metrics{padding-bottom:18px}
+/* Parcours d’accueil : modules avancés repliés, recommandation automatique visible. */
+.ob-auto-row{align-items:center;gap:10px;margin:2px 0 4px}
+.ob-auto-row .btn{flex:0 0 auto}
+.ob-auto-row .help{flex:1 1 260px;margin:0}
+.ob-advanced-modules{border:1px solid var(--line);border-radius:12px;padding:10px 14px;background:rgba(201,220,244,.02)}
+.ob-advanced-modules>summary{cursor:pointer;font-weight:700;color:var(--text);padding:4px 0}
+.ob-advanced-modules[open]>summary{margin-bottom:10px;border-bottom:1px solid var(--line);padding-bottom:10px}

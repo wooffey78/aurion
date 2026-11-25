@@ -1,4 +1,4 @@
-# Argumentaire commercial — Aurion (15.4.51)
+# Argumentaire commercial — Aurion (15.5.0)
 
 Document interne d'aide à la vente (PROMPT E5). Le prix affiché ici est la source de vérité docs/TARIFS-ABONNEMENT.md (39 €/mois TTC, essai 60 jours) — toute divergence entre ce document et la configuration Stripe est un bug à corriger avant toute démonstration.
 

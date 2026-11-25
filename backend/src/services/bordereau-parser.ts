@@ -7,6 +7,13 @@
 // SOURCE (étiquette explicite ou position) et sa CONFIANCE ; les champs manquants sont
 // signalés. L'utilisateur peut modifier toutes les valeurs détectées — le module ne crée
 // JAMAIS un document ni un client par lui-même.
+//
+// V2 — extraction PDF sans dépendance système : un décodeur de flux texte intégré (zlib +
+// opérateurs Tj/TJ) prend le relais quand pdftotext et LibreOffice sont absents. Un poste
+// Windows sans LibreOffice n'échoue donc plus sur « spawnSync soffice ENOENT » : les PDF
+// texte courants sont lus, et un PDF image reçoit un message explicite au lieu d'une trace
+// technique. La chaîne reste 100 % déterministe et locale.
+import { inflateSync, inflateRawSync } from 'node:zlib';
 
 export type BordereauConfidence = 'labeled' | 'inferred' | 'missing';
 
@@ -60,7 +67,87 @@ export function parseFrenchNumber(raw: string): number | null {
 
 const HEADER_KEYWORDS = /^(bordereau|bon de (livraison|commande|travail)|facture|devis|récapitulatif|recapitulatif)\b/i;
 
-/** Extrait le texte d'un bordereau : TXT/CSV en lecture directe, PDF texte via pdftotext ou LibreOffice. */
+/** Décode une chaîne littérale PDF « (…) » : échappements, octal et caractères spéciaux. */
+function decodePdfLiteral(raw: string): string {
+  const body = raw.slice(1, -1);
+  let out = '';
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i]!;
+    if (ch !== '\\') { out += ch; continue; }
+    const next = body[++i];
+    if (next === undefined) break;
+    if (next === 'n') out += '\n';
+    else if (next === 'r') out += '\r';
+    else if (next === 't') out += '\t';
+    else if (next === 'b') out += '\b';
+    else if (next === 'f') out += '\f';
+    else if (next === '(' || next === ')' || next === '\\') out += next;
+    else if (/[0-7]/.test(next)) {
+      let digits = next;
+      while (digits.length < 3 && /[0-7]/.test(body[i + 1] || '')) digits += body[++i];
+      out += String.fromCharCode(parseInt(digits, 8));
+    } else if (next === '\r' || next === '\n') {
+      // Continuation de ligne : le saut est ignoré.
+      if (next === '\r' && body[i + 1] === '\n') i++;
+    } else out += next;
+  }
+  return out;
+}
+/** Décode une chaîne hexadécimale PDF « <…> » (UTF-16BE si BOM, sinon Latin-1). */
+function decodePdfHex(raw: string): string {
+  const hex = raw.slice(1, -1).replace(/[^0-9a-f]/gi, '');
+  if (!hex) return '';
+  const bytes = Buffer.from(hex.length % 2 ? hex + '0' : hex, 'hex');
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+    let out = '';
+    for (let i = 2; i + 1 < bytes.length; i += 2) out += String.fromCharCode(bytes.readUInt16BE(i));
+    return out;
+  }
+  return bytes.toString('latin1');
+}
+/**
+ * Extrait le texte d'un PDF en mémoire, sans binaire externe. Prend en charge les flux
+ * FlateDecode (cas standard de tous les générateurs modernes, dont PDFKit) et les opérateurs
+ * de texte Tj/TJ/'/". Les polices à encodage propriétaire peuvent produire des glyphes
+ * illisibles : le résultat est alors rejeté par `looksLikeText` et la conversion externe
+ * reste tentée.
+ */
+export function extractPdfText(buffer: Buffer): string {
+  const source = buffer.toString('latin1');
+  const streams: string[] = [];
+  const streamRe = /stream\r?\n([\s\S]*?)endstream/g;
+  let match: RegExpExecArray | null;
+  while ((match = streamRe.exec(source))) {
+    const raw = Buffer.from(match[1]!, 'latin1');
+    let decoded: Buffer = raw;
+    try { decoded = inflateSync(raw); }
+    catch { try { decoded = inflateRawSync(raw); } catch { /* flux non compressé ou image */ } }
+    const textLike = decoded.toString('latin1');
+    if (/\b(BT|Tj|TJ)\b/.test(textLike)) streams.push(textLike);
+  }
+  let out = '';
+  for (const content of streams) {
+    const tokens = content.match(/\((?:\\[\s\S]|[^\\()])*\)|<[0-9A-Fa-f\s]+>|\bBT\b|\bET\b|\bT\*\b|\bTd\b|\bTD\b|\bTj\b|\bTJ\b|'/g) || [];
+    for (const token of tokens) {
+      if (token.startsWith('(')) out += decodePdfLiteral(token);
+      else if (token.startsWith('<')) out += decodePdfHex(token);
+      else if (token === 'BT' || token === 'ET' || token === 'T*' || token === 'Td' || token === 'TD' || token === "'") {
+        if (out && !out.endsWith('\n')) out += '\n';
+      }
+    }
+    out += '\n';
+  }
+  return out.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+/** Un texte extrait est exploitable s'il contient assez de lettres/chiffres et peu de bruit. */
+function looksLikeText(text: string): boolean {
+  if (text.trim().length < 12) return false;
+  const useful = (text.match(/[A-Za-zÀ-ÖØ-öø-ÿ0-9]/g) || []).length;
+  return useful >= 10 && useful / Math.max(1, text.length) > 0.3;
+}
+
+/** Extrait le texte d'un bordereau : TXT/CSV en lecture directe, PDF texte via pdftotext,
+ *  décodeur PDF intégré, puis LibreOffice. Aucun binaire absent ne provoque de crash brut. */
 export async function extractText(filename: string, mime: string, buffer: Buffer, run: (cmd: string, args: string[], input: Buffer) => Promise<string>): Promise<string> {
   const lower = String(filename || '').toLowerCase();
   if (mime.includes('text/plain') || mime.includes('csv') || /\.(txt|csv|md)$/.test(lower)) {
@@ -69,8 +156,16 @@ export async function extractText(filename: string, mime: string, buffer: Buffer
     return text;
   }
   if (mime.includes('pdf') || lower.endsWith('.pdf')) {
-    try { return await run('pdftotext', ['-layout', '-enc', 'UTF-8', '-', '-'], buffer); }
-    catch { return await run('soffice', ['--headless', '--convert-to', 'txt:Text', '--stdout'], buffer); }
+    try { const text = await run('pdftotext', ['-layout', '-enc', 'UTF-8', '-', '-'], buffer); if (text.trim()) return text; }
+    catch { /* pdftotext absent : décodeur intégré */ }
+    const builtin = extractPdfText(buffer);
+    if (looksLikeText(builtin)) return builtin;
+    try { return await run('soffice', ['--headless', '--convert-to', 'txt:Text', '--stdout'], buffer); }
+    catch (error: any) {
+      const missing = error?.code === 'ENOENT' || /ENOENT|not found|introuvable/i.test(String(error?.message || ''));
+      if (missing) throw new Error('EXTRACTION_PDF_INDISPONIBLE : ce PDF ne contient pas de texte lisible directement (scan image ou police propriétaire) et aucun convertisseur local (pdftotext/LibreOffice) n’est installé. Enregistrez le bordereau en TXT/CSV, ou installez LibreOffice puis réessayez.');
+      throw error;
+    }
   }
   throw new Error('Format non pris en charge pour l\'extraction déterministe : fournissez un PDF texte, un TXT ou un CSV. Les scans image nécessitent un OCR local non inclus dans cette livraison.');
 }

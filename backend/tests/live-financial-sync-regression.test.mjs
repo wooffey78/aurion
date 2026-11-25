@@ -10,7 +10,9 @@ test('synchronisation live : 1 seconde, sans rechargement et sans interception g
   assert.ok(!s.includes('location.reload('));
   assert.ok(!s.includes('window.fetch=async'));
   assert.ok(s.includes('aurion:account-sync-changed'));
-  assert.ok(s.includes('home-forecast-3m'));
+  // Les encarts sont rafraîchis par leurs identifiants réels (le libellé « 3 mois » n'est plus un id).
+  assert.ok(s.includes('home-month-revenue'));
+  assert.ok(s.includes('trez-committed-in'));
   assert.ok(s.includes('accounting/summary'));
   assert.ok(s.includes('treasury/summary'));
 });

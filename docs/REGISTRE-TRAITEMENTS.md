@@ -1,6 +1,6 @@
 # Registre des traitements — plateforme Aurion (pour le compte des abonnés)
 
-Document de conformité (15.4.54, PROMPT D3). Il décrit les traitements que la plateforme opère **pour le compte** des entreprises abonnées ; chaque abonné reste responsable de son propre registre et de ses déclarations (le présent document l'aide à les renseigner). Cohérent avec docs/DPA-RGPD.md (contrat art. 28), docs/POLITIQUE-CONFIDENTIALITE.md v5.0 et docs/SOUS-TRAITANTS.md.
+Document de conformité (15.5.0). Il décrit les traitements que la plateforme opère **pour le compte** des entreprises abonnées ; chaque abonné reste responsable de son propre registre et de ses déclarations (le présent document l'aide à les renseigner). Cohérent avec docs/DPA-RGPD.md (contrat art. 28), docs/POLITIQUE-CONFIDENTIALITE.md v5.1 et docs/SOUS-TRAITANTS.md.
 
 | # | Traitement | Finalité | Données | Personnes concernées | Base (côté abonné) | Durée | Mesures (référence) |
 |---|---|---|---|---|---|---|---|

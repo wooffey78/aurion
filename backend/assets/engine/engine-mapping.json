@@ -1,7 +1,7 @@
 {
  "workbookVersion": "1.0.0",
  "engineRequires": "1.0.0",
- "updated": "2026-11-24",
+ "updated": "2026-11-25",
  "sheets": [
   "00 ACCUEIL",
   "01 ENTREES",
@@ -1627,6 +1627,125 @@
    "type": "text",
    "unit": "TEXT",
    "description": "Statut global du calcul : OK si tous les contrôles passent"
+  },
+  "CHK_QUOTE_HT_TVA_TTC": {
+   "sheet": "17 CONTROLES",
+   "cell": "C5",
+   "type": "number",
+   "unit": "1/0",
+   "description": "Invariants HT + TVA = TTC"
+  },
+  "CHK_QUOTE_DISCOUNT_LIMIT": {
+   "sheet": "17 CONTROLES",
+   "cell": "C6",
+   "type": "number",
+   "unit": "1/0",
+   "description": "La remise ne dépasse pas le prix listé"
+  },
+  "CHK_QUOTE_NO_DISCOUNT_ON_NET": {
+   "sheet": "17 CONTROLES",
+   "cell": "C7",
+   "type": "number",
+   "unit": "1/0",
+   "description": "Driver net : aucune remise TTC"
+  },
+  "CHK_CONTRIB_RATE_SUM": {
+   "sheet": "17 CONTROLES",
+   "cell": "C8",
+   "type": "number",
+   "unit": "1/0",
+   "description": "Cumul des taux < 100 % (calcul inverse)"
+  },
+  "CHK_SOLVER_GUARD": {
+   "sheet": "17 CONTROLES",
+   "cell": "C9",
+   "type": "number",
+   "unit": "1/0",
+   "description": "Solveur : borne de représentabilité respectée"
+  },
+  "CHK_MILEAGE_BOUND": {
+   "sheet": "17 CONTROLES",
+   "cell": "C10",
+   "type": "number",
+   "unit": "1/0",
+   "description": "Kilométrage interne dans la borne entière"
+  },
+  "CHK_COEFFICIENT_BOUND": {
+   "sheet": "17 CONTROLES",
+   "cell": "C11",
+   "type": "number",
+   "unit": "1/0",
+   "description": "Coefficient dans la borne entière"
+  },
+  "CHK_CONTRIB_RATE_MAX": {
+   "sheet": "17 CONTROLES",
+   "cell": "C12",
+   "type": "number",
+   "unit": "1/0",
+   "description": "Taux de cotisation ≤ 99,99 %"
+  },
+  "CHK_INPUTS_NON_NEGATIVE": {
+   "sheet": "17 CONTROLES",
+   "cell": "C13",
+   "type": "number",
+   "unit": "1/0",
+   "description": "Entrées monétaires non négatives"
+  },
+  "CHK_INVOICES_ROWS": {
+   "sheet": "17 CONTROLES",
+   "cell": "C14",
+   "type": "number",
+   "unit": "1/0",
+   "description": "Chaque facture : encaissé + reste dû = total exigible"
+  },
+  "CHK_PAYMENT_VALID": {
+   "sheet": "17 CONTROLES",
+   "cell": "C15",
+   "type": "number",
+   "unit": "1/0",
+   "description": "Paiement : aucun refus actif"
+  },
+  "CHK_INSTALLMENTS_MATCH": {
+   "sheet": "17 CONTROLES",
+   "cell": "C16",
+   "type": "number",
+   "unit": "1/0",
+   "description": "Σ échéancier = total strict"
+  },
+  "CHK_NO_HIDDEN_ADJUSTMENT": {
+   "sheet": "17 CONTROLES",
+   "cell": "C17",
+   "type": "number",
+   "unit": "1/0",
+   "description": "Aucun ajout caché au prix (règle d’or)"
+  },
+  "CHK_STOCK_NON_NEGATIVE": {
+   "sheet": "17 CONTROLES",
+   "cell": "C18",
+   "type": "number",
+   "unit": "1/0",
+   "description": "Stock disponible ≥ 0"
+  },
+  "CHK_SAV_NON_POSITIVE": {
+   "sheet": "17 CONTROLES",
+   "cell": "C19",
+   "type": "number",
+   "unit": "1/0",
+   "description": "Σ SAV ≤ 0 (négatif ou nul)"
+  },
+  "CHK_MICRO_UNASSIGNED_VISIBLE": {
+   "sheet": "17 CONTROLES",
+   "cell": "C20",
+   "type": "number",
+   "unit": "1/0",
+   "description": "CA non affecté : visible (contrôle d’alerte)"
+  },
+  "CHK_VERSION": {
+   "sheet": "17 CONTROLES",
+   "cell": "C21",
+   "type": "number",
+   "unit": "1/0",
+   "description": "Version du classeur conforme au moteur"
   }
  },
  "params": {

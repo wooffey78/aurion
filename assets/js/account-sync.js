@@ -17,7 +17,8 @@
   }
   const set=(selectors,value)=>{for(const selector of selectors){const n=document.querySelector(selector);if(n){n.textContent=value;return true}}return false};
   const textByLabel=(label,value)=>{const nodes=[...document.querySelectorAll('#view article span,#view .metric span,#view .stat span,#view .kpi span')];const node=nodes.find(n=>n.textContent?.trim().toLowerCase()===label.toLowerCase());const parent=node?.closest('article,.metric,.stat,.kpi');const valueNode=parent?.querySelector('b,strong,.value');if(valueNode)valueNode.textContent=value};
-  const euro=n=>Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  // 15.4.68 — un montant non numérique ne doit jamais s'afficher « NaN € » dans un encart.
+  const euro=n=>{const v=Number(n);return(Number.isFinite(v)?v:0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'};
   // 15.4.56 — remplissage systématique des encarts financiers : mise à jour par identifiants
   // (encarts réels de chaque écran) avec repli par libellé. L'ancien mappage visait des libellés
   // qui n'existaient pas dans les pages (« Chiffre d'affaires HT », « Entrées prévues »,

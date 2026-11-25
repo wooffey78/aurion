@@ -23,8 +23,11 @@ test('coefficient : vide tant qu’aucune valeur n’est saisie', () => {
 });
 
 test('les documents n’impriment pas une ligne de frais kilométriques à zéro', () => {
-  assert.match(layout, /m\.mileage\.total !== '0,00\s?€' && m\.mileage\.total !== '0\s?€'/);
-  assert.match(layout, /m\.mileage\.visible !== false/);
+  // 15.4.68 : le test est désormais NUMÉRIQUE (l’ancienne comparaison au texte échouait à cause
+  // de l’espace insécable de formatEuro). On verrouille la fonction réellement utilisée.
+  assert.match(layout, /function showsMileage\(m: DocModel\): boolean/);
+  assert.match(layout, /if \(m\.mileage\.visible === false\) return false/);
+  assert.match(layout, /return !Number\.isFinite\(parsed\) \|\| parsed !== 0/);
 });
 
 test('la TVA intracommunautaire est calculée depuis le SIREN quand le registre ne la fournit pas', () => {

@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 process.env.DATABASE_URL ||= 'postgres://x:y@127.0.0.1:1/z';
 process.env.JWT_SECRET ||= 'x'.repeat(40);
 const read = p => readFileSync(new URL(p, import.meta.url), 'utf8');
@@ -19,7 +20,7 @@ test('migration 113 : chaîne append-only (RLS lecture seule runtime)', () => {
 });
 
 test('unitaire — chaîne d\u2019intégrité : liaisons correctes, altération détectée à l\u2019entrée exacte', { skip: !chainPath }, async () => {
-  const { computeChainEntry, verifyChain } = await import(chainPath);
+  const { computeChainEntry, verifyChain } = await import(pathToFileURL(chainPath).href);
   const e1 = computeChainEntry('11111111-1111-4111-8111-111111111111', 'invoice', 'FA-2026-001', 'a'.repeat(64), '2026-01-10T08:00:00.000Z', null);
   const e2 = computeChainEntry('22222222-2222-4222-8222-222222222222', 'invoice', 'FA-2026-002', 'b'.repeat(64), '2026-01-12T08:00:00.000Z', e1.chainHash);
   const e3 = computeChainEntry('33333333-3333-4333-8333-333333333333', 'quote', 'DE-2026-010', 'c'.repeat(64), '2026-01-15T08:00:00.000Z', e2.chainHash);
@@ -39,7 +40,7 @@ test('unitaire — chaîne d\u2019intégrité : liaisons correctes, altération 
 });
 
 test('unitaire — dérive devis→facture : compensation non masquée, seuils et niveaux', { skip: !devPath }, async () => {
-  const { detectDeviation } = await import(devPath);
+  const { detectDeviation } = await import(pathToFileURL(devPath).href);
   const quote = [{ label: 'Main-d\u2019œuvre', amountHt: 500 }, { label: 'Matériel', amountHt: 300 }];
   const invoice = [{ label: 'Main-d\u2019oeuvre', amountHt: 500 }, { label: 'Matériel', amountHt: 300 }]; // accents normalisés
   assert.equal(detectDeviation(quote, invoice, 10).level, 'none');
@@ -59,7 +60,7 @@ test('unitaire — dérive devis→facture : compensation non masquée, seuils e
 });
 
 test('unitaire — tendance de prix : hausse au-delà du seuil → alerte motivée, pas de tendance inventée', { skip: !pricePath }, async () => {
-  const { analyzePriceTrend } = await import(pricePath);
+  const { analyzePriceTrend } = await import(pathToFileURL(pricePath).href);
   const up = analyzePriceTrend([
     { observedAt: '2026-01-01', unitCostCents: 1000 },
     { observedAt: '2026-03-01', unitCostCents: 1150 },
