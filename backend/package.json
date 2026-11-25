@@ -43,7 +43,7 @@
     "fastify": "5.12.7",
     "fastify-plugin": "5.0.1",
     "google-auth-library": "10.9.1",
-    "googleapis": "160.0.0",
+    "googleapis": "190.0.0",
     "jose": "6.0.10",
     "light-my-request": "6.8.0",
     "nodemailer": "10.2.1",
